@@ -100,7 +100,7 @@ jobs:
           ORG_GRADLE_PROJECT_DURAK_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ORG_GRADLE_PROJECT_DURAK_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         # 64- и 32-битный ARM: опорный телефон должен хотя бы запускать игру (ADR устава 0023)
-        run: ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+        run: ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=arm64-v8a
 
       - name: Подпись
         id: cert
@@ -125,7 +125,8 @@ jobs:
           forbid: 'FOREGROUND_SERVICE|INSTALL_REFERRER|RECORD_AUDIO|READ_EXTERNAL_STORAGE'
           backup: 'off'
           min-target-sdk: '36'
-          max-size-mb: '65'
+          only-arm64: 'true'
+          max-size-mb: '50'
 
       - name: Собрать
         if: steps.key.outputs.permanent == 'yes'
