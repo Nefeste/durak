@@ -5,7 +5,7 @@
 // появляется вместе с разбором (PRO_ON_SALE, src/money/types.ts).
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import { Button } from '../ui/Button';
 import { C, RADIUS } from '../ui/theme';
 import { T } from '../i18n';
@@ -19,7 +19,7 @@ const OPEN_RUSTORE: Unavailable[] = ['other-build', 'no-rustore', 'not-signed-in
 interface Msg { text: string; detail?: string }
 
 export function StoreScreen({ onBack }: { onBack: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   // `undefined` — ещё спрашиваем магазин; `null` — покупки доступны; иначе — почему нет
   const [why, setWhy] = useState<Unavailable | null | undefined>(undefined);
   const [detail, setDetail] = useState<string | null>(null);

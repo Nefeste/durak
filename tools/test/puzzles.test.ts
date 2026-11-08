@@ -24,7 +24,7 @@ describe('набор задач дня', () => {
     for (const { id, sha } of pinned) expect(printOf(PUZZLES[id - 1])).toBe(sha);
   });
 
-  test('позиция цела: 36 карт, прикуп пуст, двое, ходит игрок, ответ законен и спасает', () => {
+  test('позиция цела: 36 карт, колода пуста, двое, ходит игрок, ответ законен и спасает', () => {
     for (const p of PUZZLES) {
       const s = stateOf(p);
       const all = [...s.hands.flat(), ...s.table.flatMap(([a, d]) => (d === null ? [a] : [a, d])), ...s.discard];

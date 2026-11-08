@@ -2,8 +2,8 @@
 // создать (вариант, 2–4 места, кто сядет на свободные) или войти по коду; быстрая игра один на один.
 // Вход за стол — в два шага, как в «Нардах»: сначала отпечаток колоды, потом своё зерно (ADR 0004).
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useInsets } from '../ui/insets';
 import type { Variant } from '../engine';
 import { LEVELS } from '../bot';
 import type { Level } from '../bot';
@@ -20,6 +20,8 @@ import type { MySeed } from '../state/online';
 export interface Seated { id: string; seed: MySeed }
 
 const errText = (e: unknown) => T.online.errors[e instanceof NetError ? e.kind : 'other'] ?? T.online.errors.other;
+/** Сервер не ответил или ответил ошибкой (502 и т. п.): это не вина игрока — «Повторить», меню открыто. */
+const serverDown = (e: unknown) => e instanceof NetError && (e.kind === 'offline' || e.kind === 'timeout' || e.kind === 'server');
 
 /** Сесть за стол по коду: отпечаток → зерно. */
 export async function sitByCode(code: string): Promise<Seated> {
@@ -32,12 +34,14 @@ export async function sitByCode(code: string): Promise<Seated> {
 export function OnlineScreen({ mode, invite, onBack, onTable }: {
   mode: 'friends' | 'quick'; invite: string | null; onBack: () => void; onTable: (s: Seated) => void;
 }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const [ready, setReady] = useState(false);
   const [adult, setAdultState] = useState(false);
   const [name, setName] = useState('');
   const [named, setNamed] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  /** Что повторить, если сервер не ответил. */
+  const [retry, setRetry] = useState<(() => Promise<void>) | null>(null);
   const [busy, setBusy] = useState(false);
   const [variant, setVariant] = useState<Variant>('podkidnoy');
   const [seats, setSeats] = useState(2);
@@ -60,8 +64,18 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
     if (busy) return;
     setBusy(true);
     setErr(null);
-    try { await fn(); } catch (e) { setErr(errText(e)); } finally { setBusy(false); }
+    setRetry(null);
+    try { await fn(); } catch (e) {
+      setErr(errText(e));
+      if (serverDown(e)) setRetry(() => fn);
+    } finally { setBusy(false); }
   };
+  const errorBlock = err ? (
+    <View style={styles.errBox}>
+      <Text style={styles.err} testID="online-error">{err}</Text>
+      {retry ? <Button label={T.online.retry} kind="ghost" onPress={() => void run(retry)} disabled={busy} testID="online-retry" /> : null}
+    </View>
+  ) : null;
 
   const saveName = () => run(async () => {
     if (nameProblem(name)) { setErr(T.online.nameBad); return; }
@@ -116,7 +130,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
 
   if (!adult || !named) {
     return (
-      <View style={[styles.root, pad]} testID="online-profile">
+      <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="online-profile">
         <Text style={styles.title}>{mode === 'quick' ? T.online.quickTitle : T.online.title}</Text>
         <View style={styles.panel}>
           <Chips id="adult" items={['no', 'yes'] as const} value={adult ? 'yes' : 'no'} label={v => (v === 'yes' ? T.online.adult : T.settings.off)}
@@ -130,17 +144,17 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
               <Button label={T.online.saveName} onPress={saveName} disabled={busy} testID="name-save" />
             </>
           ) : null}
-          {err ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
+          {errorBlock}
         </View>
         <Button label={T.online.back} kind="ghost" onPress={onBack} testID="online-back" />
-      </View>
+      </ScrollView>
     );
   }
 
   if (mode === 'quick') {
     const q = quick;
     return (
-      <View style={[styles.root, pad]} testID="quick">
+      <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="quick">
         <Text style={styles.title}>{T.online.quickTitle}</Text>
         <View style={styles.panel}>
           <Chips id="q-variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={variant} label={v => T.variant[v]} onChange={setVariant} />
@@ -159,15 +173,15 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
           ) : (
             <Button label={T.online.find} onPress={find} disabled={busy} testID="quick-find" />
           )}
-          {err ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
+          {errorBlock}
         </View>
         <Button label={T.online.back} kind="ghost" onPress={onBack} testID="online-back" />
-      </View>
+      </ScrollView>
     );
   }
 
   return (
-    <View style={[styles.root, pad]} testID="friends">
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="friends">
       <Text style={styles.title}>{T.online.title}</Text>
       <View style={styles.panel}>
         <Text style={styles.label}>{T.menu.variant}</Text>
@@ -183,17 +197,18 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         <TextInput testID="code" value={code} onChangeText={v => setCode(v.toUpperCase())} placeholder={T.online.codePlaceholder} placeholderTextColor={C.dim}
           style={styles.input} maxLength={6} autoCapitalize="characters" autoCorrect={false} />
         <Button label={T.online.join} kind="ghost" onPress={join} disabled={busy} testID="join" />
-        {err ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
+        {errorBlock}
       </View>
       <Button label={T.online.back} kind="ghost" onPress={onBack} testID="online-back" />
-    </View>
+    </ScrollView>
   );
 }
 
 export const adultNow = isAdult;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20, gap: 16 },
+  root: { flex: 1, backgroundColor: C.bg },
+  content: { paddingHorizontal: 20, gap: 16 },
   title: { color: C.accent, fontSize: 28, fontWeight: '800' },
   panel: { gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   label: { color: C.dim, fontSize: 14, marginTop: 4 },
@@ -201,4 +216,5 @@ const styles = StyleSheet.create({
   big: { color: C.text, fontSize: 19, fontWeight: '700' },
   input: { color: C.text, fontSize: 18, borderWidth: 1, borderColor: C.glassLine, borderRadius: 12, paddingHorizontal: 12, minHeight: 48 },
   err: { color: C.danger, fontSize: 15 },
+  errBox: { gap: 8 },
 });

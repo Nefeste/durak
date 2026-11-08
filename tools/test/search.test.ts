@@ -36,7 +36,7 @@ describe('точная концовка вдвоём', () => {
     const rng = makeRng(7);
     let n = 0;
     for (let g = 0; g < 400; g++) {
-      // случайные руки по 1–3 карты, прикуп пуст
+      // случайные руки по 1–3 карты, колода пуста
       const deck = shuffled(rng);
       const a = 1 + rng.int(3), b = 1 + rng.int(3);
       const name = (c: number) => ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'][c % 9] + ['♠', '♣', '♦', '♥'][Math.floor(c / 9)];

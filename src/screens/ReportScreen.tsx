@@ -1,7 +1,7 @@
 // Отчёт об ошибке (как в «Нардах»): игрок видит текст целиком и отправляет его сам — «Поделиться».
 import React, { useEffect, useState } from 'react';
 import { Platform, ScrollView, Share, StyleSheet, Text, TextInput } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import * as Application from 'expo-application';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
@@ -12,7 +12,7 @@ import { buildReport } from '../state/report';
 import { loadJson, KEYS } from '../state/storage';
 
 export function ReportScreen({ onBack }: { onBack: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const [what, setWhat] = useState('');
   const [log, setLog] = useState<CrashEntry[] | null>([]);
   const [game, setGame] = useState<string | null>(null);

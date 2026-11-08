@@ -1,10 +1,10 @@
-// Позиции для золотых тестов: руки и прикуп записью людей (`'6♠ 7♠'`).
+// Позиции для золотых тестов: руки и колода записью людей (`'6♠ 7♠'`).
 import { cards, limitOf, parseCard, RULES_V1 } from '../../src/engine';
 import type { RuleSet, State, Variant } from '../../src/engine';
 
 export interface Pos {
   hands: string[];
-  /** Прикуп сверху вниз без козыря; козырь — `trump`. Пустая строка — прикуп пуст. */
+  /** Колода сверху вниз без козыря; козырь — `trump`. Пустая строка — колода пуста. */
   talon?: string;
   trump: string;
   variant?: Variant;
@@ -12,7 +12,7 @@ export interface Pos {
   defender?: number;
   bout?: number;
   rules?: Partial<RuleSet>;
-  /** Козырь уже взят из прикупа (прикуп пуст). */
+  /** Козырь уже взят из колоды (колода пуста). */
   talonEmpty?: boolean;
 }
 

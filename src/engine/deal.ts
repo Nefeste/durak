@@ -4,7 +4,7 @@ import type { Card } from './cards';
 import type { Result, RuleSet, Setup, State, Variant } from './types';
 
 /** Раздача по колоде (docs/specs/2026-11-v1.md, «Колода»): по одной карте по местам по кругу,
- *  по шесть каждому; следующая карта — козырь, остальные — прикуп сверху вниз, козырь — последний. */
+ *  по шесть каждому; следующая карта — козырь, остальные — колода сверху вниз, козырь — последний. */
 export function dealOf(deck: Card[], seats: number, handSize = 6): { hands: Card[][]; talon: Card[]; trump: Card } {
   if (deck.length !== DECK_SIZE || new Set(deck).size !== DECK_SIZE || deck.some(c => c < 0 || c >= DECK_SIZE)) {
     throw new Error('deck: 36 distinct cards 0..35');

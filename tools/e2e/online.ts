@@ -2,7 +2,8 @@
  * Браузерный прогон онлайна (этап Г): сервер «Козыря» в этом же процессе, два браузера — два
  * телефона. Отметка «Мне есть 14 лет» и имя, стол на троих с ботом «Новичок», вход по коду, партия
  * настоящими касаниями до итога, «Колода проверена» у обоих, «Реванш» — новая партия; затем быстрая
- * игра: оба ищут подкидного, пара найдена, сдача — итог у соперника. Ловит пустой экран, утечку
+ * игра: оба ищут подкидного, пара найдена, сдача — итог у соперника. Сначала — сервер отвечает 502 (как на
+ * машине 08.11.2026): «Сервер недоступен, попробуйте позже», «Повторить» после починки проходит, «Назад» открыт. Ловит пустой экран, утечку
  * чужих карт в DOM (на руке — только свои), зависшую партию и ошибки в консоли. Снимки — в
  * tools/e2e/out/online-*.png.
  *
@@ -71,7 +72,33 @@ async function main() {
     await page.getByTestId('menu').waitFor({ timeout: 20_000 });
     return page;
   };
-  console.log(`Онлайн в браузере: сервер http://127.0.0.1:${PORT}, сборка ${web.bundle}\n\nстол с друзьями`);
+  console.log(`Онлайн в браузере: сервер http://127.0.0.1:${PORT}, сборка ${web.bundle}\n\nсервер отвечает 502`);
+  {
+    // отдельный телефон без слушателя консоли: браузер сам пишет «Failed to load resource» на 502
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 780 }, locale: 'ru-RU' });
+    let broken = true;
+    await ctx.route(`http://127.0.0.1:${PORT}/v1/**`, r => (broken ? r.fulfill({ status: 502, contentType: 'text/html', body: '<html>502 Bad Gateway</html>' }) : r.continue()));
+    const p = await ctx.newPage();
+    await p.goto(`${web.url}?inset=48`, { waitUntil: 'networkidle' });
+    await p.getByTestId('menu').waitFor({ timeout: 20_000 });
+    await p.getByTestId('friends-open').click();
+    await p.getByTestId('online-profile').waitFor({ timeout: 10_000 });
+    await p.getByTestId('adult-yes').click();
+    await p.getByTestId('name').fill('Петя');
+    await p.getByTestId('name-save').click();
+    await p.getByTestId('online-error').waitFor({ timeout: 20_000 }).catch(() => {});
+    const msg = await p.getByTestId('online-error').innerText().catch(() => '');
+    ok(/Сервер недоступен, попробуйте позже/.test(msg), `502: «${msg}»`, msg);
+    ok(await visible(p, 'online-retry'), '502: есть «Повторить»');
+    ok(await visible(p, 'online-back'), '502: «Назад» в меню открыт');
+    await p.screenshot({ path: `${OUT}/online-00-down.png` });
+    broken = false;
+    await p.getByTestId('online-retry').click();
+    await p.getByTestId('friends').waitFor({ timeout: 15_000 }).catch(() => {});
+    ok(await visible(p, 'friends'), 'сервер ожил: «Повторить» — и стол с друзьями открыт');
+    await ctx.close();
+  }
+  console.log('\nстол с друзьями');
   const a = await phone('Миша'), b = await phone('Саша');
 
   const profile = async (p: Page, nick: string, open: string) => {

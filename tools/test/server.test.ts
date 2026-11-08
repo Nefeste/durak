@@ -1,6 +1,6 @@
 // Сервер в процессе (как tools/test/server.test.ts «Нард»): база в памяти, поддельные часы, свой
 // генератор. Главное — ADR 0008: ни один ответ и ни одно сообщение WebSocket не несёт чужой руки и
-// порядка прикупа; вид места совпадает с `observe` той же позиции, пересобранной из доказательства.
+// порядка колоды; вид места совпадает с `observe` той же позиции, пересобранной из доказательства.
 import { describe, expect, test } from 'bun:test';
 import { apply, checkDeck, newGame, observe, RULES_V1, serverDeck } from '../../src/engine';
 import type { Action, Observation, State } from '../../src/engine';

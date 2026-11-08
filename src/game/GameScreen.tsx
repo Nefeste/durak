@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
@@ -19,7 +19,7 @@ import type { ThinkJob } from './think';
 import { T } from '../i18n';
 import { gameEnded, gameStarted, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, TOP_BAR } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { botDelay } from '../state/settings';
@@ -56,7 +56,7 @@ const stateOf = (r: GameRecord): State => newGame({ rules: r.rules, variant: r.v
 export function GameScreen({ variant, bots, level, restored, onExit, onStore }: {
   variant: Variant; bots: number; level: Level; restored?: SavedGame | null; onExit: () => void; onStore: () => void;
 }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const settings = useSettings();
   const less = useLessMotion();
   const seats = bots + 1;
@@ -149,9 +149,9 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const iDefend = state.defender === YOU && state.phase === 'bout' && state.table.length > 0;
   const view = useMemo(() => observe(state, YOU), [state]);
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
-  const layout = useMemo(() => (size ? layoutTable(view, { ...size, order: settings.handOrder, picked: picked?.card ?? null, targets }) : null),
+  const layout = useMemo(() => (size ? layoutTable(view, { ...size, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, size, settings.handOrder, picked]);
+    [view, size, settings.handOrder, settings.memoryAid, picked]);
 
   const explain = (c: Card) => {
     const probe: Action = state.table.length === 0 ? { type: 'attack', cards: [c] }
@@ -231,13 +231,9 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]} testID="game">
       <View style={styles.top}>
-        <Button label={T.game.menu} kind="ghost" onPress={onExit} testID="game-menu" />
-        <Text style={styles.variant}>{T.variant[variant]} · {T.level[lvl]}</Text>
-        <View style={styles.topRight}>
-          {settings.seenCards ? <Button label={T.game.seen} kind="ghost" onPress={() => setShowSeen(v => !v)} testID="seen" /> : null}
-          {canUndo(record, YOU) && state.phase !== 'end' ? <Button label={T.game.undo} kind="ghost" onPress={undo} testID="undo" /> : null}
-          {state.phase !== 'end' && mine.length > 0 ? <Button label={T.game.advise} kind="ghost" onPress={advise} testID="advise" /> : null}
-        </View>
+        <Button small label={T.game.menu} kind="ghost" onPress={onExit} testID="game-menu" />
+        <Text style={styles.variant} numberOfLines={1}>{T.variant[variant]} · {T.level[lvl]}</Text>
+        {settings.memoryAid ? <Button small label={T.game.seen} kind="ghost" onPress={() => setShowSeen(v => !v)} testID="seen" /> : null}
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
         {layout && font && small ? (
@@ -267,9 +263,15 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
           <View pointerEvents="box-none" style={[styles.controls, { top: layout.handTop - CONTROLS + 8 }]}>
             <Text style={styles.hint} testID="hint">{state.phase === 'end' ? '' : note ?? hint}</Text>
             <View style={styles.buttons} pointerEvents="box-none">
-              {transfer ? <Button label={T.game.transfer} kind="ghost" onPress={() => { setPicked(null); act(YOU, transfer); }} testID="transfer" /> : null}
-              {canTake ? <Button label={T.game.take} kind="ghost" onPress={() => act(YOU, { type: 'take' })} testID="take" /> : null}
-              {canPass ? <Button label={allCovered ? T.game.done : T.game.pass} onPress={() => act(YOU, { type: 'pass' })} testID="pass" /> : null}
+              <View style={styles.helpers} pointerEvents="box-none">
+                {canUndo(record, YOU) && state.phase !== 'end' ? <Button small label={T.game.undo} kind="ghost" onPress={undo} testID="undo" /> : null}
+                {state.phase !== 'end' && mine.length > 0 ? <Button small label={T.game.advise} kind="ghost" onPress={advise} testID="advise" /> : null}
+              </View>
+              <View style={styles.actions} pointerEvents="box-none">
+                {transfer ? <Button label={T.game.transfer} kind="ghost" onPress={() => { setPicked(null); act(YOU, transfer); }} testID="transfer" /> : null}
+                {canTake ? <Button label={T.game.take} kind="ghost" onPress={() => act(YOU, { type: 'take' })} testID="take" /> : null}
+                {canPass ? <Button label={allCovered ? T.game.done : T.game.pass} onPress={() => act(YOU, { type: 'pass' })} testID="pass" /> : null}
+              </View>
             </View>
           </View>
         ) : null}
@@ -290,9 +292,9 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 8, gap: 4 },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  topRight: { flexDirection: 'row', gap: 6 },
-  variant: { color: C.dim, fontSize: 14, flexShrink: 1 },
+  // верхняя полоса постоянной высоты: что бы ни появлялось на экране, стол не меняет размер
+  top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  variant: { color: C.dim, fontSize: 14, flex: 1 },
   area: { flex: 1 },
   opp: { position: 'absolute', alignItems: 'center' },
   oppName: { color: C.text, fontSize: 15, fontWeight: '700' },
@@ -301,7 +303,9 @@ const styles = StyleSheet.create({
   talonText: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: 13 },
   controls: { position: 'absolute', left: 8, right: 8, gap: 8 },
   hint: { color: C.text, fontSize: 15, textAlign: 'center', minHeight: 20 },
-  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, minHeight: 48 },
+  buttons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 48 },
+  helpers: { flexDirection: 'row', gap: 6, flexShrink: 1 },
+  actions: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
   result: { position: 'absolute', left: 16, right: 16, top: '30%', gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
   resultText: { color: C.text, fontSize: 19, fontWeight: '700', textAlign: 'center' },
   worst: { color: C.dim, fontSize: 15, textAlign: 'center' },

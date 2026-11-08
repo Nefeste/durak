@@ -2,7 +2,7 @@
 // по столам, числу игроков и уровням, козыри и рейтинг тренировок. Ниже — последние партии с разбором.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { isPro, onRights } from '../money';
 import { Button } from '../ui/Button';
@@ -21,7 +21,7 @@ const resultOf = (g: FinishedGame) => {
 };
 
 export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const [games, setGames] = useState<FinishedGame[]>([]);
   const [solved, setSolved] = useState(0);
   const [open, setOpen] = useState<FinishedGame | null>(null);

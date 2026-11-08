@@ -45,14 +45,14 @@ describe('раскладка стола', () => {
       const { states } = playGame(seats * 11, seats, seats === 3 ? 'perevodnoy' : 'podkidnoy');
       for (const s of states) {
         const o = observe(s, 0);
-        const l = layoutTable(o, opt);
+        const l = layoutTable(o, { ...opt, showOpenly: true });
         const keys = l.sprites.map(x => x.key);
         expect(new Set(keys).size).toBe(keys.length);
         const faces = l.sprites.filter(x => x.card !== null).map(x => x.card as Card);
         const visible = new Set<Card>([...o.hand, ...o.table.flat().filter((x): x is Card => x !== null), ...o.openly.flat()]);
         if (o.talonSize > 0) visible.add(o.trump);
         for (const f of faces) expect(visible.has(f)).toBe(true);
-        // все карты стола на столе: рука + соперники + прикуп + стол + сброс = 36
+        // все карты стола на столе: рука + соперники + колода + стол + сброс = 36
         const table = o.table.reduce((n, [, d]) => n + 1 + (d === null ? 0 : 1), 0);
         expect(l.sprites.length).toBe(o.handSizes.reduce((a, b) => a + b, 0) + o.talonSize + table + o.discard.length);
         for (const x of l.sprites) {
@@ -63,6 +63,26 @@ describe('раскладка стола', () => {
         }
       }
     }
+  });
+  test('без «Помощи памяти» у соперников ни одной карты лицом — и взятые в открытую рубашкой (решение владельца 08.11.2026)', () => {
+    let openlySeen = 0;
+    for (const seats of [2, 3, 4]) {
+      const { states } = playGame(seats * 13, seats, seats === 2 ? 'perevodnoy' : 'podkidnoy');
+      for (const s of states) {
+        const o = observe(s, 0);
+        openlySeen += o.openly.reduce((n, cs, seat) => n + (seat === 0 ? 0 : cs.length), 0);
+        const l = layoutTable(o, opt);
+        const own = new Set<Card>([...o.hand, ...o.table.flat().filter((x): x is Card => x !== null)]);
+        if (o.talonSize > 0) own.add(o.trump);
+        for (const x of l.sprites) {
+          if (x.card !== null) expect(own.has(x.card)).toBe(true);
+          if (/^h\d/.test(x.key)) expect(x.card).toBeNull();
+        }
+        // а карт у соперника столько же, сколько у него в руке
+        for (const p of l.opponents) expect(l.sprites.filter(x => x.key.startsWith(`h${p.seat}-`)).length).toBe(o.handSizes[p.seat]);
+      }
+    }
+    expect(openlySeen).toBeGreaterThan(0); // проверка не пустая: в этих партиях брали в открытую
   });
   test('ключи скрытых карт не выдают их номера', () => {
     const s = pos({ hands: ['6♠ 7♠ 8♠ 9♠ 10♠ В♠', '6♥ 7♥ 8♥ 9♥ 10♥ В♥'], trump: 'Т♦', talon: '6♦ 7♦' });
@@ -132,6 +152,10 @@ describe('настройки', () => {
     const s = parseSettings(JSON.stringify({ sound: false, botSpeed: 'warp', handOrder: 'rank', fourColor: true }));
     expect(s).toEqual({ ...DEFAULT_SETTINGS, sound: false, handOrder: 'rank', fourColor: true });
     expect(lessMotionOf(s, true)).toBe(true);
+    expect(DEFAULT_SETTINGS.memoryAid).toBe(false);
+    // до 0.5.1 «Помощь памяти» звалась seenCards — выбор игрока сохраняется
+    expect(parseSettings(JSON.stringify({ seenCards: true })).memoryAid).toBe(true);
+    expect(parseSettings(JSON.stringify({ memoryAid: false, seenCards: true })).memoryAid).toBe(false);
     expect(lessMotionOf({ ...s, lessMotion: false }, true)).toBe(false);
   });
   test('пауза бота: «Обычно» 0,5–0,9 с, «Быстро» 0,2–0,4 с', () => {

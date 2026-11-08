@@ -8,7 +8,7 @@ import type { Rng } from './rng';
 export interface RuleParams {
   /** Доля решений «наугад среди законных». */
   random: number;
-  /** Беречь козыри, пока прикуп не кончился: взять, если отбиться можно только старшим козырем. */
+  /** Беречь козыри, пока колода не кончилась: взять, если отбиться можно только старшим козырем. */
   saveTrumps: boolean;
   /** Подкидывать смелее, когда у отбивающегося мало карт и в концовке. */
   pressure: boolean;
@@ -58,7 +58,7 @@ function defend(o: Observation, legal: Action[], p: RuleParams): Action {
     if (transfers.length > 0 && o.talonSize === 0) return transfers[0];
     return { type: 'take' };
   }
-  // беречь козыри: старший козырь на мелкую атаку, пока прикуп большой, — дороже, чем взять
+  // беречь козыри: старший козырь на мелкую атаку, пока колода большая, — дороже, чем взять
   if (p.saveTrumps && plan.maxTrump >= 6 && o.talonSize > 6 && o.table.length <= 2) return { type: 'take' };
   const [on, card] = plan.pairs[0];
   return { type: 'beat', card, on };

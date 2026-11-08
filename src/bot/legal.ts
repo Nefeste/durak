@@ -1,9 +1,9 @@
 // Законные действия из наблюдения: они зависят только от своей руки и открытых сведений (числа
-// карт у соперников, стола, прикупа), поэтому скрытые карты подставляются любые.
+// карт у соперников, стола, колоды), поэтому скрытые карты подставляются любые.
 import { DECK_SIZE, legalActions, stateFrom } from '../engine';
 import type { Action, Card, Observation } from '../engine';
 
-/** Карты, которых место не видит: руки соперников без взятых в открытую и прикуп без козыря. */
+/** Карты, которых место не видит: руки соперников без взятых в открытую и колода без козыря. */
 export function unseen(o: Observation): Card[] {
   const known = new Set<Card>([...o.hand, ...o.discard, ...o.openly.flat()]);
   for (const [a, d] of o.table) {
@@ -17,7 +17,7 @@ export function unseen(o: Observation): Card[] {
 }
 
 /** Расклад скрытых карт: `pool` по порядку — сначала в руки соперников (после взятых в открытую),
- *  потом в прикуп. */
+ *  потом в колоду. */
 export function layout(o: Observation, pool: Card[]): { hidden: Card[][]; talon: Card[] } {
   let i = 0;
   const hidden = o.handSizes.map((n, seat) => {

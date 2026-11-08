@@ -1,7 +1,7 @@
 // из nardy: src/ui/dialog.tsx @ 1d2bdff (из votchina) — портрет: кнопки в столбик.
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from './insets';
 import { Button } from './Button';
 import { C, HEAD, RADIUS } from './theme';
 import { T } from '../i18n';
@@ -16,7 +16,7 @@ export interface DialogSpec {
 }
 
 export function Dialog({ spec, onClose }: { spec: DialogSpec | null; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   if (!spec) return null;
   const run = (a: DialogAction) => { onClose(); a.onPress?.(); };
   // больше трёх кнопок — в две колонки: экран альбомный, высоты мало (меню партии)

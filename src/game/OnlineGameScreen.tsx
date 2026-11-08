@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import { legalActions, stateFrom } from '../engine';
@@ -13,7 +13,7 @@ import { layout as fill, unseen } from '../bot/legal';
 import { T } from '../i18n';
 import { gameEnded, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, TOP_BAR } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { useLessMotion, useSettings } from '../state/store';
@@ -31,7 +31,7 @@ function seatName(s: SeatView | null | undefined): string {
 }
 
 export function OnlineGameScreen({ table, onExit }: { table: OnlineTable; onExit: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const [, redraw] = useReducer((x: number) => x + 1, 0);
   useEffect(() => {
     const off = table.on(redraw);
@@ -183,12 +183,12 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   return (
     <View style={[styles.root, pad, { paddingHorizontal: 8 }]} testID="online-game">
       <View style={styles.top}>
-        <Button label={t.status === 'finished' ? T.game.menu : t.kind === 'quick' ? T.online.resign : T.online.leave} kind="ghost"
+        <Button small label={t.status === 'finished' ? T.game.menu : t.kind === 'quick' ? T.online.resign : T.online.leave} kind="ghost"
           onPress={t.status === 'finished' ? onExit : resign} testID="online-exit" />
-        <Text style={styles.dim}>{T.variant[t.variant]}{left !== null ? ` · ${T.online.secs(left)}` : ''}</Text>
+        <Text style={[styles.dim, styles.topTitle]} numberOfLines={1}>{T.variant[t.variant]}{left !== null ? ` · ${T.online.secs(left)}` : ''}</Text>
       </View>
-      {down ? <Text style={styles.err} testID="online-down">{T.online.noNet}</Text> : null}
       <View style={styles.area} onLayout={onLayout} testID="table">
+        {down ? <Text style={[styles.err, styles.down]} pointerEvents="none" testID="online-down">{T.online.noNet}</Text> : null}
         {lay && font && small && view ? (
           <TableCanvas key={g.no} layout={lay} font={font} small={small} fourColor={settings.fourColor} less={less}
             hand={view.hand} table={view.table} enabled={view.phase !== 'end'} touch={{ onCard, onTableCard, onDrop }} />
@@ -252,7 +252,10 @@ const styles = StyleSheet.create({
   dim: { color: C.dim, fontSize: 14 },
   err: { color: C.danger, fontSize: 15, textAlign: 'center' },
   ok: { color: C.ok, fontSize: 15, textAlign: 'center' },
-  top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  // верхняя полоса постоянной высоты, строка «нет связи» — поверх стола: стол не меняет размер
+  top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  topTitle: { flex: 1, textAlign: 'right' },
+  down: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 5, paddingVertical: 6, backgroundColor: C.sheet },
   area: { flex: 1 },
   opp: { position: 'absolute', alignItems: 'center' },
   oppName: { color: C.text, fontSize: 15, fontWeight: '700' },

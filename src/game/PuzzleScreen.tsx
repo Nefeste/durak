@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import { apply, legalActions, nameOf, observe } from '../engine';
@@ -81,7 +81,8 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
 
   const view = useMemo(() => observe(state, you), [state, you]);
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
-  const layout = useMemo(() => (size ? layoutTable(view, { ...size, order: settings.handOrder, picked: picked?.card ?? null, targets }) : null),
+  // в задаче партия не сыграна на глазах игрока — взятое в открытую входит в условие, его видно всегда
+  const layout = useMemo(() => (size ? layoutTable(view, { ...size, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: true }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, size, settings.handOrder, picked]);
   const mine = status === 'play' && actorOf(state) === you ? legalActions(state, you) : [];
@@ -153,7 +154,7 @@ function Archive({ today, log, onOpen }: { today: number; log: PuzzleLog; onOpen
 }
 
 export function PuzzleScreen({ onBack }: { onBack: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const today = dayNumber(todayKey());
   const [day, setDay] = useState(today);
   const [archive, setArchive] = useState(false);

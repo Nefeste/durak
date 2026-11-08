@@ -102,7 +102,7 @@ function endBout(s: State, how: 'beaten' | 'taken') {
   for (const seat of order) {
     while (s.hands[seat].length < s.rules.handSize && s.talon.length > 0) s.hands[seat].push(s.talon.shift()!);
   }
-  // п. 7.2: когда прикуп пуст, игрок без карт выходит
+  // п. 7.2: когда колода пуста, игрок без карт выходит
   if (s.talon.length === 0) for (const seat of order) if (s.hands[seat].length === 0 && !s.out.includes(seat)) s.out.push(seat);
   const left: number[] = [];
   for (let seat = 0; seat < s.seats; seat++) if (!s.out.includes(seat)) left.push(seat);
