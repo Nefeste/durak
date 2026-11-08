@@ -19,8 +19,8 @@ export function actionText(a: Action, done = false): string {
   }
 }
 
-/** Строка «почему» решения разбора. */
-export function whyText(d: Decision): string {
+/** Строка «почему» решения разбора; `done` — как у `actionText`. */
+export function whyText(d: Decision, done = false): string {
   const w = d.why;
   switch (w.kind) {
     case 'exactLoses': return T.review.why.exactLoses;
@@ -28,7 +28,7 @@ export function whyText(d: Decision): string {
     case 'tookCouldBeat': return T.review.why.tookCouldBeat(nameOf(w.card), nameOf(w.on));
     case 'transferToFewer': return T.review.why.transferToFewer;
     case 'noThrow': return T.review.why.noThrow(list(w.cards));
-    case 'better': return T.review.why.better(actionText(d.best), d.bestChance, d.playedChance);
+    case 'better': return T.review.why.better(actionText(d.best, done), d.bestChance, d.playedChance);
   }
 }
 

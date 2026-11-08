@@ -20,7 +20,8 @@ import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { actionText, whyText, worstText } from './words';
 import { ReviewBoard } from './ReviewBoard';
 
-function Panel({ d, i, n, main }: { d: Decision; i: number; n: number; main: boolean }) {
+/** `done` — на столе всё покрыто: «пас» ходящего здесь значит «Бито», как на плашке стола. */
+function Panel({ d, i, n, main, done }: { d: Decision; i: number; n: number; main: boolean; done: boolean }) {
   const tone = d.grade === 'error' ? C.danger : d.grade === 'inaccurate' ? C.accent : C.dim;
   return (
     <View style={styles.row} testID={`decision-${d.at}`}>
@@ -29,11 +30,11 @@ function Panel({ d, i, n, main }: { d: Decision; i: number; n: number; main: boo
         <Text style={[styles.grade, { color: tone }]} testID="review-grade">{T.review.grade[d.grade]}</Text>
       </View>
       {main ? <Text style={styles.main}>{T.review.main}</Text> : null}
-      <Text style={styles.text}>{T.review.played(actionText(d.played))}</Text>
+      <Text style={styles.text}>{T.review.played(actionText(d.played, done))}</Text>
       {d.grade !== 'ok' ? (
         <>
-          <Text style={styles.text}>{T.review.best(actionText(d.best))}</Text>
-          <Text style={styles.why}>{whyText(d)}</Text>
+          <Text style={styles.text}>{T.review.best(actionText(d.best, done))}</Text>
+          <Text style={styles.why}>{whyText(d, done)}</Text>
           <Text style={styles.small}>{d.exact ? T.review.exact(d.playedChance) : T.review.chance(d.bestChance, d.playedChance)}</Text>
         </>
       ) : null}
@@ -91,7 +92,8 @@ export function ReviewScreen({ review: given, record, at, lastToday, counting, o
           {o && marks ? <View style={{ height: boardH }}><ReviewBoard o={o} marks={marks} /></View> : null}
           <ScrollView style={styles.scroll} contentContainerStyle={styles.list}>
             {!review.worst || !d ? <Text style={styles.head} testID="review-worst">{review.worst ? worstText(review.worst) : T.result.clean}</Text> : null}
-            {d ? <Panel d={d} i={idx + 1} n={shown.length} main={d.at === review.worst?.at} />
+            {d ? <Panel d={d} i={idx + 1} n={shown.length} main={d.at === review.worst?.at}
+              done={!!o && o.table.length > 0 && o.table.every(([, x]) => x !== null)} />
               : access === 'full' ? <Text style={styles.text}>{only && all.length ? T.review.noMisses : T.review.none}</Text> : null}
             {access === 'full' && all.length > 1 ? <Toggle id="review-only" title={T.review.onlyMisses} value={only} onChange={setOnly} /> : null}
             {access !== 'full' ? (
