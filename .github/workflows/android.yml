@@ -1,0 +1,181 @@
+# из bukvitsa: .github/workflows/android.yml @ claude/answers-0.2 (ADR 0001) — без сборки содержания.
+# Сборка APK — только по тегу vX.Y.Z (ADR студии 0019): ручного запуска нет, слияние в main сборку
+# не запускает. Тег должен совпасть с версией в app.json. Перед сборкой — проверки и сценарий в
+# браузере; ключ, подпись и содержимое APK — действия набора студии `gornitsa-kit` (ADR студии
+# 0022). Без секретов ключа APK собирается только на проверку и в выпуск не идёт.
+name: Android APK
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    name: Тег и версия
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: app.json
+          sparse-checkout-cone-mode: false
+      - name: Тег и версия совпадают
+        run: |
+          V="$(node -p "require('./app.json').expo.version")"
+          [ "$GITHUB_REF_NAME" = "v$V" ] || { echo "::error::Тег $GITHUB_REF_NAME, а в app.json версия $V. Тег — v$V."; exit 1; }
+
+  checks:
+    name: Проверки и веб-сборка
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: bun test tools/test
+      - run: npm run export:web
+        env:
+          EXPO_OFFLINE: '1'
+      # Сценарий в браузере (tools/e2e/browser.ts) гоняется перед тегом на машине агента: Playwright
+      # здесь не ставится (docs/05-process.md, «Выпуск»).
+
+  build:
+    name: Сборка APK
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      permanent: ${{ steps.key.outputs.permanent }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v5
+      - run: npm ci
+      - name: Нативный проект (expo prebuild)
+        run: npx expo prebuild --platform android --no-install
+      - name: Больше памяти Gradle
+        run: printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8\n' >> android/gradle.properties
+
+      - name: Ключ подписи
+        id: key
+        uses: Nefeste/gornitsa-kit/actions/android-keystore@v1
+        with:
+          keystore-base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          store-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          key-alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          key-password: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          gradle-prefix: DURAK
+
+      - name: Сборка
+        working-directory: android
+        env:
+          NODE_ENV: production
+          ORG_GRADLE_PROJECT_DURAK_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_DURAK_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_DURAK_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # 64- и 32-битный ARM: опорный телефон должен хотя бы запускать игру (ADR устава 0023)
+        run: ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+
+      - name: Подпись
+        id: cert
+        uses: Nefeste/gornitsa-kit/actions/android-signature@v1
+        with:
+          file: android/app/build/outputs/apk/release/app-release.apk
+          expected: ${{ vars.ANDROID_CERT_SHA256 }}
+          permanent: ${{ steps.key.outputs.permanent }}
+          keystore-file: ${{ steps.key.outputs.file }}
+
+      # Белый список разрешений — файлом (.github/apk-permissions.txt); INTERNET нужен онлайну (этап Г)
+      # и есть в шаблоне React Native; автобэкап выключен (app.json); target API не ниже 36;
+      # размер — бюджет спецификации (docs/specs/2026-11-v1.md, «Бюджет»).
+      - name: Содержимое
+        uses: Nefeste/gornitsa-kit/actions/android-contents@v1
+        with:
+          file: android/app/build/outputs/apk/release/app-release.apk
+          allow-file: .github/apk-permissions.txt
+          forbid: 'FOREGROUND_SERVICE|INSTALL_REFERRER|RECORD_AUDIO|READ_EXTERNAL_STORAGE'
+          backup: 'off'
+          min-target-sdk: '36'
+          max-size-mb: '60'
+
+      - name: Собрать
+        if: steps.key.outputs.permanent == 'yes'
+        env:
+          LABEL: ${{ steps.cert.outputs.label }}
+          SHA: ${{ steps.cert.outputs.sha256 }}
+        run: |
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/durak-${{ github.run_number }}.apk"
+          printf '%s\n%s\n' "$LABEL" "$SHA" > dist/signature.txt
+      - uses: actions/cache/save@v4
+        if: steps.key.outputs.permanent == 'yes'
+        with:
+          path: dist
+          key: dist-${{ github.run_id }}-${{ github.run_attempt }}
+
+  release:
+    name: Выпуск
+    needs: [checks, build]
+    if: needs.build.outputs.permanent == 'yes'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: repo
+          sparse-checkout: |
+            app.json
+            README.md
+          sparse-checkout-cone-mode: false
+      - uses: actions/cache/restore@v4
+        with:
+          path: dist
+          key: dist-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: dist-${{ github.run_id }}-
+          fail-on-cache-miss: true
+      - name: Что нового
+        id: ver
+        run: |
+          V=$(node -p "require('./repo/app.json').expo.version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          # раздел «### X.Y.Z …» из README, до следующего заголовка
+          awk -v v="$V" '$0 ~ "^### "v"( |$)" { on = 1; next } on && /^##/ { exit } on' repo/README.md > notes.md
+          {
+            cat notes.md
+            echo
+            echo "---"
+            echo "Подписан $(sed -n 1p dist/signature.txt), SHA-256 сертификата: \`$(sed -n 2p dist/signature.txt)\`."
+            echo "Собрано из коммита ${{ github.sha }}, сборка ${{ github.run_number }}."
+          } > release.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: Козырь ${{ steps.ver.outputs.version }}
+          body_path: release.md
+          files: dist/*.apk
+          prerelease: true

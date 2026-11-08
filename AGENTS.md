@@ -56,7 +56,7 @@ RuStore Review or Yandex Mobile Ads code from memory — follow «Expo has chang
 
 ## Commands
 
-Stage А is in the code (engine, rule bots, a table vs bots); the rest follows nardy.
+Stages А and Б are in the code (engine, rule bots, the Skia table vs bots, saves, settings); the rest follows nardy.
 
 ```bash
 npm ci
@@ -67,8 +67,10 @@ bun test tools/test                 # rules (golden), random games, observation,
 DURAK_LONG=1 bun test tools/test/games.test.ts   # 100 000 random games (~4 min)
 bun tools/sim/arena.ts 1000 average amateur podkidnoy   # bot strength on mirrored deals
 bun tools/test/make-deck-fixture.ts > tools/test/fixtures/deck-v1.json   # deck vectors (only on a new deck version)
-EXPO_OFFLINE=1 npm run export:web
+EXPO_OFFLINE=1 npm run export:web       # setup-skia-web puts canvaskit.wasm into public/ first
 NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/browser.ts   # the table in a browser, real taps
+bun tools/hermes/deck.ts            # durak-deck-v1 vectors on Hermes 0.12 (downloads it to /tmp/hermes)
+NODE_PATH=/opt/node22/lib/node_modules bun tools/art/icon.ts   # icon, adaptive icon, splash + passport assets/LICENSES.md
 ```
 
 ## Hard rules

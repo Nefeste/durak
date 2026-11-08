@@ -1,33 +1,22 @@
-// Главный экран (этап А): стол, число соперников и уровень — и «Играть».
+// Главный экран: стол, число соперников и уровень — «Играть»; «Продолжить партию», если она
+// сохранена; «Настройки».
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Variant } from '../engine';
 import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
+import { Chips } from '../ui/Chips';
 import { C, RADIUS } from '../ui/theme';
 import { CardBack } from '../render/PlayingCard';
 
 export interface Choice { variant: Variant; bots: number; level: Level }
 
-function Chips<V extends string | number>({ items, value, label, onChange, id }: {
-  items: V[]; value: V; label: (v: V) => string; onChange: (v: V) => void; id: string;
+export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings }: {
+  choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
 }) {
-  return (
-    <View style={styles.chips}>
-      {items.map(v => (
-        <Pressable key={String(v)} testID={`${id}-${v}`} accessibilityRole="button" accessibilityState={{ selected: v === value }}
-          onPress={() => onChange(v)} style={[styles.chip, v === value && styles.chipOn]}>
-          <Text style={[styles.chipText, v === value && styles.chipTextOn]}>{label(v)}</Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-export function MenuScreen({ choice, onChange, onPlay }: { choice: Choice; onChange: (c: Choice) => void; onPlay: () => void }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 }]} testID="menu">
@@ -44,7 +33,11 @@ export function MenuScreen({ choice, onChange, onPlay }: { choice: Choice; onCha
         <Text style={styles.label}>{T.menu.level}</Text>
         <Chips id="level" items={LEVELS} value={choice.level} label={l => T.level[l]} onChange={level => onChange({ ...choice, level })} />
       </View>
-      <Button label={T.menu.play} onPress={onPlay} testID="play" />
+      <View style={styles.actions}>
+        {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
+        <Button label={T.menu.play} onPress={onPlay} testID="play" />
+        <Button label={T.menu.settings} kind="ghost" onPress={onSettings} testID="settings-open" />
+      </View>
     </View>
   );
 }
@@ -58,9 +51,5 @@ const styles = StyleSheet.create({
   tagline: { color: C.dim, fontSize: 16 },
   panel: { gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   label: { color: C.dim, fontSize: 14, marginTop: 4 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: C.glassLine },
-  chipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  chipText: { color: C.text, fontSize: 15 },
-  chipTextOn: { color: C.accentText, fontWeight: '700' },
+  actions: { gap: 10 },
 });

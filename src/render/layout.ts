@@ -1,0 +1,196 @@
+// Раскладка стола (docs/09-game-design.md, «Экран партии»): чистая функция наблюдения места —
+// где лежит каждая карта, откуда она прилетает, что подсвечено. Холст (TableCanvas) только рисует
+// эти места и плавно переводит карты из старых в новые. Скрытые карты соперников и прикупа — без
+// своих номеров: ключи `h<место>-<i>` и `t-<i>`; лицо есть только у карт, которые место видит
+// (ADR 0005, 0008). Без React — проверяется тестами.
+import { rankOf, suitOf } from '../engine';
+import type { Card, Observation } from '../engine';
+
+export type HandOrder = 'suit' | 'rank';
+
+export interface Sprite {
+  key: string;
+  /** Лицо карты; `null` — рубашка. */
+  card: Card | null;
+  x: number;
+  y: number;
+  /** Поворот, градусы. */
+  rot: number;
+  scale: number;
+  z: number;
+  /** Подсвечено как место, куда можно положить выбранную карту. */
+  glow: boolean;
+  /** Откуда прилетает, если ключ новый (из прикупа, от места соперника). */
+  from: { x: number; y: number };
+}
+
+export interface Seat {
+  seat: number;
+  /** Середина веера соперника. */
+  x: number;
+  y: number;
+}
+
+export interface Layout {
+  cw: number;
+  ch: number;
+  sprites: Sprite[];
+  /** Места соперников: имена и значки над веером рисует экран. */
+  opponents: Seat[];
+  talon: { x: number; y: number };
+  discard: { x: number; y: number };
+  /** Прямоугольник стола — сюда бросают карту перетаскиванием. */
+  table: { x: number; y: number; w: number; h: number };
+  /** Верх руки: экран ставит подсказку и кнопки над ним. */
+  handTop: number;
+  /** Сукно: от вееров соперников до кнопок, во всю ширину. */
+  felt: { x: number; y: number; w: number; h: number };
+}
+
+export interface LayoutOptions {
+  width: number;
+  height: number;
+  order: HandOrder;
+  /** Выбранная карта руки: она приподнята. */
+  picked: Card | null;
+  /** Куда её можно положить: карты атаки на столе. */
+  targets: Card[];
+}
+
+/** Порядок руки: «по мастям, козыри справа» или «по старшинству» (козыри всё равно справа). */
+export function sortHand(hand: Card[], trumpSuit: number, order: HandOrder): Card[] {
+  const key = (c: Card) => {
+    const trump = suitOf(c) === trumpSuit ? 1 : 0;
+    return order === 'suit'
+      ? trump * 1000 + suitOf(c) * 100 + rankOf(c)
+      : trump * 1000 + rankOf(c) * 10 + suitOf(c);
+  };
+  return [...hand].sort((a, b) => key(a) - key(b));
+}
+
+/** Высота строки подсказки и ряда кнопок над рукой. */
+export const CONTROLS = 100;
+
+/** Небольшой постоянный поворот карты в сбросе — по номеру карты, без случайности. */
+const tilt = (c: Card) => ((c * 37) % 21) - 10;
+
+export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
+  const { width: W, height: H } = opt;
+  const cw = Math.round(Math.min(W / 6, 78, H / 9));
+  const ch = Math.round((cw * 88) / 63);
+  const m = Math.round(cw * 0.25);
+  const sprites: Sprite[] = [];
+  let z = 0;
+  const trumpSuit = suitOf(o.trump);
+
+  // соперники: по часовой стрелке от вас — слева направо по верху
+  const others = Array.from({ length: o.seats - 1 }, (_, i) => (o.seat + 1 + i) % o.seats);
+  // место под имя и число карт над веером соперника
+  const oppY = Math.round(ch * 0.55 * 0.5 + 58 + m);
+  const opponents: Seat[] = others.map((seat, i) => ({ seat, x: Math.round((W * (2 * i + 1)) / (2 * others.length)), y: oppY }));
+  const oppScale = 0.55;
+  for (const p of opponents) {
+    const openly = o.openly[p.seat];
+    const hidden = Math.max(0, o.handSizes[p.seat] - openly.length);
+    const n = hidden + openly.length;
+    const step = Math.min(cw * oppScale * 0.32, (W / others.length - cw * oppScale - m) / Math.max(1, n - 1));
+    const x0 = p.x - (step * (n - 1)) / 2;
+    const all: (Card | null)[] = [...Array(hidden).fill(null), ...sortHand(openly, trumpSuit, 'suit')];
+    all.forEach((c, i) => {
+      sprites.push({
+        key: c === null ? `h${p.seat}-${i}` : `c${c}`, card: c,
+        x: x0 + i * step, y: p.y, rot: (i - (n - 1) / 2) * 3, scale: oppScale, z: z++, glow: false,
+        from: { x: 0, y: 0 },
+      });
+    });
+  }
+
+  // середина стола — между веерами соперников и строкой подсказки с кнопками над рукой
+  const handY = Math.round(H - ch * 0.62);
+  const top = oppY + (ch * oppScale) / 2 + m;
+  const bottom = handY - ch / 2 - CONTROLS;
+  const midY = Math.round((top + bottom) / 2);
+  // прикуп слева: открытый козырь поперёк под стопкой рубашек
+
+  const talon = { x: Math.round(m + ch / 2), y: midY };
+  if (o.talonSize > 0) {
+    sprites.push({ key: `c${o.trump}`, card: o.trump, x: talon.x + cw * 0.35, y: talon.y, rot: 90, scale: 1, z: z++, glow: false, from: talon });
+    const backs = o.talonSize - 1;
+    for (let i = 0; i < backs; i++) {
+      sprites.push({ key: `t-${i}`, card: null, x: talon.x - cw * 0.1 - Math.min(i, 6) * 0.6, y: talon.y - Math.min(i, 6) * 0.6, rot: 0, scale: 1, z: z++, glow: false, from: talon });
+    }
+  }
+
+  // сброс справа: рубашками, вразброс
+  const discard = { x: Math.round(W - m - cw / 2), y: midY };
+  for (const c of o.discard) {
+    sprites.push({ key: `c${c}`, card: null, x: discard.x, y: discard.y, rot: tilt(c), scale: 1, z: z++, glow: false, from: discard });
+  }
+
+  // стол: пары «атака — защита» в два ряда по три
+  const tx = Math.round(talon.x + ch / 2 + m), tw = Math.round(discard.x - cw / 2 - m - tx);
+  const pairW = cw * 1.35, pairH = Math.min(ch * 1.3, (bottom - top) / 2);
+  const tableBox = { x: tx, y: Math.round(midY - pairH), w: tw, h: Math.round(pairH * 2) };
+  const n = o.table.length;
+  const perRow = n <= 3 ? Math.max(1, n) : 3;
+  const rows = Math.ceil(n / perRow) || 1;
+  const attacker = opponents.find(p => p.seat === o.attacker);
+  const defender = opponents.find(p => p.seat === o.defender);
+  const mine = { x: W / 2, y: handY };
+  o.table.forEach(([a, d], i) => {
+    const row = Math.floor(i / perRow), col = i % perRow;
+    const inRow = Math.min(perRow, n - row * perRow);
+    const x = tx + tw / 2 + (col - (inRow - 1) / 2) * Math.min(pairW, tw / perRow) - cw * 0.08;
+    const y = midY + (row - (rows - 1) / 2) * pairH * 0.92 - ch * 0.08;
+    sprites.push({ key: `c${a}`, card: a, x, y, rot: -3, scale: 1, z: z++, glow: opt.targets.includes(a), from: attacker ?? mine });
+    if (d !== null) {
+      sprites.push({ key: `c${d}`, card: d, x: x + cw * 0.2, y: y + ch * 0.22, rot: 6, scale: 1, z: z++, glow: false, from: defender ?? mine });
+    }
+  });
+
+  // рука снизу веером; выбранная карта приподнята
+  const hand = sortHand(o.hand, trumpSuit, opt.order);
+  const hn = hand.length;
+  const span = W - 2 * m - cw;
+  const step = hn > 1 ? Math.min(cw * 0.72, span / (hn - 1)) : 0;
+  const x0 = W / 2 - (step * (hn - 1)) / 2;
+  hand.forEach((c, i) => {
+    const t = hn > 1 ? i / (hn - 1) - 0.5 : 0;
+    sprites.push({
+      key: `c${c}`, card: c, x: x0 + i * step, y: handY + t * t * ch * 0.25 - (opt.picked === c ? ch * 0.22 : 0),
+      rot: t * 10, scale: 1, z: z++, glow: false, from: talon,
+    });
+  });
+
+  return {
+    cw, ch, sprites, opponents, talon, discard, table: tableBox,
+    handTop: Math.round(handY - ch * 0.75),
+    felt: { x: Math.round(m / 2), y: Math.round(top - m / 2), w: Math.round(W - m), h: Math.round(bottom - top + m) },
+  };
+}
+
+/** Какая карта руки под точкой: верхняя из перекрывающихся (рука рисуется слева направо). */
+export function handCardAt(l: Layout, x: number, y: number, hand: Card[]): Card | null {
+  for (let i = l.sprites.length - 1; i >= 0; i--) {
+    const s = l.sprites[i];
+    if (s.card === null || !hand.includes(s.card) || !s.key.startsWith('c')) continue;
+    if (Math.abs(x - s.x) <= l.cw / 2 && Math.abs(y - s.y) <= l.ch / 2) return s.card;
+  }
+  return null;
+}
+
+/** Какая карта атаки на столе под точкой (для «бить на …» перетаскиванием). */
+export function tableCardAt(l: Layout, x: number, y: number, table: [Card, Card | null][]): Card | null {
+  const attack = new Set(table.map(([a]) => a));
+  let best: Card | null = null, dist = Infinity;
+  for (const s of l.sprites) {
+    if (s.card === null || !attack.has(s.card)) continue;
+    const d = Math.hypot(x - s.x, y - s.y);
+    if (d < dist && Math.abs(x - s.x) <= l.cw * 0.8 && Math.abs(y - s.y) <= l.ch * 0.8) { best = s.card; dist = d; }
+  }
+  return best;
+}
+
+export const inTable = (l: Layout, x: number, y: number): boolean =>
+  x >= l.table.x && x <= l.table.x + l.table.w && y >= l.table.y && y <= l.table.y + l.table.h;
+

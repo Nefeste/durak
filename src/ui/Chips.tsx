@@ -1,0 +1,27 @@
+// Ряд выбора одного из нескольких (меню, настройки).
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { C } from './theme';
+
+export function Chips<V extends string | number>({ items, value, label, onChange, id }: {
+  items: readonly V[]; value: V; label: (v: V) => string; onChange: (v: V) => void; id: string;
+}) {
+  return (
+    <View style={styles.chips}>
+      {items.map(v => (
+        <Pressable key={String(v)} testID={`${id}-${v}`} accessibilityRole="button" accessibilityState={{ selected: v === value }} aria-selected={v === value}
+          onPress={() => onChange(v)} style={[styles.chip, v === value && styles.chipOn]}>
+          <Text style={[styles.chipText, v === value && styles.chipTextOn]}>{label(v)}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: C.glassLine },
+  chipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  chipText: { color: C.text, fontSize: 15 },
+  chipTextOn: { color: C.accentText, fontWeight: '700' },
+});
