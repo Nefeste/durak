@@ -23,6 +23,44 @@ function ok(cond: boolean, what: string, detail?: unknown) {
   console.log(`  ✗ ${what}${detail === undefined ? '' : `\n      ${String(detail).slice(0, 300)}`}`);
 }
 const OUT = 'tools/e2e/out';
+
+/** Разбор на столе (docs/09-game-design.md, «Итог партии и разбор»): холст позиции, метка «Сыграно», переход между
+ *  решениями и «Только неточности и ошибки». */
+async function checkReviewTable(p: Page) {
+  if (!(await p.locator('[data-testid^="decision-"]').count())) return;
+  await p.getByTestId('review-table').waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await visible(p, 'review-table'), 'разбор: стол позиции перед решением');
+  ok(await p.getByTestId('review-table').locator('canvas').count() > 0, 'разбор: стол нарисован на холсте');
+  await p.waitForTimeout(600);
+  const marks = async () => p.locator('[data-testid^="mark-played-"], [data-testid="mark-chip-played"]').count();
+  ok(await marks() > 0, 'разбор: сыгранный ход отмечен на столе');
+  const grade = await p.getByTestId('review-grade').innerText().catch(() => '');
+  if (grade !== 'точно') {
+    ok(await p.locator('[data-testid^="mark-best-"], [data-testid="mark-chip-best"]').count() > 0, `разбор: у решения «${grade}» отмечен и лучший ход`);
+    ok(await p.getByTestId('mark-label-best').isVisible().catch(() => false) || await visible(p, 'mark-chip-best'), 'разбор: подпись «Лучше»');
+  }
+  if (await visible(p, 'review-next') || await visible(p, 'review-prev')) {
+    const before = await p.getByTestId('review-step').innerText();
+    const dir = await p.getByTestId('review-next').isEnabled().catch(() => false) ? 'review-next' : 'review-prev';
+    await p.getByTestId(dir).click();
+    await p.waitForTimeout(300);
+    const after = await p.getByTestId('review-step').innerText();
+    ok(before !== after, `разбор: переход между решениями — «${before}» → «${after}»`);
+    ok(await marks() > 0, 'разбор: метка на столе после перехода');
+  }
+  if (await visible(p, 'review-only')) {
+    await p.getByTestId('review-only').click();
+    await p.waitForTimeout(300);
+    const g = await p.getByTestId('review-grade').innerText().catch(() => '');
+    ok(g !== 'точно', `разбор: «Только неточности и ошибки» — ${g || 'нет решений'}`);
+    for (let k = 0; k < 3 && await p.getByTestId('review-next').isEnabled().catch(() => false); k++) {
+      await p.getByTestId('review-next').click();
+      await p.waitForTimeout(200);
+      ok(await p.getByTestId('review-grade').innerText().catch(() => '') !== 'точно', 'разбор: среди неточностей и ошибок «точно» нет');
+    }
+    await p.getByTestId('review-only').click();
+  }
+}
 mkdirSync(OUT, { recursive: true });
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
 const handCount = (p: Page) => p.locator('[data-testid^="hand-"]').count();
@@ -192,6 +230,8 @@ try {
   await page.getByTestId('review').waitFor({ timeout: 5000 });
   ok(!(await visible(page, 'review-locked')), 'полный разбор последней партии дня открыт без «Про»');
   ok(await page.locator('[data-testid^="decision-"]').count() > 0 || /не было выбора/.test(await page.getByTestId('review').innerText()), 'разбор: решения по отбоям');
+  await checkReviewTable(page);
+  await page.waitForTimeout(500);
   await page.screenshot({ path: `${OUT}/03-review.png` });
   await page.getByTestId('review-back').click();
   await page.getByTestId('result').waitFor({ timeout: 5000 });
@@ -334,6 +374,7 @@ try {
   await page.locator('[data-testid^="stats-review-"]').first().click();
   await page.getByTestId('review').waitFor({ timeout: 5000 });
   ok(!(await visible(page, 'review-locked')), 'с «Про» — разбор любой партии');
+  ok(await visible(page, 'review-table') || /не было выбора|Считаем/.test(await page.getByTestId('review').innerText()), 'разбор из статистики — тоже на столе');
   await page.screenshot({ path: `${OUT}/06-stats-review.png` });
   await page.getByTestId('review-back').click();
   await page.getByTestId('stats-back').click();

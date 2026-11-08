@@ -1,10 +1,11 @@
 // Этап Д: шесть уровней и закрытый седьмой (#15), разбор партии, статистика, история (docs/10-bot.md, «Разбор»;
 // docs/09-game-design.md, «Итог партии и разбор», «Статистика»).
 import { describe, expect, test } from 'bun:test';
-import { dealOf, firstOf, observe, RULES_V1 } from '../../src/engine';
+import { apply, dealOf, firstOf, newGame, observe, RULES_V1 } from '../../src/engine';
 import type { Action, GameRecord, State } from '../../src/engine';
 import { chooseAction, gradeOf, levelOf, LEVELS, LOCKED_LEVEL, makeRng, sameAction, thinkSync, TOP, whyOf } from '../../src/bot';
-import { reviewGame } from '../../src/game/review';
+import { markOf, movesOf, positionAt, reviewGame, reviewLayout } from '../../src/game/review';
+import { layoutTable } from '../../src/render/layout';
 import { restoreGame } from '../../src/state/saved';
 import { normalizeHistory } from '../../src/state/history';
 import type { FinishedGame } from '../../src/state/history';
@@ -140,3 +141,82 @@ describe('статистика', () => {
   });
 });
 
+
+// Разбор на столе (docs/09-game-design.md, «Итог партии и разбор»): позиция перед решением и метки хода.
+describe('разбор на столе', () => {
+  const games = [11, 12, 13].map(seed => botGame(seed, 'novice', 'average'));
+  const reviews = games.map(rec => thinkSync(reviewGame(rec, 0, 8)));
+
+  test('позиция перед решением — то же наблюдение, которое судил разбор', () => {
+    games.forEach(rec => {
+      const moves = movesOf(rec, 0);
+      for (const m of moves) expect(positionAt(rec, m.at, 0)).toEqual(m.o);
+      expect(positionAt(rec, 0, 1)).toEqual(observe(newGame({ rules: rec.rules, variant: rec.variant, seats: rec.seats, first: rec.first }, rec.deck), 1));
+    });
+  });
+
+  test('на столе разбора лицом — только то, что игрок видел: ни карт соперника, ни колоды', () => {
+    games.forEach((rec, gi) => {
+      for (const d of reviews[gi].decisions) {
+        let s = newGame({ rules: rec.rules, variant: rec.variant, seats: rec.seats, first: rec.first }, rec.deck);
+        for (let i = 0; i < d.at; i++) s = apply(s, rec.actions[i].seat, rec.actions[i].action);
+        const o = positionAt(rec, d.at, 0);
+        for (const showOpenly of [false, true]) {
+          const l = layoutTable(o, { width: 380, height: 460, order: 'suit', picked: null, targets: [], showOpenly });
+          const faces = l.sprites.flatMap(x => (x.card === null ? [] : [x.card]));
+          const seen = new Set<number>([...s.hands[0], ...s.table.flat().filter((x): x is number => x !== null), s.trump, ...(showOpenly ? s.openly[1] : [])]);
+          for (const c of faces) expect(seen.has(c)).toBe(true);
+          // скрытая рука соперника — только рубашки
+          const hidden = s.hands[1].filter(c => !s.openly[1].includes(c));
+          for (const c of hidden) expect(faces).not.toContain(c);
+          for (const c of s.talon.slice(0, -1)) expect(faces).not.toContain(c);
+        }
+      }
+    });
+  });
+
+  test('метки: «Сыграно» всегда, «Лучше» — только у неточного; карты — в руке и на столе позиции', () => {
+    let both = 0;
+    games.forEach((rec, gi) => {
+      for (const d of reviews[gi].decisions) {
+        const o = positionAt(rec, d.at, 0);
+        const m = markOf(d, o);
+        const kinds = new Set([...m.hand, ...m.table].flatMap(x => x.kinds).concat(m.chips.map(x => x.kind)));
+        expect(kinds.has('played')).toBe(true);
+        expect(kinds.has('best')).toBe(d.grade !== 'ok');
+        if (d.grade !== 'ok') both++;
+        for (const x of m.hand) expect(o.hand).toContain(x.card);
+        for (const x of m.table) expect(o.table.map(([a]) => a)).toContain(x.card);
+        const base = layoutTable(o, { width: 380, height: 460, order: 'suit', picked: null, targets: [], showOpenly: false });
+        const up = reviewLayout(base, m.hand.filter(x => x.kinds.includes('best')).map(x => x.card));
+        for (const x of m.hand) {
+          const a = base.sprites.find(q => q.key === `c${x.card}`)!, b = up.sprites.find(q => q.key === `c${x.card}`)!;
+          expect(b.y < a.y).toBe(x.kinds.includes('best'));
+        }
+      }
+    });
+    expect(both).toBeGreaterThan(0);
+  }, 60_000);
+
+  test('метки ходов без карт и боя: «Беру», «Бито», «Пас», карта стола под боем', () => {
+    const s: State = { ...pos({ hands: ['8♠ 9♥ 6♣', 'Т♠ К♣'], trump: '6♥', attacker: 1, defender: 0, talonEmpty: true }), table: [[c('7♠'), null]] };
+    const o = observe(s, 0);
+    const d = (played: Action, best: Action, grade: 'ok' | 'error' = 'error') => ({
+      at: 0, bout: 1, played, best, grade, exact: false, bestChance: 0.6, playedChance: 0.3, loss: 30, why: { kind: 'better' as const },
+    });
+    expect(markOf(d({ type: 'take' }, { type: 'beat', card: c('8♠'), on: c('7♠') }), o)).toEqual({
+      hand: [{ card: c('8♠'), kinds: ['best'] }], table: [{ card: c('7♠'), kinds: ['best'] }],
+      chips: [{ kind: 'played', action: 'take', done: false }],
+    });
+    const both = markOf(d({ type: 'beat', card: c('9♥'), on: c('7♠') }, { type: 'beat', card: c('8♠'), on: c('7♠') }), o);
+    expect(both.table).toEqual([{ card: c('7♠'), kinds: ['played', 'best'] }]);
+    expect(both.hand.map(x => x.kinds)).toEqual([['played'], ['best']]);
+    // «точно» — только сыгранное
+    expect(markOf(d({ type: 'take' }, { type: 'take' }, 'ok'), o).chips).toEqual([{ kind: 'played', action: 'take', done: false }]);
+    // ходящий, всё покрыто: «пас» — это «Бито»
+    const done: State = { ...pos({ hands: ['8♠ 7♣', 'Т♠ К♣'], trump: '6♥', talonEmpty: true }), table: [[c('7♦'), c('Т♦')]] };
+    const m = markOf(d({ type: 'pass' }, { type: 'throwIn', cards: [c('7♣')] }), observe(done, 0));
+    expect(m.chips).toEqual([{ kind: 'played', action: 'pass', done: true }]);
+    expect(m.hand).toEqual([{ card: c('7♣'), kinds: ['best'] }]);
+  });
+});

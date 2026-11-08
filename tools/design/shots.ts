@@ -1,6 +1,6 @@
 /**
  * Снимки экранов для аудита вида и листа стиля (docs/reports/2026-11-08-design-audit.md, docs/13-art.md):
- * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/.
+ * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17.
  *
  *   EXPO_OFFLINE=1 npm run export:web
  *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка]   # по умолчанию docs/design
@@ -74,6 +74,20 @@ try {
   await shot(page, '04-table-attack');
   await toEnd(page);
   await shot(page, '05-result');
+  // разбор на столе: открывается на главной ошибке; дальше — следующая неточность или ошибка
+  for (let w = 0; w < 120 && /Считаем/.test(await page.getByTestId('result-worst').innerText().catch(() => 'Считаем')); w++) await page.waitForTimeout(250);
+  await page.getByTestId('result-review').click();
+  await page.getByTestId('review').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(1000);
+  await shot(page, '16-review');
+  if (await visible(page, 'review-only')) {
+    await page.getByTestId('review-only').click();
+    if (await page.getByTestId('review-next').isEnabled().catch(() => false)) await page.getByTestId('review-next').click();
+    else if (await page.getByTestId('review-prev').isEnabled().catch(() => false)) await page.getByTestId('review-prev').click();
+    await shot(page, '17-review-next');
+  }
+  await page.getByTestId('review-back').click();
+  await page.getByTestId('result').waitFor({ timeout: 5000 });
 
   await page.getByTestId('result-menu').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
