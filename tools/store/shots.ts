@@ -133,7 +133,7 @@ try {
   // 4. переводной втроём, четырёхцветная колода, таблица вышедших карт
   await p.getByTestId('settings-open').click();
   await p.getByTestId('four-on').click();
-  await p.getByTestId('seencards-on').click();
+  await p.getByTestId('memory-on').click();
   await p.getByTestId('settings-back').click();
   await p.getByTestId('variant-perevodnoy').click();
   await p.getByTestId('bots-2').click();
