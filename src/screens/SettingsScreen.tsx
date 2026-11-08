@@ -1,9 +1,9 @@
 // Настройки (docs/09-game-design.md, «Настройки»): звук, вибрация, «Меньше движения» (как в системе,
 // пока игрок не выбрал сам — ADR устава 0023, правило 6), скорость ботов, порядок руки,
-// четырёхцветная колода, вышедшие карты, персональная реклама (этап Е, как в «Нардах»).
+// четырёхцветная колода, «Помощь памяти (для учёбы)», персональная реклама (этап Е, как в «Нардах»).
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
@@ -24,7 +24,7 @@ function Row({ title, note, children }: { title: string; note?: string; children
 }
 
 export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onReport: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const s = useSettings();
   const onOff = (v: boolean) => (v ? 'on' : 'off');
   const motion: Motion = s.lessMotion === undefined ? 'system' : s.lessMotion ? 'on' : 'off';
@@ -52,8 +52,8 @@ export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onRep
         <Row title={T.settings.fourColor} note={T.settings.fourColorNote}>
           <Chips id="four" items={['on', 'off'] as const} value={onOff(s.fourColor)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ fourColor: v === 'on' })} />
         </Row>
-        <Row title={T.settings.seenCards} note={T.settings.seenCardsNote}>
-          <Chips id="seencards" items={['on', 'off'] as const} value={onOff(s.seenCards)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ seenCards: v === 'on' })} />
+        <Row title={T.settings.memoryAid} note={T.settings.memoryAidNote}>
+          <Chips id="memory" items={['on', 'off'] as const} value={onOff(s.memoryAid)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ memoryAid: v === 'on' })} />
         </Row>
         <Row title={T.settings.personalAds} note={T.settings.personalAdsNote}>
           <Chips id="personal-ads" items={['on', 'off'] as const} value={onOff(s.personalAds)} label={v => (v === 'on' ? T.settings.on : T.settings.off)}

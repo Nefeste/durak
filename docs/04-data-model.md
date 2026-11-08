@@ -17,7 +17,7 @@ type State = {
   rules: RuleSet;             // свод: id 'durak-rules-v1', пределы атаки, firstBoutTransfer
   variant: 'podkidnoy' | 'perevodnoy'; seats: number;   // 2..4
   hands: number[][];          // руки по местам
-  talon: number[];            // прикуп сверху вниз; последний — козырь
+  talon: number[];            // колода сверху вниз; последний — козырь
   trump: number;              // козырная карта (масть = козырь)
   table: [number, number | null][]; // пары «атака — защита»
   discard: number[];          // сброс

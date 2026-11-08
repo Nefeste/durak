@@ -8,7 +8,7 @@ import { layout } from '../../src/bot/legal';
 import { actorOf, shuffled } from '../sim/play';
 import { stateFrom } from '../../src/engine';
 
-/** Двойник позиции: скрытые от `seat` карты перемешаны между руками соперников и прикупом. */
+/** Двойник позиции: скрытые от `seat` карты перемешаны между руками соперников и колодой. */
 function twin(s: State, seat: number, seed: number): State {
   const o = observe(s, seat);
   const pool = unseen(o);

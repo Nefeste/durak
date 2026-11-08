@@ -37,6 +37,8 @@ export const netTiming = { timeout: 12_000, retryAfter: 1500 };
 export class Net {
   private device: Device | null = null;
   private asking: Promise<Device | null> | null = null;
+  /** Почему не выдали ключ в последний раз: «Сервер недоступен» (502) и «нет связи» — разные слова игроку. */
+  private deviceFail: NetError | null = null;
 
   constructor(
     readonly base: string,
@@ -65,8 +67,10 @@ export class Net {
         const made: Device = { key: r.key, name: saved?.name ?? '', tag: null };
         await this.store.save(made);
         this.device = made;
+        this.deviceFail = null;
         return made;
-      } catch {
+      } catch (e) {
+        this.deviceFail = e instanceof NetError ? e : new NetError('offline');
         return null;
       }
     })().finally(() => { this.asking = null; });
@@ -76,7 +80,7 @@ export class Net {
   async hello(name: string): Promise<Device> {
     if (!this.adult()) throw new NetError('age');
     const d = await this.getDevice();
-    if (!d) throw new NetError('offline');
+    if (!d) throw this.deviceFail ?? new NetError('offline');
     const r = await this.request<{ id: number; name: string; tag: string }>('POST', '/v1/session', { name }, undefined, true);
     this.device = { key: d.key, name: r.name, tag: r.tag };
     await this.store.save(this.device);

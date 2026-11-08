@@ -14,14 +14,15 @@ export interface Settings {
   handOrder: HandOrder;
   /** Четырёхцветная колода: ♠ чёрные, ♣ зелёные, ♥ красные, ♦ синие. */
   fourColor: boolean;
-  /** Таблица вышедших карт против ботов; по умолчанию выключена. */
-  seenCards: boolean;
+  /** «Помощь памяти (для учёбы)»: взятые в открытую карты соперников лицом и таблица вышедших —
+   *  только против ботов, онлайн никогда (ADR 0006). По умолчанию выключена (решение владельца 08.11.2026). */
+  memoryAid: boolean;
   /** Персональная реклама (по интересам), как в «Нардах»; выключено — обычная, её не меньше. */
   personalAds: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, seenCards: false, personalAds: true,
+  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, memoryAid: false, personalAds: true,
 };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], dflt: T): T => (allowed.includes(v as T) ? (v as T) : dflt);
@@ -41,7 +42,8 @@ export function parseSettings(raw: string | null): Settings {
     botSpeed: pick(v.botSpeed, ['normal', 'fast'] as const, d.botSpeed),
     handOrder: pick(v.handOrder, ['suit', 'rank'] as const, d.handOrder),
     fourColor: flag(v.fourColor, d.fourColor),
-    seenCards: flag(v.seenCards, d.seenCards),
+    // до 0.5.1 настройка звалась `seenCards` и включала только таблицу
+    memoryAid: flag(v.memoryAid ?? v.seenCards, d.memoryAid),
     personalAds: flag(v.personalAds, d.personalAds),
   };
   if (typeof v.lessMotion === 'boolean') s.lessMotion = v.lessMotion;

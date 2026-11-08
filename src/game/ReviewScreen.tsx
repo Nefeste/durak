@@ -3,7 +3,7 @@
 // разбор последней партии дня; любой — «Про» или один просмотр рекламы. Онлайн разбора нет (ADR 0006).
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useInsets } from '../ui/insets';
 import { reviewGame } from './review';
 import type { Decision, Review } from '../bot';
 import type { GameRecord } from '../engine';
@@ -40,7 +40,7 @@ function Row({ d }: { d: Decision }) {
 export function ReviewScreen({ review: given, record, at, lastToday, onBack, onStore }: {
   review: Review | null; record?: GameRecord; at: number; lastToday: boolean; onBack: () => void; onStore: () => void;
 }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   // разбор старой партии, который не успел досчитаться, — досчитать здесь и сохранить
   const [local, setLocal] = useState<Review | null>(null);
   const review = given ?? local;

@@ -1,9 +1,11 @@
 /**
  * Браузерный прогон этапов Б и В: меню → партия с ботом на холсте Skia настоящими касаниями до итога →
  * «Ещё партию» → сохранение: пара ходов, «В меню», перезагрузка страницы, «Продолжить партию» →
- * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, вышедшие карты) →
+ * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, «Помощь памяти») →
  * переводной с двумя ботами до итога → «Мастер» и «Подсказка» до итога → магазин: «Без рекламы» в тестовом
- * магазине, перезагрузка, «Восстановить покупки» (этап Е). Карты руки — прозрачные «кнопки» поверх холста: касание
+ * магазине, перезагрузка, «Восстановить покупки» (этап Е). Сначала — правки 0.5.1 по игре владельца на телефоне:
+ * экран 412 × 780 с отступом снизу 48 (`?inset=48`, как кнопки «Назад / Домой / Недавние»): нижние кнопки меню
+ * и стола над ним; стол и карты одного размера в свой ход и в чужой; «колода N»; «Помощь памяти» выключена. Карты руки — прозрачные «кнопки» поверх холста: касание
  * идёт в обработчик стола, поэтому щелчки — `force`. Ловит пустой экран, неработающие касания,
  * зависшую партию, потерянное сохранение и ошибки в консоли. Снимки — в tools/e2e/out/.
  *
@@ -70,6 +72,87 @@ try {
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   ok(await page.getByText('Козырь').first().isVisible(), 'главный экран: название «Козырь»');
   await page.screenshot({ path: `${OUT}/01-menu.png` });
+
+  console.log('Телефон 0.5.1: отступ снизу, постоянный стол, «колода», без помощи памяти');
+  {
+    const H = 780, INSET = 48;
+    const ctx = await browser.newContext({ viewport: { width: 412, height: H } });
+    const ph = await ctx.newPage();
+    ph.on('pageerror', e => errors.push(String(e)));
+    await ph.goto(`${web.url}?inset=${INSET}`); // без ?fast: боты думают как на телефоне
+    await ph.getByTestId('menu').waitFor({ timeout: 20000 });
+    for (const id of ['store-open', 'settings-open']) {
+      await ph.getByTestId(id).scrollIntoViewIfNeeded();
+      const b = await ph.getByTestId(id).boundingBox();
+      ok(!!b && b.y + b.height <= H - INSET, `меню: «${id}» над кнопками телефона`, JSON.stringify(b));
+    }
+    await ph.screenshot({ path: `${OUT}/00-menu-inset.png` });
+    await ph.getByTestId('settings-open').click();
+    await ph.getByTestId('settings').waitFor({ timeout: 5000 });
+    ok(await ph.getByTestId('memory-off').getAttribute('aria-selected').catch(() => null) === 'true', '«Помощь памяти (для учёбы)» по умолчанию выключена');
+    await ph.getByTestId('settings-back').scrollIntoViewIfNeeded();
+    const sb = await ph.getByTestId('settings-back').boundingBox();
+    ok(!!sb && sb.y + sb.height <= H - INSET, 'настройки: «Назад» над кнопками телефона', JSON.stringify(sb));
+    await ph.getByTestId('settings-back').click();
+    await ph.getByTestId('play').click();
+    await ph.getByTestId('game').waitFor({ timeout: 10000 });
+    await ph.waitForTimeout(400);
+    ok(!(await visible(ph, 'seen')), 'без «Помощи памяти» кнопки «Вышедшие» нет');
+    const talon = await ph.getByTestId('talon').innerText().catch(() => '');
+    ok(/^колода \d+$/.test(talon.trim()), `у стопки — «${talon}»`, talon);
+    // размеры стола и карт руки на каждом шаге: в свой ход (есть «Подсказка») и в чужой (её нет)
+    const sizes = new Map<string, number>();
+    const seen = { mine: false, theirs: false };
+    const sets = new Set<string>();
+    let lowest = 0;
+    for (let i = 0; i < 400 && !(await visible(ph, 'result')); i++) {
+      // boundingBox ждёт элемент до 30 с — меряем только то, что есть
+      const box = async (sel: string) => (await ph.locator(sel).count()) > 0 ? ph.locator(sel).first().boundingBox({ timeout: 1000 }).catch(() => null) : null;
+      const measure = async () => {
+        const felt = await box('[data-testid="felt"]');
+        const card = await box('[data-testid^="hand-"]');
+        // в 0.5.0 стол сжимался, когда у руки появлялись «Отменить» и «Подсказка»: запоминаем, какие кнопки были
+        const shown: string[] = [];
+        for (const id of ['undo', 'advise', 'pass', 'take']) if (await visible(ph, id)) shown.push(id);
+        sets.add(shown.join('+') || 'нет кнопок');
+        seen[shown.includes('advise') ? 'mine' : 'theirs'] = true;
+        if (felt && card) {
+          const key = `${Math.round(felt.width)}×${Math.round(felt.height)} карта ${Math.round(card.height)}`;
+          sizes.set(key, (sizes.get(key) ?? 0) + 1);
+        }
+      };
+      await measure();
+      for (const id of ['pass', 'take', 'advise', 'undo']) {
+        const b = await box(`[data-testid="${id}"]`);
+        if (b) lowest = Math.max(lowest, b.y + b.height);
+      }
+      const cards = ph.locator('[data-testid^="hand-"]');
+      const n = await cards.count();
+      const before = n;
+      let moved = false;
+      for (let k = 0; k < n && !moved; k++) {
+        await cards.nth(k).click({ timeout: 1000, force: true }).catch(() => {});
+        await ph.waitForTimeout(30);
+        if (/Какую карту бить|Коснитесь карты/.test(await ph.getByTestId('hint').innerText().catch(() => ''))) {
+          await ph.getByTestId('table').locator('[data-testid^="table-"]').first().click({ force: true }).catch(() => {});
+        }
+        moved = (await handCount(ph).catch(() => before)) < before;
+      }
+      // сразу после своей карты бот ещё думает (0,5–0,9 с) — замер в чужой ход
+      if (moved) await measure();
+      if (!moved) {
+        if (await visible(ph, 'pass')) await ph.getByTestId('pass').click().catch(() => {});
+        else if (await visible(ph, 'take')) await ph.getByTestId('take').click().catch(() => {});
+      }
+      await ph.waitForTimeout(100);
+      if (i === 2) await ph.screenshot({ path: `${OUT}/02-table-inset.png` });
+      if (i >= 40 && seen.mine && seen.theirs && sets.size >= 3) break; // сорок шагов партии хватает
+    }
+    ok(seen.mine && seen.theirs && sets.size >= 3, `замеры в свой ход (с «Подсказкой») и в чужой (без неё); наборы кнопок: ${[...sets].join(', ')}`, JSON.stringify(seen));
+    ok(sizes.size === 1, `стол и карты одного размера всю партию: ${[...sizes.keys()].join(', ')}`, [...sizes.entries()].join('; '));
+    ok(lowest > 0 && lowest <= H - INSET, `кнопки у руки над кнопками телефона: низ ${Math.round(lowest)} ≤ ${H - INSET}`, lowest);
+    await ctx.close();
+  }
 
   console.log('Подкидной, один бот');
   await page.getByTestId('play').click();
@@ -168,7 +251,7 @@ try {
   ok(await visible(page, 'motion-system'), '«Меньше движения»: по умолчанию — как в системе');
   await page.getByTestId('motion-on').click();
   await page.getByTestId('four-on').click();
-  await page.getByTestId('seencards-on').click();
+  await page.getByTestId('memory-on').click();
   await page.screenshot({ path: `${OUT}/05-settings.png` });
   await page.reload();
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
@@ -185,7 +268,7 @@ try {
   await page.getByTestId('game').waitFor({ timeout: 10000 });
   await page.waitForTimeout(300);
   ok(await visible(page, 'opp-2'), 'два соперника');
-  ok(await visible(page, 'seen'), 'кнопка «Вышедшие» включена в настройках');
+  ok(await visible(page, 'seen'), 'кнопка «Вышедшие» — с «Помощью памяти» из настроек');
   await page.getByTestId('seen').click();
   ok(await visible(page, 'seen-sheet'), 'таблица вышедших карт');
   await page.getByTestId('seen-close').click();

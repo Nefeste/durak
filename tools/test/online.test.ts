@@ -27,6 +27,17 @@ describe('онлайн на телефоне', () => {
     expect(inviteCode('kozyr://anything')).toBeNull();
   });
 
+  test('сервер отвечает 502: имя не сохранено с причиной «server», после починки — сохраняется (0.5.1)', async () => {
+    let broken = true;
+    const server = Bun.serve({ port: 0, fetch: req => (broken ? new Response('<html>502 Bad Gateway</html>', { status: 502 }) : app.http.handle(req, '127.0.0.1')) });
+    const n = new Net(`http://127.0.0.1:${server.port}`, mem(), '0.5.1');
+    const kind = await n.hello('Петя').then(() => 'ok', (e: { kind?: string }) => e.kind);
+    expect(kind).toBe('server');
+    broken = false;
+    expect((await n.hello('Петя')).name).toBe('Петя');
+    server.stop(true);
+  });
+
   test('цвет ошибки читается на тёмном столе (AA)', () => {
     const lum = (hex: string) => {
       const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));

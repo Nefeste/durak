@@ -1,8 +1,8 @@
 // Главный экран: стол, число соперников и уровень — «Играть»; «Продолжить партию», если она
 // сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки».
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useInsets } from '../ui/insets';
 import type { Variant } from '../engine';
 import { LEVELS, LOCKED_LEVEL } from '../bot';
 import type { Level } from '../bot';
@@ -18,10 +18,11 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
   onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void;
 }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const [lockedNote, setLockedNote] = useState(false);
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 }]} testID="menu">
+    // прокрутка: на невысоком экране или с крупным шрифтом нижний ряд не уходит под кнопки телефона (0.5.1)
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 }]} testID="menu">
       <View style={styles.head}>
         <View style={styles.backs}><CardBack /><View style={styles.tilt}><CardBack /></View></View>
         <Text style={styles.title}>{T.app.name}</Text>
@@ -53,12 +54,13 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
           <View style={styles.cell}><Button label={T.menu.settings} kind="ghost" onPress={onSettings} testID="settings-open" /></View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20, gap: 20, justifyContent: 'space-between' },
+  root: { flex: 1, backgroundColor: C.bg },
+  content: { flexGrow: 1, paddingHorizontal: 20, gap: 20, justifyContent: 'space-between' },
   head: { alignItems: 'center', gap: 6 },
   backs: { flexDirection: 'row', height: 100, marginBottom: 8 },
   tilt: { marginLeft: -30, transform: [{ rotate: '12deg' }] },

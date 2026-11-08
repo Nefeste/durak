@@ -84,7 +84,7 @@ export function TableCanvas({ layout, font, small, fourColor, less, hand, table,
 }) {
   const { cw, ch } = layout;
   const faces = useMemo(() => makeFaces(cw, ch, font, small, fourColor), [cw, ch, font, small, fourColor]);
-  // раздача: пока она идёт, появившиеся карты вылетают из прикупа по очереди; позже новая карта
+  // раздача: пока она идёт, появившиеся карты вылетают из колоды по очереди; позже новая карта
   // прилетает сразу (с места, откуда её положили, — `from` раскладки)
   const [dealing, setDealing] = React.useState(!less);
   useEffect(() => {

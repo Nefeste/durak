@@ -1,8 +1,10 @@
 // Раскладка стола (docs/09-game-design.md, «Экран партии»): чистая функция наблюдения места —
 // где лежит каждая карта, откуда она прилетает, что подсвечено. Холст (TableCanvas) только рисует
-// эти места и плавно переводит карты из старых в новые. Скрытые карты соперников и прикупа — без
+// эти места и плавно переводит карты из старых в новые. Скрытые карты соперников и колоды — без
 // своих номеров: ключи `h<место>-<i>` и `t-<i>`; лицо есть только у карт, которые место видит
-// (ADR 0005, 0008). Без React — проверяется тестами.
+// (ADR 0005, 0008). Карты, взятые соперником в открытую, лицом — только с «Помощью памяти»
+// (`showOpenly`; решение владельца 08.11.2026, docs/09-game-design.md): игрок держит их в памяти,
+// как за настоящим столом. Без React — проверяется тестами.
 import { rankOf, suitOf } from '../engine';
 import type { Card, Observation } from '../engine';
 
@@ -20,7 +22,7 @@ export interface Sprite {
   z: number;
   /** Подсвечено как место, куда можно положить выбранную карту. */
   glow: boolean;
-  /** Откуда прилетает, если ключ новый (из прикупа, от места соперника). */
+  /** Откуда прилетает, если ключ новый (из колоды, от места соперника). */
   from: { x: number; y: number };
 }
 
@@ -55,6 +57,8 @@ export interface LayoutOptions {
   picked: Card | null;
   /** Куда её можно положить: карты атаки на столе. */
   targets: Card[];
+  /** Показывать лицом карты, взятые соперником в открытую («Помощь памяти»); по умолчанию — рубашкой. */
+  showOpenly?: boolean;
 }
 
 /** Порядок руки: «по мастям, козыри справа» или «по старшинству» (козыри всё равно справа). */
@@ -90,7 +94,7 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   const opponents: Seat[] = others.map((seat, i) => ({ seat, x: Math.round((W * (2 * i + 1)) / (2 * others.length)), y: oppY }));
   const oppScale = 0.55;
   for (const p of opponents) {
-    const openly = o.openly[p.seat];
+    const openly = opt.showOpenly ? o.openly[p.seat] : [];
     const hidden = Math.max(0, o.handSizes[p.seat] - openly.length);
     const n = hidden + openly.length;
     const step = Math.min(cw * oppScale * 0.32, (W / others.length - cw * oppScale - m) / Math.max(1, n - 1));
@@ -110,7 +114,7 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   const top = oppY + (ch * oppScale) / 2 + m;
   const bottom = handY - ch / 2 - CONTROLS;
   const midY = Math.round((top + bottom) / 2);
-  // прикуп слева: открытый козырь поперёк под стопкой рубашек
+  // колода слева: открытый козырь поперёк под стопкой рубашек
 
   const talon = { x: Math.round(m + ch / 2), y: midY };
   if (o.talonSize > 0) {

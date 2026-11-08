@@ -38,3 +38,6 @@ export const suitColors = (fourColor: boolean): readonly string[] =>
 
 export const RADIUS = { card: 14, button: 22, playing: 8 } as const;
 export const HEAD = undefined as string | undefined;
+
+/** Высота верхней полосы экранов со столом: постоянная, чтобы стол не менял размер (0.5.1). */
+export const TOP_BAR = 44;
