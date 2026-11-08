@@ -44,4 +44,8 @@ export const KEYS = {
   unlocked: 'durak.unlocked',
   /** когда просили оценку в RuStore (src/money/review.ts) */
   rate: 'durak.rate',
+  /** законченные партии с ботами, 200 последних (`FinishedGame`, src/state/history.ts) */
+  games: 'durak.games',
+  /** задачи дня: попытки и итог по дням (`PuzzleLog`, src/state/puzzles.ts) */
+  puzzles: 'durak.puzzles',
 } as const;

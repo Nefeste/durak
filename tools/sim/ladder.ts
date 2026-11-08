@@ -5,7 +5,7 @@
 import { LEVELS } from '../../src/bot';
 
 const [rulePairs = '1000', searchPairs = '200', jobs = '4'] = process.argv.slice(2);
-const SEARCH = new Set(['experienced', 'strong', 'master']);
+const SEARCH = new Set(['experienced', 'master']);
 const tasks: { a: string; b: string; variant: string; pairs: number; seed: number }[] = [];
 for (let i = 1; i < LEVELS.length; i++) {
   for (const [k, variant] of ['podkidnoy', 'perevodnoy'].entries()) {

@@ -30,7 +30,7 @@ const arg = (typeof (globalThis as { LEVELS_ARG?: string }).LEVELS_ARG === 'stri
 const levels = (arg ? arg.split(',') : LEVELS) as Level[];
 for (const level of levels) {
   const times: number[] = [];
-  for (const { o } of positions.slice(0, level === 'master' ? 6 : level === 'strong' ? 12 : 30)) {
+  for (const { o } of positions.slice(0, level === 'master' ? 6 : 30)) {
     const t = Date.now();
     chooseAction(o, level, makeRng(1));
     times.push(Date.now() - t);

@@ -19,7 +19,7 @@ export interface SearchParams {
   endgame: number;
 }
 
-const same = (a: Action, b: Action) => JSON.stringify(a) === JSON.stringify(b);
+export const same = (a: Action, b: Action) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Действия, которые стоит считать: из наборов одного достоинства — по одной карте и весь набор;
  *  первым — то, что выбрал бы «Средний» (при равенстве побеждает он: игра похожа на человеческую). */
@@ -52,8 +52,10 @@ function shuffle(xs: Card[], rng: Rng): Card[] {
 export interface Scored { action: Action; score: number; samples: number }
 
 /** Оценки действий по раскладам: `yield` после каждого расклада, `true` в ответ — хватит. */
-export function* scoreActions(o: Observation, samples: number, rng: Rng, legal: Action[] = legalFor(o)): Thinking<Scored[]> {
+export function* scoreActions(o: Observation, samples: number, rng: Rng, legal: Action[] = legalFor(o), include?: Action): Thinking<Scored[]> {
   const cands = candidates(o, legal, rng);
+  // разбор оценивает и действие игрока, даже если поиск его сам не перебирал бы (часть набора)
+  if (include && !cands.some(a => same(a, include))) cands.push(include);
   const sum = new Array<number>(cands.length).fill(0);
   const pool = unseen(o);
   let n = 0;

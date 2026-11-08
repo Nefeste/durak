@@ -10,11 +10,10 @@ export const MAIN_PRODUCTS: readonly MainProductId[] = ['no_ads', 'pro_month', '
 export const PRODUCT_IDS: readonly ProductId[] = MAIN_PRODUCTS;
 
 /**
- * «Про» продаётся, только когда есть то, что она даёт: полный разбор и подробная статистика —
- * этап Д (docs/07-roadmap.md). До этого витрина показывает одну «Без рекламы»: продавать то,
- * чего ещё нет, нельзя (устав, «Честность»). Включает этап Д — одной строкой.
+ * «Про» продаётся, только когда есть то, что она даёт: полный разбор и подробная статистика (устав,
+ * «Честность»). С этапа Д (0.5.0) они есть — «Про» на витрине.
  */
-export const PRO_ON_SALE = false;
+export const PRO_ON_SALE: boolean = true;
 /** Товары на витрине сейчас. */
 export const ON_SALE: readonly MainProductId[] = PRO_ON_SALE ? MAIN_PRODUCTS : ['no_ads'];
 

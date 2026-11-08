@@ -30,11 +30,11 @@ describe('думать кусками', () => {
     while (legalFor(observe(s, actorOf(s))).length < 4) s = apply(s, actorOf(s), thinkSync(think(observe(s, actorOf(s)), 'average', rng)));
     const o = observe(s, actorOf(s));
     let yields = 0;
-    const t = think(o, 'strong', makeRng(1));
+    const t = think(o, 'master', makeRng(1));
     let r = t.next();
     while (!r.done) { yields++; r = t.next(false); }
     expect(yields).toBeGreaterThan(50);
-    expect(r.value).toEqual(thinkSync(think(o, 'strong', makeRng(1))));
+    expect(r.value).toEqual(thinkSync(think(o, 'master', makeRng(1))));
   }, 60_000);
   test('сигнал «хватит» — ответ сразу, из досчитанного', () => {
     const rng = makeRng(8);
@@ -72,11 +72,11 @@ describe('кусками на часах', () => {
     for (let n = 0; n < 40 && s.phase !== 'end'; n++) {
       const o = observe(s, actorOf(s));
       if (legalFor(o).length > 2) {
-        const sync = thinkSync(think(o, 'strong', makeRng(n)));
-        const sliced = await thinkSliced(think(o, 'strong', makeRng(n)), 1e9, 1).promise;
+        const sync = thinkSync(think(o, 'master', makeRng(n)));
+        const sliced = await thinkSliced(think(o, 'master', makeRng(n)), 1e9, 1).promise;
         expect(sliced).toEqual(sync);
         // шаг — работа между двумя `yield`: одно доигрывание или 48 узлов концовки
-        const t = think(o, 'strong', makeRng(n));
+        const t = think(o, 'master', makeRng(n));
         let at = performance.now();
         for (let r = t.next(); !r.done; r = t.next(false)) { const now = performance.now(); longest = Math.max(longest, now - at); at = now; }
         checked++;

@@ -1,10 +1,10 @@
 // Главный экран: стол, число соперников и уровень — «Играть»; «Продолжить партию», если она
 // сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки».
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Variant } from '../engine';
-import { LEVELS } from '../bot';
+import { LEVELS, LOCKED_LEVEL } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
@@ -14,11 +14,12 @@ import { CardBack } from '../render/PlayingCard';
 
 export interface Choice { variant: Variant; bots: number; level: Level }
 
-export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore }: {
+export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore, onPuzzle, onStats }: {
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
-  onFriends: () => void; onQuick: () => void; onStore: () => void;
+  onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const [lockedNote, setLockedNote] = useState(false);
   return (
     <View style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 }]} testID="menu">
       <View style={styles.head}>
@@ -32,7 +33,9 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
         <Text style={styles.label}>{T.menu.opponents}</Text>
         <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => onChange({ ...choice, bots })} />
         <Text style={styles.label}>{T.menu.level}</Text>
-        <Chips id="level" items={LEVELS} value={choice.level} label={l => T.level[l]} onChange={level => onChange({ ...choice, level })} />
+        <Chips id="level" items={LEVELS} value={choice.level} label={l => T.level[l]} onChange={level => { setLockedNote(false); onChange({ ...choice, level }); }}
+          locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel, onPress: () => setLockedNote(v => !v) }} />
+        {lockedNote ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
       </View>
       <View style={styles.actions}>
         {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
@@ -40,6 +43,10 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
         <View style={styles.row}>
           <View style={styles.cell}><Button label={T.menu.friends} kind="ghost" onPress={onFriends} testID="friends-open" /></View>
           <View style={styles.cell}><Button label={T.menu.quick} kind="ghost" onPress={onQuick} testID="quick-open" /></View>
+        </View>
+        <View style={styles.row}>
+          <View style={styles.cell}><Button label={T.menu.puzzle} kind="ghost" onPress={onPuzzle} testID="puzzle-open" /></View>
+          <View style={styles.cell}><Button label={T.menu.stats} kind="ghost" onPress={onStats} testID="stats-open" /></View>
         </View>
         <View style={styles.row}>
           <View style={styles.cell}><Button label={T.menu.store} kind="ghost" onPress={onStore} testID="store-open" /></View>
@@ -59,6 +66,7 @@ const styles = StyleSheet.create({
   tagline: { color: C.dim, fontSize: 16 },
   panel: { gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   label: { color: C.dim, fontSize: 14, marginTop: 4 },
+  note: { color: C.dim, fontSize: 14 },
   actions: { gap: 10 },
   row: { flexDirection: 'row', gap: 10 },
   cell: { flex: 1 },

@@ -210,7 +210,7 @@ SDK из зависимостей убран, чтобы APK не нёс его 
   `app.json` — App Link на этот адрес.
 - CI: `server.yml` — тесты сервера, сборка в один файл, пробный запуск и ветка `vps` (как у «Нард»); машина —
   `Nefeste/gornitsagames`, `deploy/durak/`, порт 8792.
-- Бот за отключившегося — «Сильный» этапа В; пока его нет — сильнейший из готовых уровней (`standInLevel`).
+- Бот за отключившегося — сильнейший уровень, «Мастер» (`standInLevel` = `TOP`); столы с `strong` в базе читаются как «Мастер» (`fixTable`).
 
 ### Этап Е, 08.11.2026 — деньги и магазин
 
@@ -220,4 +220,18 @@ SDK из зависимостей убран, чтобы APK не нёс его 
 - `src/screens/StoreScreen.tsx` — «Магазин» в меню; «Персональная реклама» — в настройках.
 - `store/` — карточка RuStore, анкеты, графика и снимки (`tools/store/shots.ts`), страница игры для сайта студии.
 - `.github/workflows/rustore.yml` — загрузка в RuStore из набора студии, только руками.
+
+### Этап Д, 08.11.2026 — разбор, задача дня, статистика, шесть уровней
+
+- Уровни — шесть и закрытое седьмое место «Нейросеть» (#15): `LEVELS`, `TOP`, `LOCKED_LEVEL`, `levelOf` в
+  `src/bot/index.ts`; закрытое место — `Chips` с `locked` в меню.
+- Разбор — `src/bot/review.ts` (`reviewThink`: кусками, только по наблюдениям игрока — запись партии разворачивает в них `src/game/review.ts`, ADR 0005; точная концовка вдвоём или расклады,
+  `whyOf`); экран — `src/game/ReviewScreen.tsx`, слова — `src/game/words.ts`. Считается после партии
+  (`GameScreen`), хранится с партией в `src/state/history.ts`.
+- Задача дня — `src/game/puzzle.ts` (позиция, день, проверка хода и ответ соперника точным расчётом),
+  `src/game/PuzzleScreen.tsx`, набор `src/game/puzzleSet.ts` — генерирует `tools/puzzles/collect.ts`; попытки —
+  `src/state/puzzles.ts`.
+- Статистика — чистая `src/state/stats.ts` (`computeStats`, козыри `trumpsDealt`, Эло тренировок) и
+  `src/screens/StatsScreen.tsx`.
+- «Про» в продаже: `PRO_ON_SALE = true`; права читают только `StoreScreen`, `StatsScreen` и `ReviewScreen` (тест).
 

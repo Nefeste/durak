@@ -1,5 +1,6 @@
-// Уровни ботов (docs/10-bot.md, «Уровни»): четыре — по правилам, три — поиск по раскладам; «Сильный» и
-// «Мастер» решают концовку вдвоём точно. Вход у всех — только наблюдение места (ADR 0005).
+// Уровни ботов (docs/10-bot.md, «Уровни»): четыре — по правилам, два — поиск по раскладам; «Мастер» решает
+// концовку вдвоём точно. Седьмое место — «Нейросеть», закрыто, пока её нет (решение владельца #15).
+// Вход у всех — только наблюдение места (ADR 0005).
 import type { Action, Observation } from '../engine';
 import { legalFor } from './legal';
 import { chooseByRules } from './rules';
@@ -10,11 +11,16 @@ import type { SearchParams } from './search';
 import { thinkSync } from './think';
 import type { Thinking } from './think';
 
-export type Level = 'novice' | 'beginner' | 'amateur' | 'average' | 'experienced' | 'strong' | 'master';
+export type Level = 'novice' | 'beginner' | 'amateur' | 'average' | 'experienced' | 'master';
 
-export const LEVELS: Level[] = ['novice', 'beginner', 'amateur', 'average', 'experienced', 'strong', 'master'];
+export const LEVELS: Level[] = ['novice', 'beginner', 'amateur', 'average', 'experienced', 'master'];
 export const RULE_LEVELS: Level[] = ['novice', 'beginner', 'amateur', 'average'];
-export const SEARCH_LEVELS: Level[] = ['experienced', 'strong', 'master'];
+export const SEARCH_LEVELS: Level[] = ['experienced', 'master'];
+/** Сильнейший уровень: подсказка, разбор, бот за отключившегося онлайн. */
+export const TOP: Level = 'master';
+/** Седьмое место в меню — закрыто: откроется вместе с нейросетью (docs/10-bot.md, «Нейросеть»). Не
+ *  продаётся и ничем не открывается, кроме новой версии игры: сила за деньги не продаётся (устав). */
+export const LOCKED_LEVEL = 'neural' as const;
 
 const RULES: Partial<Record<Level, RuleParams>> = {
   novice: { random: 0.6, saveTrumps: false, pressure: false },
@@ -25,20 +31,27 @@ const RULES: Partial<Record<Level, RuleParams>> = {
 
 export const SEARCH: Partial<Record<Level, SearchParams>> = {
   experienced: { samples: 4, endgame: 0 },
-  strong: { samples: 32, endgame: 8_000 },
   master: { samples: 128, endgame: 15_000 },
 };
 
 /** Сколько уровень думает самое большее в приложении, мс (docs/10-bot.md, «Скорость»): на медленном
  *  телефоне бот чуть слабее, а не медленнее. В арене бюджет — число раскладов, а не время. */
 export const THINK_MS: Record<Level, number> = {
-  novice: 50, beginner: 50, amateur: 50, average: 50, experienced: 300, strong: 1000, master: 1500,
+  novice: 50, beginner: 50, amateur: 50, average: 50, experienced: 300, master: 1500,
 };
 
 /** С какого отбоя партии бот рвёт круг (обычная партия вдвоём — 15–25 отбоев). */
 export const LOOP_BOUT = 60;
 
 export const isLevel = (x: unknown): x is Level => typeof x === 'string' && (LEVELS as string[]).includes(x);
+
+/** Уровень из сохранения, настроек или базы сервера. До 0.5.0 был седьмой уровень `strong` («Сильный»);
+ *  его слили с «Мастером» (#15) — старые записи с ним открываются за «Мастером». Номера уровней вечные:
+ *  `strong` больше не выдаётся, но читается. */
+export function levelOf(x: unknown): Level | null {
+  if (x === 'strong') return 'master';
+  return isLevel(x) ? x : null;
+}
 
 /** Размышление уровня кусками (`think.ts`): для приложения — `thinkSliced`, для арены — `thinkSync`. */
 export function think(o: Observation, level: Level, rng: Rng): Thinking<Action> {
@@ -68,3 +81,5 @@ export type { Thinking } from './think';
 export { isEndgame, solveActions } from './endgame';
 export { adviseThink } from './search';
 export type { Advice } from './search';
+export { reviewThink, sameAction, gradeOf, whyOf, ERROR_PTS, INACCURATE_PTS, REVIEW_SAMPLES } from './review';
+export type { Review, Decision, Grade, Why, Move } from './review';

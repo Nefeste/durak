@@ -9,10 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
-import { apply, dealOf, deckFrom, firstOf, legalActions, nameOf, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
+import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
 import type { Action, Card, GameRecord, Result, State, Variant } from '../engine';
-import { adviseThink, makeRng, think, THINK_MS } from '../bot';
-import type { Advice, Level } from '../bot';
+import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
+import { reviewGame } from './review';
+import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
 import type { ThinkJob } from './think';
 import { T } from '../i18n';
@@ -28,6 +29,9 @@ import type { SavedGame } from '../state/save';
 import { botToAct, tapCard, YOU } from './table';
 import { autoPass, canUndo, seenGrid } from './flow';
 import { SeenCards } from './SeenCards';
+import { ReviewScreen } from './ReviewScreen';
+import { actionText, worstText } from './words';
+import { addFinished, setReview as storeReview } from '../state/history';
 
 const fast = typeof globalThis.location !== 'undefined' && /[?&]fast=1/.test(globalThis.location.search);
 /** Пауза перед «бито» само, когда подкинуть нечего (docs/09-game-design.md, «Темп»). */
@@ -44,24 +48,13 @@ function newRecord(variant: Variant, seats: number, history: (Result | null)[]):
     first: after ?? lowest.seat, firstWhy: after !== null ? 'afterFool' : lowest.why,
   };
 }
-/** Слова подсказки для действия. */
-function adviceText(a: Action, s: State): string {
-  const list = (cs: Card[]) => cs.map(nameOf).join(' ');
-  switch (a.type) {
-    case 'attack': return T.game.adviceAttack(list(a.cards));
-    case 'throwIn':
-    case 'give': return T.game.adviceThrow(list(a.cards));
-    case 'beat': return T.game.adviceBeat(nameOf(a.on), nameOf(a.card));
-    case 'transfer': return T.game.adviceTransfer(list(a.cards));
-    case 'take': return T.game.adviceTake;
-    case 'pass': return s.table.every(([, d]) => d !== null) ? T.game.adviceDone : T.game.advicePass;
-  }
-}
+/** Слова подсказки для действия: «пас» ходящего при всём покрытом — «бито». */
+const adviceText = (a: Action, s: State): string => actionText(a, s.table.every(([, d]) => d !== null));
 
 const stateOf = (r: GameRecord): State => newGame({ rules: r.rules, variant: r.variant, seats: r.seats, first: r.first }, r.deck);
 
-export function GameScreen({ variant, bots, level, restored, onExit }: {
-  variant: Variant; bots: number; level: Level; restored?: SavedGame | null; onExit: () => void;
+export function GameScreen({ variant, bots, level, restored, onExit, onStore }: {
+  variant: Variant; bots: number; level: Level; restored?: SavedGame | null; onExit: () => void; onStore: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const settings = useSettings();
@@ -82,6 +75,21 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
   // деньги (src/money): полноэкранная грузится в начале партии и показывается только при уходе с итога
   const startedAt = useRef(0);
   useEffect(() => { startedAt.current = Date.now(); gameStarted(); }, [deal]);
+  // разбор (docs/10-bot.md, «Разбор»): считается кусками после партии, пока виден итог; главная ошибка — на итоге
+  const hinted = useRef(false);
+  const [review, setReview] = useState<Review | null>(null);
+  const [showReview, setShowReview] = useState(false);
+  const reviewJob = useRef<ThinkJob<Review> | null>(null);
+  useEffect(() => () => reviewJob.current?.cancel(), []);
+  const gameAt = (r: GameRecord) => r.actions[0]?.at ?? startedAt.current;
+  const finished = (rec: GameRecord) => {
+    const at = gameAt(rec);
+    void addFinished({ record: rec, level: lvl, at, end: Date.now(), hinted: hinted.current, review: null });
+    reviewJob.current?.cancel();
+    const job = thinkSliced(reviewGame(rec, YOU), 1e9);
+    reviewJob.current = job;
+    job.promise.then(r => { setReview(r); void storeReview(at, r); }, () => {});
+  };
 
   const act = (seat: number, a: Action) => {
     if (reasonOf(state, seat, a) !== null) return;
@@ -93,6 +101,7 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
       if (next.result) history.current.push(next.result);
       gameEnded(Date.now() - startedAt.current);
       dropGame();
+      finished(rec);
     } else {
       saveGame({ record: rec, level: lvl, history: history.current });
     }
@@ -118,9 +127,10 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
   useEffect(() => () => adviseJob.current?.cancel(), [state]);
   const advise = () => {
     if (advising) return;
+    hinted.current = true;
     setAdvising(true);
     setNote(T.game.thinking);
-    const job = thinkSliced(adviseThink(observe(state, YOU), makeRng(record.actions.length + 1)), THINK_MS.master);
+    const job = thinkSliced(adviseThink(observe(state, YOU), makeRng(record.actions.length + 1)), THINK_MS[TOP]);
     adviseJob.current = job;
     job.promise.then(a => { setAdvising(false); setNote(T.game.advice(adviceText(a.action, state), a.chance, a.exact)); }, () => setAdvising(false));
   };
@@ -193,6 +203,10 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
     setRecord(rec);
     setState(stateOf(rec));
     setDeal(d => d + 1);
+    reviewJob.current?.cancel();
+    setReview(null);
+    setShowReview(false);
+    hinted.current = false;
   };
 
   const hint = state.phase === 'end' ? '' : picked ? (transfer ? T.game.pickTargetOrTransfer : T.game.pickTarget) : iDefend
@@ -211,6 +225,9 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
   };
 
+  if (showReview) {
+    return <ReviewScreen review={review} at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
+  }
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]} testID="game">
       <View style={styles.top}>
@@ -259,7 +276,9 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
         {state.phase === 'end' && state.result ? (
           <View style={styles.result} testID="result">
             <Text style={styles.resultText}>{resultText(state.result)}</Text>
+            <Text style={styles.worst} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>
             <Button label={T.result.again} onPress={again} testID="again" />
+            <Button label={T.result.review} kind="ghost" onPress={() => setShowReview(true)} testID="result-review" />
             <Button label={T.game.menu} kind="ghost" onPress={() => { leaveEnd(); onExit(); }} testID="result-menu" />
           </View>
         ) : null}
@@ -285,4 +304,5 @@ const styles = StyleSheet.create({
   buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, minHeight: 48 },
   result: { position: 'absolute', left: 16, right: 16, top: '30%', gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
   resultText: { color: C.text, fontSize: 19, fontWeight: '700', textAlign: 'center' },
+  worst: { color: C.dim, fontSize: 15, textAlign: 'center' },
 });

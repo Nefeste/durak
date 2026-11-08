@@ -87,6 +87,21 @@ try {
   const result = await page.getByTestId('result').innerText().catch(() => '');
   ok(!/дурак/i.test(result), 'итог без слова «дурак»', result);
   ok(/Остались с картами|Вы вышли|Ничья/.test(result), 'итог «остались с картами» или «вышли»', result);
+  // разбор (этап Д): главная ошибка на итоге, полный разбор последней партии дня — бесплатно
+  let worst = '';
+  for (let w = 0; w < 120; w++) {
+    worst = await page.getByTestId('result-worst').innerText().catch(() => '');
+    if (worst && !/Считаем/.test(worst)) break;
+    await page.waitForTimeout(250);
+  }
+  ok(/Главная ошибка|Ошибок не нашли/.test(worst), `итог: главная ошибка партии — ${worst}`, worst);
+  await page.getByTestId('result-review').click();
+  await page.getByTestId('review').waitFor({ timeout: 5000 });
+  ok(!(await visible(page, 'review-locked')), 'полный разбор последней партии дня открыт без «Про»');
+  ok(await page.locator('[data-testid^="decision-"]').count() > 0 || /не было выбора/.test(await page.getByTestId('review').innerText()), 'разбор: решения по отбоям');
+  await page.screenshot({ path: `${OUT}/03-review.png` });
+  await page.getByTestId('review-back').click();
+  await page.getByTestId('result').waitFor({ timeout: 5000 });
 
   await page.getByTestId('again').click();
   await page.waitForTimeout(400);
@@ -190,7 +205,7 @@ try {
   await page.getByTestId('store').waitFor({ timeout: 5000 });
   ok(await visible(page, 'store-test'), 'тестовый магазин подписан');
   ok(await visible(page, 'product-no_ads'), 'на витрине «Без рекламы»');
-  ok(!(await visible(page, 'product-pro_month')), '«Про» не продаётся, пока нет разбора');
+  ok(await visible(page, 'product-pro_month'), '«Про» в продаже — разбор и статистика есть');
   await page.getByTestId('buy-no_ads').click();
   await page.getByTestId('owned-no_ads').waitFor({ timeout: 5000 }).catch(() => {});
   ok(await visible(page, 'owned-no_ads'), '«Без рекламы» куплена');
@@ -206,6 +221,50 @@ try {
   await page.getByTestId('settings-open').click();
   ok(await visible(page, 'personal-ads-on'), 'настройка «Персональная реклама» на месте');
   await page.getByTestId('settings-back').click();
+
+  console.log('Статистика и «Про»');
+  await page.getByTestId('stats-open').click();
+  await page.getByTestId('stats').waitFor({ timeout: 5000 });
+  ok(/Партий с ботами: [1-9]/.test(await page.getByTestId('stats-games').innerText()), 'статистика: партии посчитаны', await page.getByTestId('stats-games').innerText());
+  ok(await visible(page, 'stats-locked'), 'подробная статистика — с «Про»');
+  await page.getByTestId('stats-store').click();
+  await page.getByTestId('store').waitFor({ timeout: 5000 });
+  await page.getByTestId('buy-pro_month').click();
+  await page.getByTestId('owned-pro_month').waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await visible(page, 'owned-pro_month'), '«Про» куплена в тестовом магазине');
+  await page.getByTestId('store-back').click();
+  await page.getByTestId('stats-open').click();
+  await page.getByTestId('stats').waitFor({ timeout: 5000 });
+  ok(await visible(page, 'stats-pro'), 'с «Про» — подробная статистика');
+  ok(/Козырей приходило/.test(await page.getByTestId('stats-trumps').innerText()), 'козыри вам и боту');
+  ok(/Рейтинг тренировок/.test(await page.getByTestId('stats-elo').innerText()), 'рейтинг тренировок');
+  await page.locator('[data-testid^="stats-review-"]').first().click();
+  await page.getByTestId('review').waitFor({ timeout: 5000 });
+  ok(!(await visible(page, 'review-locked')), 'с «Про» — разбор любой партии');
+  await page.screenshot({ path: `${OUT}/06-stats-review.png` });
+  await page.getByTestId('review-back').click();
+  await page.getByTestId('stats-back').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
+
+  console.log('Задача дня');
+  await page.getByTestId('puzzle-open').click();
+  await page.getByTestId('puzzle').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(400);
+  ok(/Задача \d+/.test(await page.getByTestId('puzzle-number').innerText()), 'задача дня с номером');
+  ok(/У соперника:/.test(await page.getByTestId('puzzle-opponent').innerText()), 'карты соперника открыты');
+  await page.screenshot({ path: `${OUT}/07-puzzle.png` });
+  await page.getByTestId('puzzle-answer').click();
+  ok(/Ответ:/.test(await page.getByTestId('puzzle-line').innerText()), 'ответ — по кнопке', await page.getByTestId('puzzle-line').innerText());
+  await page.getByTestId('puzzle-share').click();
+  ok(/Козырь, задача \d+/.test(await page.getByTestId('puzzle-share-text').innerText().catch(() => '')), 'результат — текстом');
+  await page.getByTestId('puzzle-archive').click();
+  ok(await visible(page, 'puzzle-archive-list'), 'архив задач');
+  await page.getByTestId('puzzle-back').click();
+  await page.getByTestId('puzzle-back').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
+  ok(!(await visible(page, 'locked-note')), 'седьмой уровень закрыт');
+  await page.getByTestId('level-neural').click();
+  ok(await visible(page, 'locked-note'), '«Нейросеть · скоро»: касание объясняет, выбрать нельзя');
 
   console.log('«Мастер» и подсказка');
   await page.getByTestId('variant-podkidnoy').click();

@@ -45,12 +45,12 @@ export function arena(pairs: number, a: Level, b: Level, variant: Variant, seed 
 if (import.meta.main && process.argv[2] === 'table') {
   // bun tools/sim/arena.ts table 100 master average 3 podkidnoy [зерно]
   const [, n = '100', a = 'master', b = 'average', seats = '3', variant = 'podkidnoy', seed = '1'] = process.argv.slice(2);
-  if (!isLevel(a) || !isLevel(b)) throw new Error('уровни: novice beginner amateur average experienced strong master');
+  if (!isLevel(a) || !isLevel(b)) throw new Error('уровни: novice beginner amateur average experienced master');
   const r = tableShare(Number(n), a, b, Number(seats), variant as Variant, Number(seed));
   console.log(`${a} за столом на ${seats} против ${b}, ${variant}: ${r.games} партий, без карт ${(r.share * 100).toFixed(1)} % (как все — ${(r.base * 100).toFixed(1)} %)`);
 } else if (import.meta.main) {
   const [n = '500', a = 'average', b = 'novice', variant = 'podkidnoy', seed = '1'] = process.argv.slice(2);
-  if (!isLevel(a) || !isLevel(b)) throw new Error('уровни: novice beginner amateur average experienced strong master');
+  if (!isLevel(a) || !isLevel(b)) throw new Error('уровни: novice beginner amateur average experienced master');
   const r = arena(Number(n), a, b, variant as Variant, Number(seed));
   const pct = (x: number) => (x * 100).toFixed(1) + ' %';
   console.log(`${a} против ${b}, ${variant}: ${r.games} партий, ${pct(r.share)} [${pct(r.low)} … ${pct(r.high)}]${r.loops ? `, не кончились (круг): ${r.loops}` : ''}`);
