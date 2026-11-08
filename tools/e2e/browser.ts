@@ -71,6 +71,8 @@ async function setLevel(p: Page, name: string) {
     await p.getByTestId(order.indexOf(now) < order.indexOf(name) ? 'level-next' : 'level-prev').click();
   }
 }
+/** Строки подсказки новичка (T.game.newbie). */
+const NEWBIE = /положите любую карту|Бейте старшей|Бейте, переводите|Нечем побить|Подкиньте то же достоинство/;
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
 const handCount = (p: Page) => p.locator('[data-testid^="hand-"]').count();
 
@@ -235,6 +237,14 @@ try {
   ok(/^Бот 1 · Средний/.test(seat.trim()), `место соперника — «Бот 1 · Средний»: ${seat.split('\n')[0]}`, seat);
   // вдвоём бот всегда ходит или отбивается — его плашка с золотой кромкой
   ok(await page.getByTestId('opp-1').getAttribute('aria-selected').catch(() => null) === 'true', 'плашка ходящего соперника выделена');
+  // первая партия: строка над рукой учит первые три отбоя (docs/09-game-design.md, «Первая партия»)
+  let taught = '';
+  for (let w = 0; w < 40 && !NEWBIE.test(taught); w++) {
+    taught = await page.getByTestId('hint').innerText().catch(() => '');
+    if (!NEWBIE.test(taught)) await page.waitForTimeout(100);
+  }
+  ok(NEWBIE.test(taught), `первая партия: подсказка новичка над рукой — «${taught}»`, taught);
+  ok(!(await visible(page, 'dialog')), 'подсказка новичка — строкой, без окна');
   await page.screenshot({ path: `${OUT}/02-table.png` });
   const first = await playOut(page, 'подкидной');
   ok(first.ended, 'партия дошла до итога');
@@ -267,6 +277,12 @@ try {
   await page.getByTestId('again').click();
   await page.waitForTimeout(400);
   ok(!(await visible(page, 'result')) && await handCount(page) > 0, '«Ещё партию» — новая раздача');
+  {
+    // вторая партия — без подсказок новичка: строку смотрим несколько раз, пока ходят боты
+    const lines = new Set<string>();
+    for (let w = 0; w < 15; w++) { lines.add(await page.getByTestId('hint').innerText().catch(() => '')); await page.waitForTimeout(100); }
+    ok(![...lines].some(l => NEWBIE.test(l)), `вторая партия — без подсказок новичка: ${[...lines].filter(Boolean).join(' | ')}`);
+  }
 
   console.log('Сохранение и продолжение');
   // один свой ход, если он есть, — чтобы в записи было действие
@@ -342,6 +358,7 @@ try {
   await page.getByTestId('motion-on').click();
   await page.getByTestId('four').click();
   await page.getByTestId('memory').click();
+  ok(await page.getByTestId('newbie').getAttribute('aria-checked').catch(() => null) === 'false', '«Подсказки для новичка» погасли после первой партии');
   await page.screenshot({ path: `${OUT}/05-settings.png` });
   await page.reload();
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
@@ -356,6 +373,22 @@ try {
   await page.getByTestId('bots-2').click();
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
+  // перед первым переводным столом — окно «Что такое перевод», один раз; пока оно открыто, боты ждут
+  await page.getByTestId('transfer-ok').waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await visible(page, 'transfer-ok'), 'первый переводной стол: окно «Что такое перевод»');
+  ok(await page.getByTestId('transfer-picture').locator('canvas').count() === 1, 'в окне — картинка перевода из карт');
+  const dealt = await handCount(page);
+  await page.waitForTimeout(600);
+  ok(await handCount(page) === dealt && await page.getByTestId('table').locator('[data-testid^="table-"]').count() === 0, 'пока окно открыто, боты не ходят');
+  await page.screenshot({ path: `${OUT}/04-transfer-what.png` });
+  await page.getByTestId('transfer-rules').click();
+  await page.getByTestId('rules').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(400);
+  const tr = await page.getByTestId('rules-transfer').boundingBox();
+  ok(!!tr && tr.y >= 0 && tr.y < 915 / 2, `«Правила перевода» открыли правила на разделе «Перевод»: y ${tr ? Math.round(tr.y) : '—'}`, JSON.stringify(tr));
+  await page.getByTestId('rules-back').click();
+  await page.getByTestId('game').waitFor({ timeout: 5000 });
+  ok(!(await visible(page, 'transfer-ok')), 'из правил — обратно за стол, окно больше не показано');
   await page.waitForTimeout(300);
   ok(await visible(page, 'opp-2'), 'два соперника');
   ok(await visible(page, 'seen'), 'кнопка «Вышедшие» — с «Помощью памяти» из настроек');
@@ -368,6 +401,12 @@ try {
   await page.getByTestId('result-menu').click();
   await page.waitForTimeout(300);
   ok(!(await visible(page, 'resume')), 'законченной партии нет в «Продолжить»');
+  await page.getByTestId('play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(800);
+  ok(!(await visible(page, 'transfer-ok')), 'второй переводной стол — без окна о переводе');
+  await page.getByTestId('game-menu').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   // в браузере реклама — подделка (src/money/adsSdk.web.ts): после двух коротких первых партий её нет
   const ads = await page.evaluate(() => (globalThis as unknown as { __kozyrAds?: { shown: string[] } }).__kozyrAds?.shown ?? []);

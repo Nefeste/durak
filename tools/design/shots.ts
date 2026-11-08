@@ -1,6 +1,6 @@
 /**
  * Снимки экранов для аудита вида и листа стиля (docs/reports/2026-11-08-design-audit.md, docs/13-art.md):
- * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, отчёт с раскрытой партией — 22, закрытый уровень — 23.
+ * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, окно «Что такое перевод» — 21, отчёт с раскрытой партией — 22, закрытый уровень — 23.
  *
  *   EXPO_OFFLINE=1 npm run export:web
  *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка]   # по умолчанию docs/design
@@ -78,7 +78,7 @@ try {
   await page.getByTestId('game').waitFor({ timeout: 10000 });
   await page.waitForTimeout(1500);
   await shot(page, '02-table-start');
-  await until(page, /Отбивайтесь|Побейте|Переводите/);
+  await until(page, /Отбивайтесь|Побейте|Переводите|Бейте|Нечем побить/);
   await shot(page, '03-table-defence');
   await until(page, /Подкиньте|Ходите/);
   await shot(page, '04-table-attack');
@@ -119,6 +119,10 @@ try {
   await shot(page, '09-menu-choice');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
+  if (await page.getByTestId('transfer-ok').waitFor({ timeout: 3000 }).then(() => true, () => false)) {
+    await shot(page, '21-transfer-what');
+    await page.getByTestId('transfer-ok').click();
+  }
   await page.waitForTimeout(1500);
   await shot(page, '10-table-four');
   await until(page, /Переводите|Переведите|Отбивайтесь/);

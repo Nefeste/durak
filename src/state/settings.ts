@@ -19,10 +19,16 @@ export interface Settings {
   memoryAid: boolean;
   /** Персональная реклама (по интересам), как в «Нардах»; выключено — обычная, её не меньше. */
   personalAds: boolean;
+  /** «Подсказки для новичка»: строка над рукой первые три отбоя (src/game/newbie.ts). Гаснет сама после первой
+   *  партии; включённая снова — учит в следующей партии и снова показывает окно о переводе. */
+  newbie: boolean;
+  /** Окно «Что такое перевод» уже показано — перед переводным столом оно бывает один раз. */
+  transferTold: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, memoryAid: false, personalAds: true,
+  newbie: true, transferTold: false,
 };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], dflt: T): T => (allowed.includes(v as T) ? (v as T) : dflt);
@@ -45,6 +51,8 @@ export function parseSettings(raw: string | null): Settings {
     // до 0.5.1 настройка звалась `seenCards` и включала только таблицу
     memoryAid: flag(v.memoryAid ?? v.seenCards, d.memoryAid),
     personalAds: flag(v.personalAds, d.personalAds),
+    newbie: flag(v.newbie, d.newbie),
+    transferTold: flag(v.transferTold, d.transferTold),
   };
   if (typeof v.lessMotion === 'boolean') s.lessMotion = v.lessMotion;
   return s;
@@ -59,4 +67,19 @@ export function lessMotionOf(s: Settings, system: boolean): boolean {
 export function botDelay(speed: BotSpeed, r: number): number {
   const [lo, hi] = speed === 'fast' ? [200, 400] : [500, 900];
   return Math.round(lo + (hi - lo) * Math.min(1, Math.max(0, r)));
+}
+
+/** Есть ли в сохранённой строке выбор «Подсказок для новичка» — до 1.0 его не было (`taughtBefore`). */
+export function hasNewbie(raw: string | null): boolean {
+  try {
+    const p = raw ? (JSON.parse(raw) as unknown) : null;
+    return !!p && typeof p === 'object' && 'newbie' in p;
+  } catch { return false; }
+}
+
+/** Игрок из версии до подсказок новичка: кто уже доиграл партию с ботами, того не учим заново, а кто играл
+ *  переводной — тому не объясняем перевод. Новый игрок (партий нет) — по умолчанию. */
+export function taughtBefore(s: Settings, games: { variant: string }[]): Settings {
+  if (!games.length) return s;
+  return { ...s, newbie: false, transferTold: s.transferTold || games.some(g => g.variant === 'perevodnoy') };
 }

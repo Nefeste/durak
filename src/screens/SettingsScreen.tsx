@@ -49,6 +49,8 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
         </Row>
         <Toggle id="four" title={T.settings.fourColor} note={T.settings.fourColorNote} value={s.fourColor} onChange={v => setSettings({ fourColor: v })} />
         <Toggle id="memory" title={T.settings.memoryAid} note={T.settings.memoryAidNote} value={s.memoryAid} onChange={v => setSettings({ memoryAid: v })} />
+        <Toggle id="newbie" title={T.settings.newbie} note={T.settings.newbieNote} value={s.newbie}
+          onChange={v => setSettings(v ? { newbie: true, transferTold: false } : { newbie: false })} />
         <Toggle id="personal-ads" title={T.settings.personalAds} note={T.settings.personalAdsNote} value={s.personalAds} onChange={v => { setSettings({ personalAds: v }); setPersonalAds(v); }} />
       </View>
       <Button label={T.settings.report} kind="ghost" onPress={onReport} testID="report" />
