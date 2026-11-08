@@ -1,7 +1,10 @@
 /**
- * Браузерный прогон этапа А: меню → партия с ботом настоящими касаниями до итога → «Ещё партию» →
- * переводной с двумя ботами до итога. Ловит пустой экран, неработающие касания, зависшую партию и
- * ошибки в консоли. Снимки — в tools/e2e/out/.
+ * Браузерный прогон этапа Б: меню → партия с ботом на холсте Skia настоящими касаниями до итога →
+ * «Ещё партию» → сохранение: пара ходов, «В меню», перезагрузка страницы, «Продолжить партию» →
+ * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, вышедшие карты) →
+ * переводной с двумя ботами до итога. Карты руки — прозрачные «кнопки» поверх холста: касание
+ * идёт в обработчик стола, поэтому щелчки — `force`. Ловит пустой экран, неработающие касания,
+ * зависшую партию, потерянное сохранение и ошибки в консоли. Снимки — в tools/e2e/out/.
  *
  *   EXPO_OFFLINE=1 npm run export:web
  *   NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/browser.ts
@@ -19,6 +22,7 @@ function ok(cond: boolean, what: string, detail?: unknown) {
 const OUT = 'tools/e2e/out';
 mkdirSync(OUT, { recursive: true });
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
+const handCount = (p: Page) => p.locator('[data-testid^="hand-"]').count();
 
 /** Играть до итога: сначала карты руки по очереди (ход, подкидывание, отбой, перевод), если ни одна
  *  не легла — «пас»/«бито», иначе «беру». Возвращает, сколько раз легла своя карта. */
@@ -26,21 +30,21 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
   let played = 0;
   for (let i = 0; i < 600; i++) {
     if (await visible(p, 'result')) return { ended: true, played };
-    const before = await p.getByTestId('hand').locator('[data-testid^="hand-"]').count();
+    const before = await handCount(p);
     // сначала попробовать отбиться или походить картой — так проверяются касания карт
-    const cards = p.getByTestId('hand').locator('[data-testid^="hand-"]');
+    const cards = p.locator('[data-testid^="hand-"]');
     const n = await cards.count();
     let moved = false;
     for (let k = 0; k < n && !moved; k++) {
-      await cards.nth(k).click({ timeout: 1000 }).catch(() => {});
+      await cards.nth(k).click({ timeout: 1000, force: true }).catch(() => {});
       await p.waitForTimeout(30);
       if (await visible(p, 'transfer')) await p.getByTestId('transfer').click().catch(() => {});
       const table = p.getByTestId('table').locator('[data-testid^="table-"]');
-      if ((await p.getByTestId('hint').innerText().catch(() => '')).includes('Какую карту бить')) {
-        await table.first().click().catch(() => {});
+      if (/Какую карту бить|Коснитесь карты/.test(await p.getByTestId('hint').innerText().catch(() => ''))) {
+        await table.first().click({ force: true }).catch(() => {});
         await p.waitForTimeout(30);
       }
-      const after = await p.getByTestId('hand').locator('[data-testid^="hand-"]').count().catch(() => before);
+      const after = await handCount(p).catch(() => before);
       if (after < before) { moved = true; played++; }
     }
     if (!moved) {
@@ -69,8 +73,11 @@ try {
   console.log('Подкидной, один бот');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
-  ok(await page.getByTestId('hand').locator('[data-testid^="hand-"]').count() === 6, 'на руке шесть карт');
+  await page.waitForTimeout(400);
+  ok(await page.locator('canvas').count() >= 1, 'стол — холст Skia');
+  ok(await handCount(page) === 6, 'на руке шесть карт', await handCount(page));
   ok(await visible(page, 'opp-1'), 'соперник с подписью «бот»', await page.getByTestId('opp-1').innerText().catch(() => ''));
+  ok(/бот/.test(await page.getByTestId('opp-1').innerText().catch(() => '')), 'у соперника значок «бот»');
   await page.screenshot({ path: `${OUT}/02-table.png` });
   const first = await playOut(page, 'подкидной');
   ok(first.ended, 'партия дошла до итога');
@@ -78,21 +85,100 @@ try {
   await page.screenshot({ path: `${OUT}/03-result.png` });
   const result = await page.getByTestId('result').innerText().catch(() => '');
   ok(!/дурак/i.test(result), 'итог без слова «дурак»', result);
+  ok(/Остались с картами|Вы вышли|Ничья/.test(result), 'итог «остались с картами» или «вышли»', result);
 
   await page.getByTestId('again').click();
-  await page.waitForTimeout(200);
-  ok(!(await visible(page, 'result')) && await page.getByTestId('hand').locator('[data-testid^="hand-"]').count() > 0, '«Ещё партию» — новая раздача');
+  await page.waitForTimeout(400);
+  ok(!(await visible(page, 'result')) && await handCount(page) > 0, '«Ещё партию» — новая раздача');
 
-  console.log('Переводной, два бота');
+  console.log('Сохранение и продолжение');
+  // один свой ход, если он есть, — чтобы в записи было действие
+  for (let k = 0; k < 6; k++) {
+    const before = await handCount(page);
+    await page.locator('[data-testid^="hand-"]').nth(k).click({ force: true }).catch(() => {});
+    await page.waitForTimeout(40);
+    if (await handCount(page) < before) break;
+  }
+  await page.waitForTimeout(300);
+  const handBefore = await handCount(page);
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(300);
+  ok(await visible(page, 'resume'), 'в меню — «Продолжить партию»');
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(500);
+  ok(await visible(page, 'resume'), 'после перезагрузки — «Продолжить партию»');
+  await page.getByTestId('resume').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(500);
+  ok(await handCount(page) === handBefore, `партия продолжилась с той же рукой: ${handBefore}`, await handCount(page));
+  // отмена: боты с обычной паузой (0,5–0,9 с) — успеваем отменить свой ход до их ответа
+  await page.getByTestId('game-menu').click();
+  await page.goto(web.url);
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(400);
+  await page.getByTestId('resume').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  let undone = false;
+  for (let tries = 0; tries < 40 && !undone; tries++) {
+    const n = await handCount(page);
+    for (let k = 0; k < n; k++) {
+      await page.locator('[data-testid^="hand-"]').nth(k).click({ force: true }).catch(() => {});
+      if (await handCount(page) < n) {
+        if (await visible(page, 'undo')) {
+          await page.getByTestId('undo').click();
+          await page.waitForTimeout(100);
+          ok(await handCount(page) === n, '«Отменить» вернул карту в руку до ответа бота', await handCount(page));
+          undone = true;
+        }
+        break;
+      }
+    }
+    if (!undone) {
+      if (await visible(page, 'pass')) await page.getByTestId('pass').click().catch(() => {});
+      else if (await visible(page, 'take')) await page.getByTestId('take').click().catch(() => {});
+      await page.waitForTimeout(1200);
+    }
+  }
+  ok(undone, 'отмена своего хода проверена');
+  await page.goto(`${web.url}?fast=1`);
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+
+  console.log('Настройки');
+  await page.getByTestId('settings-open').click();
+  await page.getByTestId('settings').waitFor({ timeout: 5000 });
+  ok(await visible(page, 'motion-system'), '«Меньше движения»: по умолчанию — как в системе');
+  await page.getByTestId('motion-on').click();
+  await page.getByTestId('four-on').click();
+  await page.getByTestId('seencards-on').click();
+  await page.screenshot({ path: `${OUT}/05-settings.png` });
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.getByTestId('settings-open').click();
+  await page.waitForTimeout(300);
+  ok(await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null) === 'true', 'выбор «Меньше движения» пережил перезагрузку',
+    await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null));
+  await page.getByTestId('settings-back').click();
+
+  console.log('Переводной, два бота, четырёхцветная колода, без полёта');
   await page.getByTestId('variant-perevodnoy').click();
   await page.getByTestId('bots-2').click();
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(300);
   ok(await visible(page, 'opp-2'), 'два соперника');
+  ok(await visible(page, 'seen'), 'кнопка «Вышедшие» включена в настройках');
+  await page.getByTestId('seen').click();
+  ok(await visible(page, 'seen-sheet'), 'таблица вышедших карт');
+  await page.getByTestId('seen-close').click();
   const second = await playOut(page, 'переводной');
   ok(second.ended, 'партия втроём дошла до итога');
   await page.screenshot({ path: `${OUT}/04-perevodnoy.png` });
+  await page.getByTestId('result-menu').click();
+  await page.waitForTimeout(300);
+  ok(!(await visible(page, 'resume')), 'законченной партии нет в «Продолжить»');
 } finally {
   ok(errors.length === 0, 'ошибок в консоли нет', errors.join('\n'));
   await browser.close();

@@ -1,0 +1,9 @@
+# Белый список разрешений APK (docs/05-process.md). android.yml сверяет с ним готовый APK действием
+# android-contents набора gornitsa-kit: разрешение не из списка останавливает сборку. Новое — сюда,
+# в карточку RuStore и, если оно о данных игрока, в политику. Файл — путь владельца (.github/).
+# Этап Б: сеть — из шаблона React Native (онлайн — этап Г), вибрация — expo-haptics, звук — expo-audio.
+# Первый тег сверит список с настоящим APK.
+android.permission.INTERNET
+android.permission.VIBRATE
+android.permission.MODIFY_AUDIO_SETTINGS
+games.gornitsa.durak.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION

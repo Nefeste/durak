@@ -1,7 +1,7 @@
 {
   "name": "durak",
-  "version": "0.1.0",
-  "main": "index.ts",
+  "version": "0.2.0",
+  "main": "index",
   "private": true,
   "description": "Дурак подкидной и переводной для RuStore",
   "scripts": {
@@ -12,12 +12,15 @@
     "lint": "expo lint src App.tsx --max-warnings 0",
     "test": "bun test tools/test",
     "arena": "bun tools/sim/arena.ts",
-    "export:web": "expo export -p web --output-dir dist-web"
+    "export:web": "setup-skia-web public && expo export -p web --output-dir dist-web",
+    "hermes": "bun tools/hermes/deck.ts"
   },
   "dependencies": {
+    "@expo-google-fonts/onest": "^0.4.2",
     "@expo/metro-runtime": "~57.0.16",
     "@gornitsa/kit": "github:Nefeste/gornitsa-kit#v1.1.0",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@shopify/react-native-skia": "2.6.2",
     "expo": "~57.0.24",
     "expo-application": "~57.0.3",
     "expo-audio": "~57.0.5",
@@ -29,10 +32,11 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
-    "yandex-mobile-ads": "^8.6.0"
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

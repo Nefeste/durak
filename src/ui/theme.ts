@@ -19,7 +19,20 @@ export const C = {
   back: '#7A2E2E',
   backLine: '#E3B75E',
   ok: '#7FD1A1',
+  /** Четырёхцветная колода: ♣ зелёные, ♦ синие (♠ — black, ♥ — red). */
+  green: '#1E6B3A',
+  blue: '#1F4FA3',
+  /** Подсветка места, куда можно положить карту, и выбранной карты. */
+  glow: '#E3B75E',
+  /** Тень под картой. */
+  shadow: 'rgba(0,0,0,0.35)',
+  /** Сукно: светлее к середине. */
+  feltLight: '#174047',
 } as const;
+
+/** Цвета мастей ♠ ♣ ♦ ♥ (docs/09-game-design.md, «Вид»): обычная колода или четырёхцветная. */
+export const suitColors = (fourColor: boolean): readonly string[] =>
+  fourColor ? [C.black, C.green, C.blue, C.red] : [C.black, C.black, C.red, C.red];
 
 export const RADIUS = { card: 14, button: 22, playing: 8 } as const;
 export const HEAD = undefined as string | undefined;

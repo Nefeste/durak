@@ -6,3 +6,4 @@ dist-web/
 /ios/
 tools/e2e/out/
 *.log
+public/canvaskit.wasm
