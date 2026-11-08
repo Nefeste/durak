@@ -29,6 +29,7 @@ import type { SavedGame } from '../state/save';
 import { botToAct, tapCard, YOU } from './table';
 import { autoPass, canUndo, seenGrid } from './flow';
 import { SeenCards } from './SeenCards';
+import { SeatPlate } from './SeatPlate';
 import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
@@ -218,7 +219,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const name = () => T.level[lvl];
   const resultText = (r: Result) => r.draw || r.fool === null ? T.result.draw
     : r.fool === YOU ? T.result.lose
-    : seats === 2 ? T.result.win : `${T.result.win}. ${T.result.other(`${name()} ${r.fool}`)}`;
+    : seats === 2 ? T.result.win : `${T.result.win}. ${T.result.other(`${T.game.bot(r.fool)} · ${name()}`)}`;
   const oppW = size ? Math.min(180, size.width / Math.max(1, bots) - 6) : 120;
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -242,16 +243,12 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
             touch={{ onCard, onTableCard, onDrop }} />
         ) : null}
         {layout ? layout.opponents.map(p => (
-          <View key={p.seat} pointerEvents="none" testID={`opp-${p.seat}`}
-            style={[styles.opp, { left: p.x - oppW / 2, width: oppW, top: Math.max(0, p.y - layout.ch * 0.55 * 0.5 - 58) }]}>
-            <Text style={styles.oppName} numberOfLines={1}>{name()} {p.seat}</Text>
-            <Text style={styles.oppInfo} testID={`opp-${p.seat}-cards`} numberOfLines={1}>
-              {T.game.botMark} · {state.out.includes(p.seat) ? T.game.out : T.game.cards(state.hands[p.seat].length)}
-            </Text>
-            <Text style={styles.oppRole} numberOfLines={1}>
-              {state.phase === 'end' ? ' ' : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : ' '}
-            </Text>
-          </View>
+          // вчетвером «Бот 1 · Средний» в строку не влезает — уровень уходит во вторую строку
+          <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={oppW >= 150 ? `${T.game.bot(p.seat)} · ${name()}` : T.game.bot(p.seat)}
+            info={`${oppW >= 150 ? '' : `${name()} · `}${state.out.includes(p.seat) ? T.game.out : T.game.cards(state.hands[p.seat].length)}`}
+            role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : null}
+            active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat)}
+            left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - layout.ch * 0.55 * 0.5 - 66)} />
         )) : null}
         {layout && state.talon.length > 0 ? (
           <Text pointerEvents="none" style={[styles.talonText, { left: layout.talon.x - 40, top: layout.talon.y + layout.ch * 0.62 }]} testID="talon">{T.game.talon(state.talon.length)}</Text>
@@ -296,10 +293,6 @@ const styles = StyleSheet.create({
   top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
   variant: { color: C.dim, fontSize: TYPE.caption, flex: 1 },
   area: { flex: 1 },
-  opp: { position: 'absolute', alignItems: 'center' },
-  oppName: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
-  oppInfo: { color: C.dim, fontSize: TYPE.caption },
-  oppRole: { color: C.accent, fontSize: TYPE.caption },
   talonText: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
   hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },

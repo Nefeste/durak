@@ -165,7 +165,10 @@ try {
   ok(await page.locator('canvas').count() >= 1, 'стол — холст Skia');
   ok(await handCount(page) === 6, 'на руке шесть карт', await handCount(page));
   ok(await visible(page, 'opp-1'), 'соперник с подписью «бот»', await page.getByTestId('opp-1').innerText().catch(() => ''));
-  ok(/бот/.test(await page.getByTestId('opp-1').innerText().catch(() => '')), 'у соперника значок «бот»');
+  const seat = await page.getByTestId('opp-1').innerText().catch(() => '');
+  ok(/^Бот 1 · Средний/.test(seat.trim()), `место соперника — «Бот 1 · Средний»: ${seat.split('\n')[0]}`, seat);
+  // вдвоём бот всегда ходит или отбивается — его плашка с золотой кромкой
+  ok(await page.getByTestId('opp-1').getAttribute('aria-selected').catch(() => null) === 'true', 'плашка ходящего соперника выделена');
   await page.screenshot({ path: `${OUT}/02-table.png` });
   const first = await playOut(page, 'подкидной');
   ok(first.ended, 'партия дошла до итога');
