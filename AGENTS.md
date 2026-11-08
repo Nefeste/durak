@@ -56,7 +56,8 @@ RuStore Review or Yandex Mobile Ads code from memory — follow «Expo has chang
 
 ## Commands
 
-Stages А and Б are in the code (engine, rule bots, the Skia table vs bots, saves, settings); the rest follows nardy.
+Stages А, Б and В are in the code (engine, rule bots, search bots and the exact endgame, the Skia table vs bots,
+saves, settings, the hint); the rest follows nardy.
 
 ```bash
 npm ci
@@ -66,6 +67,9 @@ npm run lint                        # zero warnings
 bun test tools/test                 # rules (golden), random games, observation, deck, purity, texts, bots
 DURAK_LONG=1 bun test tools/test/games.test.ts   # 100 000 random games (~4 min)
 bun tools/sim/arena.ts 1000 average amateur podkidnoy   # bot strength on mirrored deals
+bun tools/sim/arena.ts table 100 master average 3 podkidnoy   # one level at a 3–4 seat table against another
+bun tools/sim/ladder.ts 1000 150 4  # the whole ladder: each level vs the one below, both variants, 4 processes
+bun tools/hermes/bots.ts [levels]   # ms per decision of each level and the endgame solver on Hermes 0.12
 bun tools/test/make-deck-fixture.ts > tools/test/fixtures/deck-v1.json   # deck vectors (only on a new deck version)
 EXPO_OFFLINE=1 npm run export:web       # setup-skia-web puts canvaskit.wasm into public/ first
 NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/browser.ts   # the table in a browser, real taps
@@ -83,6 +87,10 @@ This project's own rules:
 - **Rules live in one place**: `src/engine/` implements `docs/08-rules.md` exactly and stays pure. The deck
   order is an argument, never shuffled inside the engine. Table rules (variant, players, options) are part of
   the game record (ADR 0003). Golden tests pin the behaviour.
+- **Bots think in slices** (`src/bot/think.ts`: the `Thinking` generator, `thinkSync` for the arena and tests;
+  `src/game/think.ts`: `thinkSliced` with the clock, ≤ 12 ms per slice). `src/bot/` never reads a clock.
+  Search rollouts use `src/bot/fast.ts`, which must decide exactly like the «Средний» rules (`tools/test/search.test.ts`);
+  change one — change the other. The endgame solver is checked against brute force on small positions.
 - **The bot sees only its observation** (ADR 0005): `src/bot/` gets `observe(state, seat)` — its own hand,
   the trump, the talon size, the table, the discard pile, cards opponents picked up in the open, hand sizes —
   and nothing else. It never imports the deck. A test runs every bot on pairs of states with the same

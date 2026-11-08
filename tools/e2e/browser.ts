@@ -1,8 +1,8 @@
 /**
- * Браузерный прогон этапа Б: меню → партия с ботом на холсте Skia настоящими касаниями до итога →
+ * Браузерный прогон этапов Б и В: меню → партия с ботом на холсте Skia настоящими касаниями до итога →
  * «Ещё партию» → сохранение: пара ходов, «В меню», перезагрузка страницы, «Продолжить партию» →
  * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, вышедшие карты) →
- * переводной с двумя ботами до итога. Карты руки — прозрачные «кнопки» поверх холста: касание
+ * переводной с двумя ботами до итога → «Мастер» и «Подсказка» до итога. Карты руки — прозрачные «кнопки» поверх холста: касание
  * идёт в обработчик стола, поэтому щелчки — `force`. Ловит пустой экран, неработающие касания,
  * зависшую партию, потерянное сохранение и ошибки в консоли. Снимки — в tools/e2e/out/.
  *
@@ -179,6 +179,31 @@ try {
   await page.getByTestId('result-menu').click();
   await page.waitForTimeout(300);
   ok(!(await visible(page, 'resume')), 'законченной партии нет в «Продолжить»');
+
+  console.log('«Мастер» и подсказка');
+  await page.getByTestId('variant-podkidnoy').click();
+  await page.getByTestId('bots-1').click();
+  await page.getByTestId('level-master').click();
+  await page.getByTestId('play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(300);
+  ok(/Мастер/.test(await page.getByTestId('game').innerText().catch(() => '')), 'за столом «Мастер»');
+  // подсказка — когда есть свой ход
+  let advised = '';
+  for (let tries = 0; tries < 40 && !advised; tries++) {
+    if (await visible(page, 'advise')) {
+      await page.getByTestId('advise').click();
+      for (let w = 0; w < 40; w++) {
+        await page.waitForTimeout(100);
+        const t = await page.getByTestId('hint').innerText().catch(() => '');
+        if (/Ходите|Подкиньте|Побейте|Переведите|Берите|Пас|Бито/.test(t)) { advised = t; break; }
+      }
+    } else await page.waitForTimeout(200);
+  }
+  ok(/Ходите|Подкиньте|Побейте|Переведите|Берите|Пас|Бито/.test(advised), `подсказка «Мастера»: ${advised}`, advised);
+  await page.screenshot({ path: `${OUT}/06-advice.png` });
+  const third = await playOut(page, 'против «Мастера»');
+  ok(third.ended, 'партия с «Мастером» дошла до итога');
 } finally {
   ok(errors.length === 0, 'ошибок в консоли нет', errors.join('\n'));
   await browser.close();

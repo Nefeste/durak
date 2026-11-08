@@ -25,6 +25,13 @@ export function apply(state: State, seat: number, a: Action): State {
   const why = reasonOf(state, seat, a);
   if (why) throw new IllegalAction(why);
   const s = cloneState(state);
+  applyInPlace(s, seat, a);
+  return s;
+}
+
+/** То же, но меняет переданную позицию и законность не проверяет. Только для доигрывания у ботов на
+ *  своей копии позиции, когда действие заведомо законно (`apply` — через эту же функцию). */
+export function applyInPlace(s: State, seat: number, a: Action): void {
   switch (a.type) {
     case 'attack':
     case 'throwIn':
@@ -59,7 +66,6 @@ export function apply(state: State, seat: number, a: Action): State {
       break;
   }
   settle(s);
-  return s;
 }
 
 /** Закончился ли отбой — и если да, закончить его (п. 4.6, 4.5). */
