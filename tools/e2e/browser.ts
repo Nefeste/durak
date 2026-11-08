@@ -90,9 +90,13 @@ try {
     await ph.getByTestId('settings-open').click();
     await ph.getByTestId('settings').waitFor({ timeout: 5000 });
     ok(await ph.getByTestId('memory').getAttribute('aria-checked').catch(() => null) === 'false', '«Помощь памяти (для учёбы)» по умолчанию выключена');
+    // «Назад» — вверху слева под отступом сверху, последняя кнопка списка — над кнопками телефона
+    const back = await ph.getByTestId('settings-back').boundingBox();
+    ok(!!back && back.y >= INSET / 2 && back.x < 40, 'настройки: «Назад» вверху слева, под отступом сверху', JSON.stringify(back));
+    await ph.getByTestId('report').scrollIntoViewIfNeeded();
+    const sb = await ph.getByTestId('report').boundingBox();
+    ok(!!sb && sb.y + sb.height <= H - INSET, 'настройки: нижняя кнопка над кнопками телефона', JSON.stringify(sb));
     await ph.getByTestId('settings-back').scrollIntoViewIfNeeded();
-    const sb = await ph.getByTestId('settings-back').boundingBox();
-    ok(!!sb && sb.y + sb.height <= H - INSET, 'настройки: «Назад» над кнопками телефона', JSON.stringify(sb));
     await ph.getByTestId('settings-back').click();
     await ph.getByTestId('play').click();
     await ph.getByTestId('game').waitFor({ timeout: 10000 });

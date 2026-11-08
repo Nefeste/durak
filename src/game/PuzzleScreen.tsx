@@ -12,6 +12,7 @@ import type { Action, Card, State } from '../engine';
 import { actorOf } from '../bot/sim';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
+import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
@@ -162,11 +163,8 @@ export function PuzzleScreen({ onBack }: { onBack: () => void }) {
   useEffect(() => { if (archive) void loadPuzzleLog().then(setLog); }, [archive]);
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="puzzle">
-      <View style={styles.top}>
-        <Button label={T.puzzle.back} kind="ghost" onPress={archive ? () => setArchive(false) : onBack} testID="puzzle-back" />
-        <Text style={styles.title}>{archive ? T.puzzle.archive : T.puzzle.title}</Text>
-        {!archive && day !== today ? <Button label={T.puzzle.today} kind="ghost" onPress={() => setDay(today)} testID="puzzle-today" /> : null}
-      </View>
+      <Header title={archive ? T.puzzle.archive : T.puzzle.title} back={T.puzzle.back} onBack={archive ? () => setArchive(false) : onBack} backTestID="puzzle-back"
+        right={!archive && day !== today ? <Button small label={T.puzzle.today} kind="ghost" onPress={() => setDay(today)} testID="puzzle-today" /> : null} />
       {archive ? <Archive today={today} log={log} onOpen={n => { setDay(n); setArchive(false); }} />
         : <Board key={day} day={day} onArchive={() => setArchive(true)} />}
     </View>
@@ -175,8 +173,6 @@ export function PuzzleScreen({ onBack }: { onBack: () => void }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.s, gap: SPACE.s },
-  top: { flexDirection: 'row', alignItems: 'center', gap: SPACE.m },
-  title: { color: C.text, fontSize: TYPE.section, fontWeight: '700', flex: 1 },
   board: { flex: 1, gap: SPACE.s },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700', textAlign: 'center' },
   opp: { color: C.dim, fontSize: TYPE.body, textAlign: 'center' },
