@@ -9,7 +9,7 @@ export function SeatPlate({ name, info, role, active, testID, left, top, width }
   name: string; info: string; role: string | null; active: boolean; testID: string; left: number; top: number; width: number;
 }) {
   return (
-    <View pointerEvents="none" testID={testID} accessibilityState={{ selected: active }}
+    <View pointerEvents="none" testID={testID} accessibilityState={{ selected: active }} aria-selected={active}
       style={[styles.plate, active && styles.active, { left, top, width }]}>
       <Text style={styles.name} numberOfLines={1}>{name}</Text>
       <Text style={styles.info} testID={`${testID}-cards`} numberOfLines={1}>{info}</Text>
