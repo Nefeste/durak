@@ -182,4 +182,7 @@ jobs:
           name: Козырь ${{ steps.ver.outputs.version }}
           body_path: release.md
           files: dist/*.apk
-          prerelease: true
+          # выпуск — «Latest»: на странице репозитория справа ссылка на последнюю сборку (просьба владельца
+          # 08.11.2026, как в «Нардах»); тег с `-rc` — пре-релиз, «Latest» не трогает
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          make_latest: ${{ contains(github.ref_name, '-rc') && 'false' || 'true' }}
