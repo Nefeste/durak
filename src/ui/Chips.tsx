@@ -1,4 +1,5 @@
-// Ряд выбора одного из нескольких (меню, настройки).
+// Ряд выбора одного из нескольких (меню, настройки). Выбранное — золотой контур и золотой текст на стекле:
+// заливка золотом остаётся только у главного действия экрана (аудит 08.11.2026, находка 7).
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { C, RADIUS, SPACE, TYPE } from './theme';
@@ -29,9 +30,10 @@ export function Chips<V extends string | number>({ items, value, label, onChange
 const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.s },
   chip: { paddingHorizontal: SPACE.l, minHeight: 40, justifyContent: 'center', borderRadius: RADIUS.small, borderWidth: 1, borderColor: C.glassLine },
-  chipOn: { backgroundColor: C.accent, borderColor: C.accent },
+  // контур в 2 точки, а ширина ряда та же: поле на точку уже
+  chipOn: { backgroundColor: C.glass, borderColor: C.accent, borderWidth: 2, paddingHorizontal: SPACE.l - 1 },
   chipText: { color: C.text, fontSize: TYPE.body },
-  chipTextOn: { color: C.accentText, fontWeight: '700' },
+  chipTextOn: { color: C.accent, fontWeight: '700' },
   chipLocked: { borderStyle: 'dashed' },
   chipTextLocked: { color: C.dim },
 });

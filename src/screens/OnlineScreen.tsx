@@ -10,6 +10,7 @@ import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
+import { Checkbox } from '../ui/Toggle';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { isCode, nameProblem } from '../state/protocol';
 import type { QuickView } from '../state/protocol';
@@ -133,8 +134,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
       <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="online-profile">
         <Text style={styles.title}>{mode === 'quick' ? T.online.quickTitle : T.online.title}</Text>
         <View style={styles.panel}>
-          <Chips id="adult" items={['no', 'yes'] as const} value={adult ? 'yes' : 'no'} label={v => (v === 'yes' ? T.online.adult : T.settings.off)}
-            onChange={v => { const on = v === 'yes'; setAdultState(on); void setAdult(on); }} />
+          <Checkbox id="adult" label={T.online.adult} value={adult} onChange={on => { setAdultState(on); void setAdult(on); }} />
           <Text style={styles.note}>{T.online.adultNote}</Text>
           {adult ? (
             <>
