@@ -2,8 +2,12 @@
 # android-contents набора gornitsa-kit: разрешение не из списка останавливает сборку. Новое — сюда,
 # в карточку RuStore и, если оно о данных игрока, в политику. Файл — путь владельца (.github/).
 # Этап Б: сеть — из шаблона React Native (онлайн — этап Г), вибрация — expo-haptics, звук — expo-audio.
-# Первый тег сверит список с настоящим APK.
+# Тег v0.2.0 (08.11.2026) показал ещё два, как у «Нард»: ACCESS_NETWORK_STATE и WAKE_LOCK — из библиотек
+# шаблона, данных игрока не касаются. INSTALL_REFERRER (из expo-application) не нужен — он в
+# blockedPermissions app.json и в запрете android.yml.
+android.permission.ACCESS_NETWORK_STATE
 android.permission.INTERNET
 android.permission.VIBRATE
+android.permission.WAKE_LOCK
 android.permission.MODIFY_AUDIO_SETTINGS
 games.gornitsa.durak.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
