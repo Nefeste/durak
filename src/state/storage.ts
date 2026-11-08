@@ -32,4 +32,8 @@ export const KEYS = {
   settings: 'durak.settings',
   /** журнал сбоев, 30 последних записей (src/state/crashlog.ts) */
   crashlog: 'durak.crashlog',
+  /** ключ устройства, ник и тег онлайна (`Device`, src/state/net.ts) */
+  device: 'durak.device',
+  /** отметка «Мне есть 14 лет» (src/state/onlineStore.ts) */
+  adult: 'durak.adult',
 } as const;
