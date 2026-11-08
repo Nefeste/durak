@@ -40,8 +40,8 @@
 ## Разрешения Android
 
 Белый список — `.github/apk-permissions.txt`: `android.yml` не выпустит APK с другим разрешением. Список
-скопирован у «Нард» (сборка 78 — первая с RuStore Pay и рекламой Яндекса); первый тег «Козыря» сверит его с
-настоящим APK.
+— как у «Нард» (сборка 78 — первая с RuStore Pay и рекламой Яндекса), но без Install Referrer: он запрещён в
+`app.json` и в `android.yml` (тег `v0.2.0`). Первый тег с рекламой сверит список с настоящим APK.
 
 | Разрешение | Зачем |
 |---|---|
@@ -50,11 +50,10 @@
 | `MODIFY_AUDIO_SETTINGS` | служебное библиотеки звука `expo-audio` |
 | `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED` | служебные React Native и SDK |
 | `com.google.android.gms.permission.AD_ID` | рекламный идентификатор для Рекламной сети Яндекса |
-| `com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE` | SDK рекламы узнаёт, из какого магазина установлена игра |
 | `games.gornitsa.durak.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | служебное Android, само приложение |
 
-Явно запрещены в `app.json`: память (`READ/WRITE_EXTERNAL_STORAGE`), окна поверх других, микрофон и фоновое
-воспроизведение.
+Явно запрещены в `app.json`: память (`READ/WRITE_EXTERNAL_STORAGE`), окна поверх других, микрофон, фоновое
+воспроизведение и служба Install Referrer (`BIND_GET_INSTALL_REFERRER_SERVICE`).
 
 ## Какие данные собираются
 
