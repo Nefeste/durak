@@ -15,9 +15,9 @@ import { CardBack } from '../render/PlayingCard';
 
 export interface Choice { variant: Variant; bots: number; level: Level }
 
-export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore, onPuzzle, onStats }: {
+export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore, onPuzzle, onStats, onRules }: {
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
-  onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void;
+  onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void; onRules: () => void;
 }) {
   const insets = useInsets();
   // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна
@@ -25,6 +25,8 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   return (
     // прокрутка: на невысоком экране или с крупным шрифтом нижний ряд не уходит под кнопки телефона (0.5.1)
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.xl, paddingBottom: insets.bottom + SPACE.l }]} testID="menu">
+      {/* «Правила» — в углу над названием: видно с первого экрана и не ломает сетку кнопок */}
+      <View style={[styles.corner, { top: insets.top + SPACE.s }]}><Button small label={T.rules.menu} kind="ghost" onPress={onRules} testID="rules-open" /></View>
       <View style={styles.head}>
         <View style={styles.backs}><CardBack /><View style={styles.tilt}><CardBack /></View></View>
         <Text style={styles.title}>{T.app.name}</Text>
@@ -65,6 +67,7 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   content: { flexGrow: 1, paddingHorizontal: SPACE.l, gap: SPACE.l, justifyContent: 'space-between' },
+  corner: { position: 'absolute', right: SPACE.l, zIndex: 1 },
   head: { alignItems: 'center', gap: SPACE.s },
   backs: { flexDirection: 'row', height: 100, marginBottom: SPACE.s },
   tilt: { marginLeft: -30, transform: [{ rotate: '12deg' }] },

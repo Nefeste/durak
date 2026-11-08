@@ -1,6 +1,6 @@
 /**
  * Снимки экранов для аудита вида и листа стиля (docs/reports/2026-11-08-design-audit.md, docs/13-art.md):
- * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, отчёт с раскрытой партией — 22, закрытый уровень — 23.
+ * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, отчёт с раскрытой партией — 22, закрытый уровень — 23.
  *
  *   EXPO_OFFLINE=1 npm run export:web
  *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка]   # по умолчанию docs/design
@@ -63,6 +63,16 @@ try {
   await page.goto(`${web.url}?fast=1`);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   await shot(page, '01-menu');
+  await page.getByTestId('rules-open').click();
+  await page.getByTestId('rules').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(800);
+  await shot(page, '18-rules');
+  await page.getByTestId('rules-throw').scrollIntoViewIfNeeded();
+  await shot(page, '19-rules-throw');
+  await page.getByTestId('rules-transfer').scrollIntoViewIfNeeded();
+  await shot(page, '20-rules-transfer');
+  await page.getByTestId('rules-back').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
