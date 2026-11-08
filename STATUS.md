@@ -29,7 +29,7 @@
 - послушать звуки стола на телефоне (тасовка, шлепок, «бито», «беру»; `assets/sounds/SOURCES.md`): громкость и выбор
   записей — на слух владельца;
 - проверка «Козыря» в ФИПС (классы 9 и 41);
-- карточка в RuStore (`store/README.md`): товары `no_ads` 249 ₽, `pro_month` 199 ₽ и `pro_year` 990 ₽ в RuStore Pay; переменные сборки
+- карточка в RuStore (`store/README.md`): ролик — `bun tools/store/video.ts`, загрузить на видеохостинг и вписать ссылку; товары `no_ads` 249 ₽, `pro_month` 199 ₽ и `pro_year` 990 ₽ в RuStore Pay; переменные сборки
   `EXPO_PUBLIC_RUSTORE_APP_ID`, `EXPO_PUBLIC_YANDEX_ADS_INTERSTITIAL`, `EXPO_PUBLIC_YANDEX_ADS_REWARDED`;
   токену сайта `GAMES_READ_TOKEN` — право чтения `Nefeste/durak`;
 - секреты ключа подписи `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` и
