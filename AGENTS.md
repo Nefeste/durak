@@ -81,7 +81,15 @@ EXPO_PUBLIC_DURAK_SERVER=http://127.0.0.1:8796 EXPO_OFFLINE=1 npx expo export -p
 DURAK_WEB_DIR=dist-web-online NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/online.ts   # two browsers: friend table with a bot to the end, deck check, rematch, quick match
 NODE_PATH=/opt/node22/lib/node_modules bun tools/art/icon.ts   # icon, adaptive icon, splash + passport assets/LICENSES.md
 NODE_PATH=/opt/node22/lib/node_modules bun tools/store/shots.ts # after export:web: store/graphics (icon 512, feature, og) and store/screenshots/ru (1080×1920)
+NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts # after export:web: every screen at 412×915 ×2 → docs/design/ (audits, before/after sheets)
 ```
+
+## Design work
+
+Before any visual work on screens, the table or the cards, use the skill `.claude/skills/redesign-existing-projects/`
+(from elayadesign, MIT, adapted to this game's own look — its preface lists what wins and what does not apply). The style
+sheet is `docs/13-art.md` (charter ADR 0023, rule 2); screenshots for audits and «before — after» sheets —
+`bun tools/design/shots.ts` after `export:web` → `docs/design/`. The last audit: `docs/reports/2026-11-08-design-audit.md`.
 
 ## Hard rules
 
