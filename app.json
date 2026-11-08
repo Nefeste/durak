@@ -51,6 +51,13 @@
     "plugins": [
       "./plugins/with-release-signing",
       [
+        "@gornitsa/kit/rustore-pay/plugin",
+        {
+          "scheme": "gornitsadurakpay",
+          "otherStore": "maven"
+        }
+      ],
+      [
         "expo-audio",
         {
           "recordAudioAndroid": false,

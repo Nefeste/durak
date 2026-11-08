@@ -36,4 +36,12 @@ export const KEYS = {
   device: 'durak.device',
   /** отметка «Мне есть 14 лет» (src/state/onlineStore.ts) */
   adult: 'durak.adult',
+  /** счётчики полноэкранной рекламы (`AdCounters`, src/money/ads.ts) */
+  ads: 'durak.ads',
+  /** кэш прав «Без рекламы» и «Про» (`Rights`, src/money/rights.ts) */
+  purchases: 'durak.purchases',
+  /** разборы, открытые рекламой за вознаграждение: начала партий (src/money/rights.ts) */
+  unlocked: 'durak.unlocked',
+  /** когда просили оценку в RuStore (src/money/review.ts) */
+  rate: 'durak.rate',
 } as const;

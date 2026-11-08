@@ -1,5 +1,5 @@
 // Главный экран: стол, число соперников и уровень — «Играть»; «Продолжить партию», если она
-// сохранена; «Настройки».
+// сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки».
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,9 +14,9 @@ import { CardBack } from '../render/PlayingCard';
 
 export interface Choice { variant: Variant; bots: number; level: Level }
 
-export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick }: {
+export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore }: {
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
-  onFriends: () => void; onQuick: () => void;
+  onFriends: () => void; onQuick: () => void; onStore: () => void;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -41,7 +41,10 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
           <View style={styles.cell}><Button label={T.menu.friends} kind="ghost" onPress={onFriends} testID="friends-open" /></View>
           <View style={styles.cell}><Button label={T.menu.quick} kind="ghost" onPress={onQuick} testID="quick-open" /></View>
         </View>
-        <Button label={T.menu.settings} kind="ghost" onPress={onSettings} testID="settings-open" />
+        <View style={styles.row}>
+          <View style={styles.cell}><Button label={T.menu.store} kind="ghost" onPress={onStore} testID="store-open" /></View>
+          <View style={styles.cell}><Button label={T.menu.settings} kind="ghost" onPress={onSettings} testID="settings-open" /></View>
+        </View>
       </View>
     </View>
   );
