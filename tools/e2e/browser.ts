@@ -89,7 +89,7 @@ try {
     await ph.screenshot({ path: `${OUT}/00-menu-inset.png` });
     await ph.getByTestId('settings-open').click();
     await ph.getByTestId('settings').waitFor({ timeout: 5000 });
-    ok(await ph.getByTestId('memory-off').getAttribute('aria-selected').catch(() => null) === 'true', '«Помощь памяти (для учёбы)» по умолчанию выключена');
+    ok(await ph.getByTestId('memory').getAttribute('aria-checked').catch(() => null) === 'false', '«Помощь памяти (для учёбы)» по умолчанию выключена');
     await ph.getByTestId('settings-back').scrollIntoViewIfNeeded();
     const sb = await ph.getByTestId('settings-back').boundingBox();
     ok(!!sb && sb.y + sb.height <= H - INSET, 'настройки: «Назад» над кнопками телефона', JSON.stringify(sb));
@@ -250,8 +250,8 @@ try {
   await page.getByTestId('settings').waitFor({ timeout: 5000 });
   ok(await visible(page, 'motion-system'), '«Меньше движения»: по умолчанию — как в системе');
   await page.getByTestId('motion-on').click();
-  await page.getByTestId('four-on').click();
-  await page.getByTestId('memory-on').click();
+  await page.getByTestId('four').click();
+  await page.getByTestId('memory').click();
   await page.screenshot({ path: `${OUT}/05-settings.png` });
   await page.reload();
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
@@ -302,7 +302,7 @@ try {
   ok(await visible(page, 'owned-no_ads'), 'покупка пережила перезагрузку и «Восстановить покупки»');
   await page.getByTestId('store-back').click();
   await page.getByTestId('settings-open').click();
-  ok(await visible(page, 'personal-ads-on'), 'настройка «Персональная реклама» на месте');
+  ok(await visible(page, 'personal-ads'), 'настройка «Персональная реклама» на месте');
   await page.getByTestId('settings-back').click();
 
   console.log('Статистика и «Про»');

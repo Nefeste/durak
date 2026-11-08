@@ -83,7 +83,7 @@ async function main() {
     await p.getByTestId('menu').waitFor({ timeout: 20_000 });
     await p.getByTestId('friends-open').click();
     await p.getByTestId('online-profile').waitFor({ timeout: 10_000 });
-    await p.getByTestId('adult-yes').click();
+    await p.getByTestId('adult').click();
     await p.getByTestId('name').fill('Петя');
     await p.getByTestId('name-save').click();
     await p.getByTestId('online-error').waitFor({ timeout: 20_000 }).catch(() => {});
@@ -105,7 +105,7 @@ async function main() {
     await p.getByTestId(open).click();
     await p.getByTestId('online-profile').waitFor({ timeout: 10_000 });
     ok(!(await visible(p, 'name')), `${nick}: без отметки «Мне есть 14 лет» имени не спрашиваем`);
-    await p.getByTestId('adult-yes').click();
+    await p.getByTestId('adult').click();
     await p.getByTestId('name').fill(nick);
     await p.getByTestId('name-save').click();
   };

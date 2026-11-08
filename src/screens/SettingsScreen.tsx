@@ -7,6 +7,7 @@ import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
+import { Toggle } from '../ui/Toggle';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { setSettings, useSettings } from '../state/store';
 import { setPersonalAds } from '../money';
@@ -26,7 +27,6 @@ function Row({ title, note, children }: { title: string; note?: string; children
 export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onReport: () => void }) {
   const insets = useInsets();
   const s = useSettings();
-  const onOff = (v: boolean) => (v ? 'on' : 'off');
   const motion: Motion = s.lessMotion === undefined ? 'system' : s.lessMotion ? 'on' : 'off';
   return (
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]} testID="settings">
@@ -37,28 +37,17 @@ export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onRep
             label={m => (m === 'system' ? T.settings.lessMotionSystem : m === 'on' ? T.settings.lessMotionOn : T.settings.lessMotionOff)}
             onChange={m => setSettings({ lessMotion: m === 'system' ? undefined : m === 'on' })} />
         </Row>
-        <Row title={T.settings.sound}>
-          <Chips id="sound" items={['on', 'off'] as const} value={onOff(s.sound)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ sound: v === 'on' })} />
-        </Row>
-        <Row title={T.settings.vibration}>
-          <Chips id="vibration" items={['on', 'off'] as const} value={onOff(s.vibration)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ vibration: v === 'on' })} />
-        </Row>
+        <Toggle id="sound" title={T.settings.sound} value={s.sound} onChange={v => setSettings({ sound: v })} />
+        <Toggle id="vibration" title={T.settings.vibration} value={s.vibration} onChange={v => setSettings({ vibration: v })} />
         <Row title={T.settings.botSpeed}>
           <Chips id="speed" items={['normal', 'fast'] as const} value={s.botSpeed} label={v => (v === 'normal' ? T.settings.botNormal : T.settings.botFast)} onChange={botSpeed => setSettings({ botSpeed })} />
         </Row>
         <Row title={T.settings.handOrder} note={T.settings.handOrderNote}>
           <Chips id="order" items={['suit', 'rank'] as const} value={s.handOrder} label={v => (v === 'suit' ? T.settings.bySuit : T.settings.byRank)} onChange={handOrder => setSettings({ handOrder })} />
         </Row>
-        <Row title={T.settings.fourColor} note={T.settings.fourColorNote}>
-          <Chips id="four" items={['on', 'off'] as const} value={onOff(s.fourColor)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ fourColor: v === 'on' })} />
-        </Row>
-        <Row title={T.settings.memoryAid} note={T.settings.memoryAidNote}>
-          <Chips id="memory" items={['on', 'off'] as const} value={onOff(s.memoryAid)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ memoryAid: v === 'on' })} />
-        </Row>
-        <Row title={T.settings.personalAds} note={T.settings.personalAdsNote}>
-          <Chips id="personal-ads" items={['on', 'off'] as const} value={onOff(s.personalAds)} label={v => (v === 'on' ? T.settings.on : T.settings.off)}
-            onChange={v => { setSettings({ personalAds: v === 'on' }); setPersonalAds(v === 'on'); }} />
-        </Row>
+        <Toggle id="four" title={T.settings.fourColor} note={T.settings.fourColorNote} value={s.fourColor} onChange={v => setSettings({ fourColor: v })} />
+        <Toggle id="memory" title={T.settings.memoryAid} note={T.settings.memoryAidNote} value={s.memoryAid} onChange={v => setSettings({ memoryAid: v })} />
+        <Toggle id="personal-ads" title={T.settings.personalAds} note={T.settings.personalAdsNote} value={s.personalAds} onChange={v => { setSettings({ personalAds: v }); setPersonalAds(v); }} />
       </View>
       <Button label={T.settings.report} kind="ghost" onPress={onReport} testID="report" />
       <Button label={T.settings.back} onPress={onBack} testID="settings-back" />
