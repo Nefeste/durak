@@ -5,7 +5,7 @@ import { useInsets } from '../ui/insets';
 import * as Application from 'expo-application';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { readCrashlog } from '../state/crashlog';
 import type { CrashEntry } from '../state/crashlog';
 import { buildReport } from '../state/report';
@@ -25,7 +25,7 @@ export function ReportScreen({ onBack }: { onBack: () => void }) {
     device: `${Platform.OS} ${String(Platform.Version ?? '')}`.trim(), lang: 'ru', screen: 'settings', game, log, labels: T.report.labels,
   });
   return (
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]} testID="report-screen">
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]} testID="report-screen">
       <Text style={styles.title}>{T.report.title}</Text>
       <Text style={styles.label}>{T.report.what}</Text>
       <TextInput value={what} onChangeText={setWhat} placeholder={T.report.placeholder} placeholderTextColor={C.dim} multiline style={styles.input} testID="report-what" />
@@ -39,10 +39,10 @@ export function ReportScreen({ onBack }: { onBack: () => void }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  content: { paddingHorizontal: 20, gap: 12 },
-  title: { color: C.text, fontSize: 24, fontWeight: '800' },
-  label: { color: C.text, fontSize: 16, fontWeight: '700' },
-  input: { minHeight: 80, color: C.text, borderWidth: 1, borderColor: C.glassLine, borderRadius: RADIUS.card, padding: 12, fontSize: 15, textAlignVertical: 'top' },
-  note: { color: C.dim, fontSize: 13 },
-  preview: { color: C.dim, fontSize: 12, padding: 12, borderRadius: RADIUS.card, backgroundColor: C.glass },
+  content: { paddingHorizontal: SPACE.l, gap: SPACE.m },
+  title: { color: C.text, fontSize: TYPE.title, fontWeight: '800' },
+  label: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
+  input: { minHeight: 80, color: C.text, borderWidth: 1, borderColor: C.glassLine, borderRadius: RADIUS.panel, padding: SPACE.m, fontSize: TYPE.body, textAlignVertical: 'top' },
+  note: { color: C.dim, fontSize: TYPE.caption },
+  preview: { color: C.dim, fontSize: TYPE.caption, padding: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass },
 });

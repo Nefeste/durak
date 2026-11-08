@@ -1,7 +1,7 @@
 // Ряд выбора одного из нескольких (меню, настройки).
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { C } from './theme';
+import { C, RADIUS, SPACE, TYPE } from './theme';
 
 export function Chips<V extends string | number>({ items, value, label, onChange, id, locked }: {
   items: readonly V[]; value: V; label: (v: V) => string; onChange: (v: V) => void; id: string;
@@ -27,10 +27,10 @@ export function Chips<V extends string | number>({ items, value, label, onChange
 }
 
 const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: C.glassLine },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.s },
+  chip: { paddingHorizontal: SPACE.l, minHeight: 40, justifyContent: 'center', borderRadius: RADIUS.small, borderWidth: 1, borderColor: C.glassLine },
   chipOn: { backgroundColor: C.accent, borderColor: C.accent },
-  chipText: { color: C.text, fontSize: 15 },
+  chipText: { color: C.text, fontSize: TYPE.body },
   chipTextOn: { color: C.accentText, fontWeight: '700' },
   chipLocked: { borderStyle: 'dashed' },
   chipTextLocked: { color: C.dim },

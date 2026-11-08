@@ -13,7 +13,7 @@ import { YOU } from './table';
 import { T } from '../i18n';
 import { isPro, isUnlocked, onRights, prepareRewarded, reviewAccess, rewardedReady, watchForReview } from '../money';
 import { Button } from '../ui/Button';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { actionText, whyText, worstText } from './words';
 
 function Row({ d }: { d: Decision }) {
@@ -62,7 +62,7 @@ export function ReviewScreen({ review: given, record, at, lastToday, onBack, onS
     if (ok) bump(n => n + 1); else setFailed(true);
   };
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]} testID="review">
+    <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="review">
       <View style={styles.top}>
         <Button label={T.review.back} kind="ghost" onPress={onBack} testID="review-back" />
         <Text style={styles.title}>{T.review.title}</Text>
@@ -88,17 +88,17 @@ export function ReviewScreen({ review: given, record, at, lastToday, onBack, onS
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, gap: 12 },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { color: C.text, fontSize: 20, fontWeight: '700' },
-  list: { gap: 10, paddingBottom: 24 },
-  head: { color: C.text, fontSize: 16, fontWeight: '700' },
-  row: { gap: 3, padding: 12, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.m },
+  top: { flexDirection: 'row', alignItems: 'center', gap: SPACE.m },
+  title: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },
+  list: { gap: SPACE.m, paddingBottom: SPACE.xl },
+  head: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
+  row: { gap: SPACE.xs, padding: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   rowHead: { flexDirection: 'row', justifyContent: 'space-between' },
-  bout: { color: C.dim, fontSize: 14 },
-  grade: { fontSize: 14, fontWeight: '700' },
-  text: { color: C.text, fontSize: 15 },
-  why: { color: C.text, fontSize: 15, fontStyle: 'italic' },
-  small: { color: C.dim, fontSize: 13 },
-  locked: { gap: 10, padding: 14, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  bout: { color: C.dim, fontSize: TYPE.caption },
+  grade: { fontSize: TYPE.caption, fontWeight: '700' },
+  text: { color: C.text, fontSize: TYPE.body },
+  why: { color: C.text, fontSize: TYPE.body, fontStyle: 'italic' },
+  small: { color: C.dim, fontSize: TYPE.caption },
+  locked: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
 });

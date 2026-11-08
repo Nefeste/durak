@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { Button } from '../ui/Button';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { T } from '../i18n';
 import { ON_SALE, billing, buy, getRights, isPro, onRights, openRuStore, syncRights } from '../money';
 import type { Availability, MainProductId, Product, Unavailable } from '../money';
@@ -57,7 +57,7 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
   const restore = () => { void syncRights().then(r => setMsg(r.ok ? { text: T.money.restored } : { text: T.money.why[r.why], detail: r.detail })); };
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={[styles.pad, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]} testID="store">
+    <ScrollView style={styles.root} contentContainerStyle={[styles.pad, { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]} testID="store">
       <Text style={styles.title} maxFontSizeMultiplier={1.3}>{T.money.title}</Text>
       {billing.test ? <Text style={styles.note} testID="store-test" maxFontSizeMultiplier={1.3}>{T.money.test}</Text> : null}
       {why ? (
@@ -95,12 +95,12 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  pad: { paddingHorizontal: 20, gap: 14 },
-  title: { color: C.text, fontSize: 24, fontWeight: '800' },
-  banner: { backgroundColor: C.sheet, borderRadius: RADIUS.card, padding: 14, gap: 10, borderWidth: 1, borderColor: C.glassLine },
-  card: { padding: 16, gap: 10, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
-  name: { color: C.accent, fontSize: 19, fontWeight: '800' },
-  text: { color: C.text, fontSize: 15, lineHeight: 20 },
-  note: { color: C.dim, fontSize: 13, lineHeight: 18 },
-  good: { color: C.ok, fontSize: 15, fontWeight: '700' },
+  pad: { paddingHorizontal: SPACE.l, gap: SPACE.l },
+  title: { color: C.text, fontSize: TYPE.title, fontWeight: '800' },
+  banner: { backgroundColor: C.sheet, borderRadius: RADIUS.panel, padding: SPACE.l, gap: SPACE.m, borderWidth: 1, borderColor: C.glassLine },
+  card: { padding: SPACE.l, gap: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  name: { color: C.accent, fontSize: TYPE.section, fontWeight: '800' },
+  text: { color: C.text, fontSize: TYPE.body, lineHeight: 20 },
+  note: { color: C.dim, fontSize: TYPE.caption, lineHeight: 18 },
+  good: { color: C.ok, fontSize: TYPE.body, fontWeight: '700' },
 });

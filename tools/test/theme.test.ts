@@ -49,3 +49,23 @@ describe('контраст', () => {
     }
   });
 });
+
+// Шкалы листа стиля (13-art.md §3–4; аудит 08.11.2026, находки 5 и 14): экраны берут размеры текста, отступы,
+// скругления и цвета только из src/ui/theme.ts. Рисунок карт (src/render) — своя геометрия, его здесь не проверяем.
+describe('токены вместо чисел на глаз', () => {
+  const { readdirSync, readFileSync } = require('node:fs') as typeof import('node:fs');
+  const files = ['src/screens', 'src/game', 'src/ui'].flatMap(dir => readdirSync(dir).filter(f => f.endsWith('.tsx')).map(f => `${dir}/${f}`));
+  const bad = (re: RegExp) => files.flatMap(f => readFileSync(f, 'utf8').split('\n').map((l, i) => [f, i + 1, l] as const).filter(([, , l]) => re.test(l)).map(([f, i, l]) => `${f}:${i}: ${l.trim()}`));
+  test('шкалы — как в листе стиля', async () => {
+    const { TYPE, SPACE, RADIUS } = await import('../../src/ui/theme');
+    expect(Object.values(TYPE)).toEqual([13, 15, 17, 20, 28, 40]);
+    expect(Object.values(SPACE)).toEqual([4, 8, 12, 16, 24, 32, 48]);
+    expect(RADIUS).toMatchObject({ playing: 8, small: 12, panel: 20 });
+  });
+  test('размер текста — только TYPE', () => expect(bad(/fontSize: \d/)).toEqual([]));
+  test('отступы и скругления — только SPACE и RADIUS (сдвиг внахлёст отрицательным числом можно)', () => {
+    expect(bad(/\b(gap|rowGap|columnGap|padding\w*|margin\w*|borderRadius): \d/)).toEqual([]);
+    expect(bad(/insets\.\w+ \+ \d/)).toEqual([]);
+  });
+  test('цвета — только C', () => expect(bad(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)).toEqual([]));
+});

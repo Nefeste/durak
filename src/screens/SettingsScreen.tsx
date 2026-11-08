@@ -7,7 +7,7 @@ import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { setSettings, useSettings } from '../state/store';
 import { setPersonalAds } from '../money';
 
@@ -29,7 +29,7 @@ export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onRep
   const onOff = (v: boolean) => (v ? 'on' : 'off');
   const motion: Motion = s.lessMotion === undefined ? 'system' : s.lessMotion ? 'on' : 'off';
   return (
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]} testID="settings">
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]} testID="settings">
       <Text style={styles.title}>{T.settings.title}</Text>
       <View style={styles.panel}>
         <Row title={T.settings.lessMotion} note={T.settings.lessMotionNote}>
@@ -68,10 +68,10 @@ export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onRep
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  content: { paddingHorizontal: 20, gap: 16 },
-  title: { color: C.text, fontSize: 24, fontWeight: '800' },
-  panel: { gap: 18, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
-  row: { gap: 8 },
-  label: { color: C.text, fontSize: 16, fontWeight: '700' },
-  note: { color: C.dim, fontSize: 13 },
+  content: { paddingHorizontal: SPACE.l, gap: SPACE.l },
+  title: { color: C.text, fontSize: TYPE.title, fontWeight: '800' },
+  panel: { gap: SPACE.l, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  row: { gap: SPACE.s },
+  label: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
+  note: { color: C.dim, fontSize: TYPE.caption },
 });
