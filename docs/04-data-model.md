@@ -69,6 +69,11 @@ AsyncStorage, ключи `durak.*`, как в «Нардах»: идущая п�
 (`durak.rights`), задачи дня (`durak.daily`), счётчики своей статистики (`durak.stats`). Резервная копия Android —
 как в «Нардах» (ADR 0024 «Нард»): профиль онлайна возвращается только на тот же телефон.
 
+Сделано к этапу Е — ключи `src/state/storage.ts`: `durak.current` (идущая партия с ботами), `durak.settings`,
+`durak.crashlog`, `durak.device`, `durak.adult`, `durak.ads` (счётчики рекламы, `src/money/ads.ts`), `durak.purchases`
+(кэш прав «Без рекламы» и «Про»), `durak.unlocked` (разборы, открытые рекламой), `durak.rate` (когда просили оценку).
+Настройки — `personalAds` с этапа Е.
+
 ## Сервер
 
 SQLite (WAL), как в «Нардах»; миграции — `server/src/schema.ts` (номер — `PRAGMA user_version`, новые — только в

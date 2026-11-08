@@ -1,0 +1,25 @@
+// из nardy: modules/rustore-review/android/build.gradle @ 1d2bdff — пакет games.gornitsa.durak.
+// Оценка приложения в RuStore изнутри игры (docs/09-game-design.md, «Статистика и то, что возвращает
+// в игру»). Официальная обёртка RuStore для React Native собирается старым плагином Android
+// и Java 8, поэтому здесь свой модуль Expo поверх нативного SDK. Репозиторий maven RuStore
+// добавляет плагин RuStore Pay из общего набора (@gornitsa/kit, в app.json otherStore: "maven" —
+// и в сборке other).
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'games.gornitsa.durak'
+version = '1.0.0'
+
+android {
+  namespace "games.gornitsa.durak.review"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}
+
+dependencies {
+  implementation "ru.rustore.sdk:review:10.5.1"
+}

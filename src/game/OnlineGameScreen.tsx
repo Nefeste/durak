@@ -1,7 +1,7 @@
 // Стол онлайн (docs/09-game-design.md, «Онлайн»): пока ждём — код, ссылка и места; партия — тот же
 // холст Skia, что с ботами, но по виду места с сервера (ADR 0008). Онлайн нет помощников: ни
 // подсказки, ни вышедших карт, ни отмены (ADR 0006). После партии — итог, проверка колоды и «Реванш».
-import React, { useEffect, useMemo, useReducer, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
 import { Share, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { legalActions, stateFrom } from '../engine';
 import type { Action, Card, Result } from '../engine';
 import { layout as fill, unseen } from '../bot/legal';
 import { T } from '../i18n';
+import { gameEnded, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
 import { C, RADIUS } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
@@ -90,6 +91,16 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const [askedNo, setAskedNo] = useState(-1);
   const g = t.game!;
   const at = `${g.no}:${g.n}`;
+  // деньги (src/money): партия по сети — в счётчики рекламы, когда кончилась; реклама — только при
+  // уходе с итога в меню, никогда во время партии и не между партиями за одним столом
+  const started = useRef<{ no: number; at: number } | null>(null);
+  const counted = useRef(-1);
+  useEffect(() => {
+    if (started.current?.no !== g.no) started.current = { no: g.no, at: Date.now() };
+    if (t.status !== 'finished' || counted.current === g.no) return;
+    counted.current = g.no;
+    gameEnded(Date.now() - started.current.at);
+  }, [t.status, g.no]);
   // выбранная карта — только для того действия, при котором её выбрали
   const picked = pick && pick.at === at ? pick : null;
   const setPicked = (p: { card: Card; options: Action[] } | null) => setPick(p ? { ...p, at } : null);
@@ -224,7 +235,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
             ) : null}
             {asked || g.rematch[t.you] ? <Text style={styles.dim} testID="rematch-wait">{T.online.rematchWait}</Text>
               : <Button label={T.online.rematch} onPress={rematch} testID="rematch" />}
-            <Button label={T.game.menu} kind="ghost" onPress={onExit} testID="result-menu" />
+            <Button label={T.game.menu} kind="ghost" onPress={() => { leavingEnd({ wonVsBot: false }); onExit(); }} testID="result-menu" />
           </View>
         ) : null}
       </View>

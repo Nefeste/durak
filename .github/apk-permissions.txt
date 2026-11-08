@@ -1,13 +1,17 @@
 # Белый список разрешений APK (docs/05-process.md). android.yml сверяет с ним готовый APK действием
 # android-contents набора gornitsa-kit: разрешение не из списка останавливает сборку. Новое — сюда,
-# в карточку RuStore и, если оно о данных игрока, в политику. Файл — путь владельца (.github/).
+# в store/forms.md («Разрешения Android») и, если оно о данных игрока, в политику. Файл — путь владельца (.github/).
 # Этап Б: сеть — из шаблона React Native (онлайн — этап Г), вибрация — expo-haptics, звук — expo-audio.
 # Тег v0.2.0 (08.11.2026) показал ещё два, как у «Нард»: ACCESS_NETWORK_STATE и WAKE_LOCK — из библиотек
 # шаблона, данных игрока не касаются. INSTALL_REFERRER (из expo-application) не нужен — он в
-# blockedPermissions app.json и в запрете android.yml.
+# blockedPermissions app.json и в запрете android.yml; рекламе Яндекса он тоже не обязателен.
+# Этап Е (0.4.0): реклама Яндекса и RuStore Pay — по списку «Нард» (nardy @ 1d2bdff, сборка 78: первая с
+# RuStore Pay и рекламой Яндекса) — RECEIVE_BOOT_COMPLETED и AD_ID. Первый тег с ними сверит список с APK.
 android.permission.ACCESS_NETWORK_STATE
 android.permission.INTERNET
 android.permission.VIBRATE
 android.permission.WAKE_LOCK
 android.permission.MODIFY_AUDIO_SETTINGS
+android.permission.RECEIVE_BOOT_COMPLETED
+com.google.android.gms.permission.AD_ID
 games.gornitsa.durak.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION

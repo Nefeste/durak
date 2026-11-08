@@ -1,0 +1,66 @@
+// из nardy: src/money/types.ts @ 1d2bdff — без оформлений (их в «Козыре» пока нет, docs/11-money.md).
+// Общие типы денег (docs/11-money.md): товары, права, порты оплаты и рекламы. Кода платформ здесь нет:
+// реализации — billing.ts / adsSdk.ts (телефон) и *.web.ts (браузер, только для проверок).
+
+/** Товары карточками в «Магазине». */
+export type MainProductId = 'no_ads' | 'pro_month' | 'pro_year';
+/** Идентификаторы товаров — навсегда, как `applicationId` (они же в консоли RuStore). */
+export type ProductId = MainProductId;
+export const MAIN_PRODUCTS: readonly MainProductId[] = ['no_ads', 'pro_month', 'pro_year'];
+export const PRODUCT_IDS: readonly ProductId[] = MAIN_PRODUCTS;
+
+/**
+ * «Про» продаётся, только когда есть то, что она даёт: полный разбор и подробная статистика —
+ * этап Д (docs/07-roadmap.md). До этого витрина показывает одну «Без рекламы»: продавать то,
+ * чего ещё нет, нельзя (устав, «Честность»). Включает этап Д — одной строкой.
+ */
+export const PRO_ON_SALE = false;
+/** Товары на витрине сейчас. */
+export const ON_SALE: readonly MainProductId[] = PRO_ON_SALE ? MAIN_PRODUCTS : ['no_ads'];
+
+/** Товар для витрины: цена — строкой из магазина («249 ₽»); `null` — магазин цену не назвал. */
+export interface Product { id: ProductId; price: string | null }
+
+/** Что куплено, по словам магазина: «Без рекламы» и до какого времени оплачена «Про» (0 — нет). */
+export interface Owned { noAds: boolean; proUntil: number }
+
+/** Почему покупки недоступны. */
+export type Unavailable =
+  | 'other-build'     // сборка не для RuStore
+  | 'not-ready'       // сборка RuStore, но номер приложения в консоли ещё не задан
+  | 'no-rustore'      // RuStore не установлен или не поддерживает платежи
+  | 'not-signed-in'   // не выполнен вход в RuStore
+  | 'error';          // RuStore отказал или не ответил
+
+/** `detail` — что ответил RuStore, как есть (текст или код ошибки SDK): по нему видно, что чинить. */
+export type Availability = { ok: true } | { ok: false; why: Unavailable; detail?: string };
+
+export type BuyResult = { ok: true } | { ok: false; why: 'cancelled' | 'failed' | 'unavailable'; code?: string; detail?: string };
+
+/** Порт оплаты: всё, что приложению нужно от магазина. */
+export interface Billing {
+  /** Тестовый магазин (браузер): витрина подписывает это, чтобы не путать с настоящим. */
+  readonly test: boolean;
+  availability(): Promise<Availability>;
+  products(): Promise<Product[]>;
+  purchase(id: ProductId): Promise<BuyResult>;
+  /** Сверка прав с магазином; `null` — сверить не удалось (тогда живём по кэшу). */
+  owned(): Promise<Owned | null>;
+}
+
+/** Порт рекламной сети: загрузить заранее, показать готовое. Ждать загрузки игрок не должен никогда. */
+export interface AdsSdk {
+  /** Запуск SDK; `personal` — согласие на персональную рекламу (настройка «Персональная реклама»). */
+  init(personal: boolean): Promise<void>;
+  setPersonal(personal: boolean): void;
+  /** Начать загрузку полноэкранной, если её ещё нет и она не грузится. */
+  loadInterstitial(): void;
+  interstitialReady(): boolean;
+  /** Показать загруженную; `false` — показывать нечего. `onShown` — реклама действительно показана. */
+  showInterstitial(onShown: () => void): boolean;
+  /** Начать загрузку рекламы за вознаграждение; `onReady` — когда загрузится. */
+  loadRewarded(onReady?: () => void): void;
+  rewardedReady(): boolean;
+  /** Показать рекламу за вознаграждение: `rewarded` — только по событию SDK «награда получена». */
+  showRewarded(): Promise<'rewarded' | 'closed' | 'failed'>;
+}

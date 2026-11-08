@@ -56,7 +56,7 @@ RuStore Review or Yandex Mobile Ads code from memory — follow «Expo has chang
 
 ## Commands
 
-Stages А, Б and Г are in the code (engine, rule bots, the Skia table vs bots, saves, settings; online: `server/`, per-seat
+Stages А, Б, Г and Е are in the code (engine, rule bots, the Skia table vs bots, saves, settings; online: `server/`, per-seat
 views, friend tables, quick match, deck check); the rest follows nardy.
 
 ```bash
@@ -76,6 +76,7 @@ bun test tools/test/server.test.ts  # server in-process: per-seat views (ADR 000
 EXPO_PUBLIC_DURAK_SERVER=http://127.0.0.1:8796 EXPO_OFFLINE=1 npx expo export -p web --output-dir dist-web-online --clear
 DURAK_WEB_DIR=dist-web-online NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/online.ts   # two browsers: friend table with a bot to the end, deck check, rematch, quick match
 NODE_PATH=/opt/node22/lib/node_modules bun tools/art/icon.ts   # icon, adaptive icon, splash + passport assets/LICENSES.md
+NODE_PATH=/opt/node22/lib/node_modules bun tools/store/shots.ts # after export:web: store/graphics (icon 512, feature, og) and store/screenshots/ru (1080×1920)
 ```
 
 ## Hard rules
@@ -97,6 +98,11 @@ This project's own rules:
 - **The server sends each seat only what that seat may see** (ADR 0008): no response or event ever carries
   another player's hand or the talon order before the reveal; a test checks every route.
 - **No bot, hints, card counting or review during an online game** — for anyone, paid or not (ADR 0006).
+- **Money as nardy** (ADR 0009, `docs/11-money.md`): everything about money lives in `src/money/` (copy of nardy's
+  module without skins); screens call only `src/money/index.ts`; ads only when leaving the result screen, never during
+  a game. Never call the RuStore Pay wrapper's `updateAcknowledgementState` (it crashes 11.1.0 after a payment;
+  `money.test.ts` fails on any caller). «Про» is on sale only with the review (`PRO_ON_SALE`, stage Д); hints,
+  seen cards and undo never read purchase rights.
 - **Portrait only** (ADR 0007).
 - **Own look, not the studio brand book** (ADR 0012, owner's decision): dark table with glass, colours only in
   `src/ui/theme.ts`. Unique card backs «including 18+» are a post-1.0 owner decision (the age rating changes).
