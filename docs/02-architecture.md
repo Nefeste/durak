@@ -243,3 +243,12 @@ SDK из зависимостей убран, чтобы APK не нёс его 
   `src/screens/StatsScreen.tsx`.
 - «Про» в продаже: `PRO_ON_SALE = true`; права читают только `StoreScreen`, `StatsScreen` и `ReviewScreen` (тест).
 
+
+### 1.0, 08.11.2026 — «Правила»
+
+- Экран — `src/screens/RulesScreen.tsx`: разделы `RULES_SECTIONS` и текст — `T.rules` в `src/i18n/` (пересказ
+  `08-rules.md`, своих правил не добавляет); картинки — `src/game/rulesPictures.ts` (какие карты), рисует
+  `src/render/CardPicture.tsx` тем же `makeFaces`, что стол, одним холстом на картинку; раскладка мест — чистая
+  `src/render/picture.ts`. `tools/test/picture.test.ts`: карты внутри полоски, подпись под каждым местом, покрытые
+  карты биты по п. 4.2, подкинутые — достоинства со стола, перевод — того же достоинства. Открывается из меню
+  («Правила» в углу) и параметром `section` — сразу на нужном разделе.
