@@ -19,6 +19,7 @@ import { SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
+import { useTableCues } from './useTableCues';
 import { useLessMotion, useSettings } from '../state/store';
 import type { OnlineTable } from '../state/online';
 import type { SeatView, TableView } from '../state/protocol';
@@ -153,6 +154,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
 
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   const origins = useOrigins(view);
+  useTableCues(view, g.no, less);
   const lay = useMemo(() => (size && view ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, origins, size, settings.handOrder, picked]);
