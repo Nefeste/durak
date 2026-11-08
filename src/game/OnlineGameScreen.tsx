@@ -15,6 +15,7 @@ import { gameEnded, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
+import { SeatPlate } from './SeatPlate';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { useLessMotion, useSettings } from '../state/store';
 import type { OnlineTable } from '../state/online';
@@ -196,17 +197,12 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
         {lay && view ? lay.opponents.map(p => {
           const s = t.seats[p.seat];
           return (
-            <View key={p.seat} pointerEvents="none" testID={`opp-${p.seat}`}
-              style={[styles.opp, { left: p.x - oppW / 2, width: oppW, top: Math.max(0, p.y - lay.ch * 0.55 * 0.5 - 58) }]}>
-              <Text style={styles.oppName} numberOfLines={1}>{seatName(s)}</Text>
-              <Text style={styles.oppInfo} numberOfLines={1} testID={`opp-${p.seat}-cards`}>
-                {s?.botFor ? T.online.playingFor(s.name) : s && !s.online ? T.online.offline
-                  : view.out.includes(p.seat) ? T.game.out : T.game.cards(view.handSizes[p.seat])}
-              </Text>
-              <Text style={styles.oppRole} numberOfLines={1}>
-                {view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : ' '}
-              </Text>
-            </View>
+            <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={seatName(s)}
+              info={s?.botFor ? T.online.playingFor(s.name) : s && !s.online ? T.online.offline
+                : view.out.includes(p.seat) ? T.game.out : T.game.cards(view.handSizes[p.seat])}
+              role={view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : null}
+              active={view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat)}
+              left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - lay.ch * 0.55 * 0.5 - 66)} />
           );
         }) : null}
         {lay && view && view.talonSize > 0 ? (
@@ -257,10 +253,6 @@ const styles = StyleSheet.create({
   topTitle: { flex: 1, textAlign: 'right' },
   down: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 5, paddingVertical: SPACE.s, backgroundColor: C.sheet },
   area: { flex: 1 },
-  opp: { position: 'absolute', alignItems: 'center' },
-  oppName: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
-  oppInfo: { color: C.dim, fontSize: TYPE.caption },
-  oppRole: { color: C.accent, fontSize: TYPE.caption },
   talon: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
   hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
