@@ -13,7 +13,7 @@ import { layout as fill, unseen } from '../bot/legal';
 import { T } from '../i18n';
 import { gameEnded, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
-import { C, RADIUS, TOP_BAR } from '../ui/theme';
+import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { useLessMotion, useSettings } from '../state/store';
@@ -39,7 +39,7 @@ export function OnlineGameScreen({ table, onExit }: { table: OnlineTable; onExit
     return () => { off(); table.stop(); };
   }, [table]);
   const t = table.view;
-  const pad = { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 };
+  const pad = { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s };
   if (!t) return <View style={[styles.root, pad]} testID="online-loading"><Text style={styles.dim}>{T.online.waiting}</Text></View>;
   if (t.status === 'waiting' || t.status === 'cancelled') return <Lobby t={t} onExit={onExit} pad={pad} />;
   return <Play table={table} t={t} onExit={onExit} pad={pad} down={table.down} />;
@@ -181,7 +181,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const resign = () => { void net.resign(t.id).catch(() => {}); if (t.kind === 'friend') onExit(); };
 
   return (
-    <View style={[styles.root, pad, { paddingHorizontal: 8 }]} testID="online-game">
+    <View style={[styles.root, pad, { paddingHorizontal: SPACE.s }]} testID="online-game">
       <View style={styles.top}>
         <Button small label={t.status === 'finished' ? T.game.menu : t.kind === 'quick' ? T.online.resign : T.online.leave} kind="ghost"
           onPress={t.status === 'finished' ? onExit : resign} testID="online-exit" />
@@ -244,27 +244,27 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 20, gap: 8 },
-  lobby: { gap: 16 },
-  panel: { gap: 8, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
-  code: { color: C.accent, fontSize: 44, fontWeight: '800', letterSpacing: 6 },
-  seat: { color: C.text, fontSize: 17 },
-  dim: { color: C.dim, fontSize: 14 },
-  err: { color: C.danger, fontSize: 15, textAlign: 'center' },
-  ok: { color: C.ok, fontSize: 15, textAlign: 'center' },
+  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.s },
+  lobby: { gap: SPACE.l },
+  panel: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  code: { color: C.accent, fontSize: TYPE.display, fontWeight: '800', letterSpacing: 6 },
+  seat: { color: C.text, fontSize: TYPE.button },
+  dim: { color: C.dim, fontSize: TYPE.caption },
+  err: { color: C.danger, fontSize: TYPE.body, textAlign: 'center' },
+  ok: { color: C.ok, fontSize: TYPE.body, textAlign: 'center' },
   // верхняя полоса постоянной высоты, строка «нет связи» — поверх стола: стол не меняет размер
-  top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
   topTitle: { flex: 1, textAlign: 'right' },
-  down: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 5, paddingVertical: 6, backgroundColor: C.sheet },
+  down: { position: 'absolute', left: 0, right: 0, top: 0, zIndex: 5, paddingVertical: SPACE.s, backgroundColor: C.sheet },
   area: { flex: 1 },
   opp: { position: 'absolute', alignItems: 'center' },
-  oppName: { color: C.text, fontSize: 15, fontWeight: '700' },
-  oppInfo: { color: C.dim, fontSize: 13 },
-  oppRole: { color: C.accent, fontSize: 13 },
-  talon: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: 13 },
-  controls: { position: 'absolute', left: 8, right: 8, gap: 8 },
-  hint: { color: C.text, fontSize: 15, textAlign: 'center', minHeight: 20 },
-  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, minHeight: 48 },
-  result: { position: 'absolute', left: 16, right: 16, top: '25%', gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
-  resultText: { color: C.text, fontSize: 19, fontWeight: '700', textAlign: 'center' },
+  oppName: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
+  oppInfo: { color: C.dim, fontSize: TYPE.caption },
+  oppRole: { color: C.accent, fontSize: TYPE.caption },
+  talon: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
+  controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
+  hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
+  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: SPACE.m, minHeight: 48 },
+  result: { position: 'absolute', left: 16, right: 16, top: '25%', gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
+  resultText: { color: C.text, fontSize: TYPE.section, fontWeight: '700', textAlign: 'center' },
 });

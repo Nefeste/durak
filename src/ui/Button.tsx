@@ -1,7 +1,7 @@
 // Кнопка: золотая капсула — главное действие, стекло — остальные (как в «Нардах», ADR 0012).
 import React from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { C, RADIUS } from './theme';
+import { C, RADIUS, SPACE, TYPE } from './theme';
 
 /** `small` — для верхней полосы и помощников у руки: ниже и уже, зона касания та же (hitSlop). */
 export function Button({ label, onPress, kind = 'main', disabled, testID, small }: {
@@ -22,13 +22,13 @@ export function Button({ label, onPress, kind = 'main', disabled, testID, small 
 }
 
 const styles = StyleSheet.create({
-  base: { minHeight: 48, paddingHorizontal: 20, borderRadius: RADIUS.button, alignItems: 'center', justifyContent: 'center' },
+  base: { minHeight: 48, paddingHorizontal: SPACE.l, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
   main: { backgroundColor: C.accent },
   ghost: { backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
-  small: { minHeight: 40, paddingHorizontal: 14 },
+  small: { minHeight: 40, paddingHorizontal: SPACE.l },
   dim: { opacity: 0.55 },
-  label: { fontSize: 17, fontWeight: '700' },
-  smallLabel: { fontSize: 15 },
+  label: { fontSize: TYPE.button, fontWeight: '700' },
+  smallLabel: { fontSize: TYPE.body },
   mainText: { color: C.accentText },
   ghostText: { color: C.text },
 });

@@ -4,7 +4,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
-import { C, RADIUS, suitColors } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE, suitColors } from '../ui/theme';
 import type { Seen } from './flow';
 
 export function SeenCards({ grid, fourColor, onClose }: { grid: Seen[][]; fourColor: boolean; onClose: () => void }) {
@@ -30,14 +30,14 @@ export function SeenCards({ grid, fourColor, onClose }: { grid: Seen[][]; fourCo
 }
 
 const styles = StyleSheet.create({
-  sheet: { position: 'absolute', left: 12, right: 12, top: '18%', gap: 6, padding: 14, borderRadius: RADIUS.card, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
-  title: { color: C.text, fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  suit: { width: 22, fontSize: 18, textAlign: 'center' },
-  cell: { flex: 1, height: 28, borderRadius: 6, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  sheet: { position: 'absolute', left: 12, right: 12, top: '18%', gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
+  title: { color: C.text, fontSize: TYPE.button, fontWeight: '700', textAlign: 'center', marginBottom: SPACE.xs },
+  row: { flexDirection: 'row', alignItems: 'center', gap: SPACE.xs },
+  suit: { width: 22, fontSize: TYPE.button, textAlign: 'center' },
+  cell: { flex: 1, height: 28, borderRadius: RADIUS.small, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
   gone: { backgroundColor: C.line },
   openly: { borderColor: C.accent },
-  rank: { color: C.text, fontSize: 13, fontWeight: '700' },
+  rank: { color: C.text, fontSize: TYPE.caption, fontWeight: '700' },
   rankGone: { color: C.dim },
-  legend: { color: C.dim, fontSize: 13, marginTop: 4 },
+  legend: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
 });

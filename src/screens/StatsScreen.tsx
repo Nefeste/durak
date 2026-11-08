@@ -6,7 +6,7 @@ import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { isPro, onRights } from '../money';
 import { Button } from '../ui/Button';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { LEVELS } from '../bot';
 import { lastToday, loadHistory } from '../state/history';
 import type { FinishedGame } from '../state/history';
@@ -35,7 +35,7 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
   const pro = isPro();
   const row = (name: string, t: Tally) => <Text key={name} style={styles.text}>{T.stats.row(name, t.games, t.kept)}</Text>;
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]} testID="stats">
+    <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="stats">
       <View style={styles.top}>
         <Button label={T.stats.back} kind="ghost" onPress={onBack} testID="stats-back" />
         <Text style={styles.title}>{T.stats.title}</Text>
@@ -81,13 +81,13 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 16, gap: 12 },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { color: C.text, fontSize: 20, fontWeight: '700' },
-  list: { gap: 10, paddingBottom: 24 },
-  card: { gap: 6, padding: 14, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
-  head: { color: C.text, fontSize: 16, fontWeight: '700', marginTop: 6 },
-  text: { color: C.text, fontSize: 15 },
-  small: { color: C.dim, fontSize: 13 },
-  game: { gap: 6 },
+  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.m },
+  top: { flexDirection: 'row', alignItems: 'center', gap: SPACE.m },
+  title: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },
+  list: { gap: SPACE.m, paddingBottom: SPACE.xl },
+  card: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  head: { color: C.text, fontSize: TYPE.body, fontWeight: '700', marginTop: SPACE.s },
+  text: { color: C.text, fontSize: TYPE.body },
+  small: { color: C.dim, fontSize: TYPE.caption },
+  game: { gap: SPACE.s },
 });

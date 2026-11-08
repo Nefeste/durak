@@ -12,7 +12,7 @@ import type { Action, Card, State } from '../engine';
 import { actorOf } from '../bot/sim';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { useLessMotion, useSettings } from '../state/store';
@@ -161,7 +161,7 @@ export function PuzzleScreen({ onBack }: { onBack: () => void }) {
   const [log, setLog] = useState<PuzzleLog>({});
   useEffect(() => { if (archive) void loadPuzzleLog().then(setLog); }, [archive]);
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]} testID="puzzle">
+    <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="puzzle">
       <View style={styles.top}>
         <Button label={T.puzzle.back} kind="ghost" onPress={archive ? () => setArchive(false) : onBack} testID="puzzle-back" />
         <Text style={styles.title}>{archive ? T.puzzle.archive : T.puzzle.title}</Text>
@@ -174,18 +174,18 @@ export function PuzzleScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 8, gap: 8 },
-  top: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { color: C.text, fontSize: 20, fontWeight: '700', flex: 1 },
-  board: { flex: 1, gap: 6 },
-  head: { color: C.text, fontSize: 16, fontWeight: '700', textAlign: 'center' },
-  opp: { color: C.dim, fontSize: 15, textAlign: 'center' },
+  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.s, gap: SPACE.s },
+  top: { flexDirection: 'row', alignItems: 'center', gap: SPACE.m },
+  title: { color: C.text, fontSize: TYPE.section, fontWeight: '700', flex: 1 },
+  board: { flex: 1, gap: SPACE.s },
+  head: { color: C.text, fontSize: TYPE.body, fontWeight: '700', textAlign: 'center' },
+  opp: { color: C.dim, fontSize: TYPE.body, textAlign: 'center' },
   area: { flex: 1 },
-  controls: { position: 'absolute', left: 8, right: 8, gap: 8 },
-  line: { color: C.text, fontSize: 15, textAlign: 'center', minHeight: 20 },
-  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, minHeight: 48 },
-  row: { flexDirection: 'row', gap: 8 },
+  controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
+  line: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
+  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: SPACE.m, minHeight: 48 },
+  row: { flexDirection: 'row', gap: SPACE.s },
   cell: { flex: 1 },
-  shared: { color: C.dim, fontSize: 14, textAlign: 'center', padding: 8, borderRadius: RADIUS.card, borderWidth: 1, borderColor: C.glassLine },
-  list: { gap: 8, paddingBottom: 24 },
+  shared: { color: C.dim, fontSize: TYPE.caption, textAlign: 'center', padding: SPACE.s, borderRadius: RADIUS.panel, borderWidth: 1, borderColor: C.glassLine },
+  list: { gap: SPACE.s, paddingBottom: SPACE.xl },
 });

@@ -3,13 +3,13 @@
  * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/.
  *
  *   EXPO_OFFLINE=1 npm run export:web
- *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts
+ *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка]   # по умолчанию docs/design
  */
 import { mkdirSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 import { serveWeb } from '../e2e/serve';
 
-const OUT = 'docs/design';
+const OUT = process.argv[2] ?? 'docs/design'; // папка снимков «после» — аргументом
 mkdirSync(OUT, { recursive: true });
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
 const hand = (p: Page) => p.locator('[data-testid^="hand-"]');

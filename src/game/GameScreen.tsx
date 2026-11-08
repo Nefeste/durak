@@ -19,7 +19,7 @@ import type { ThinkJob } from './think';
 import { T } from '../i18n';
 import { gameEnded, gameStarted, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
-import { C, RADIUS, TOP_BAR } from '../ui/theme';
+import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { botDelay } from '../state/settings';
@@ -229,7 +229,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     return <ReviewScreen review={review} at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
   }
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]} testID="game">
+    <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
       <View style={styles.top}>
         <Button small label={T.game.menu} kind="ghost" onPress={onExit} testID="game-menu" />
         <Text style={styles.variant} numberOfLines={1}>{T.variant[variant]} · {T.level[lvl]}</Text>
@@ -291,22 +291,22 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: 8, gap: 4 },
+  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.s, gap: SPACE.xs },
   // верхняя полоса постоянной высоты: что бы ни появлялось на экране, стол не меняет размер
-  top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  variant: { color: C.dim, fontSize: 14, flex: 1 },
+  top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
+  variant: { color: C.dim, fontSize: TYPE.caption, flex: 1 },
   area: { flex: 1 },
   opp: { position: 'absolute', alignItems: 'center' },
-  oppName: { color: C.text, fontSize: 15, fontWeight: '700' },
-  oppInfo: { color: C.dim, fontSize: 13 },
-  oppRole: { color: C.accent, fontSize: 13 },
-  talonText: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: 13 },
-  controls: { position: 'absolute', left: 8, right: 8, gap: 8 },
-  hint: { color: C.text, fontSize: 15, textAlign: 'center', minHeight: 20 },
-  buttons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 48 },
-  helpers: { flexDirection: 'row', gap: 6, flexShrink: 1 },
-  actions: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
-  result: { position: 'absolute', left: 16, right: 16, top: '30%', gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
-  resultText: { color: C.text, fontSize: 19, fontWeight: '700', textAlign: 'center' },
-  worst: { color: C.dim, fontSize: 15, textAlign: 'center' },
+  oppName: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
+  oppInfo: { color: C.dim, fontSize: TYPE.caption },
+  oppRole: { color: C.accent, fontSize: TYPE.caption },
+  talonText: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
+  controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
+  hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
+  buttons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.s, minHeight: 48 },
+  helpers: { flexDirection: 'row', gap: SPACE.s, flexShrink: 1 },
+  actions: { flexDirection: 'row', gap: SPACE.s, marginLeft: 'auto' },
+  result: { position: 'absolute', left: 16, right: 16, top: '30%', gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
+  resultText: { color: C.text, fontSize: TYPE.section, fontWeight: '700', textAlign: 'center' },
+  worst: { color: C.dim, fontSize: TYPE.body, textAlign: 'center' },
 });

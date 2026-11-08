@@ -9,7 +9,7 @@ import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { CardBack } from '../render/PlayingCard';
 
 export interface Choice { variant: Variant; bots: number; level: Level }
@@ -22,7 +22,7 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   const [lockedNote, setLockedNote] = useState(false);
   return (
     // прокрутка: на невысоком экране или с крупным шрифтом нижний ряд не уходит под кнопки телефона (0.5.1)
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 }]} testID="menu">
+    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.xl, paddingBottom: insets.bottom + SPACE.l }]} testID="menu">
       <View style={styles.head}>
         <View style={styles.backs}><CardBack /><View style={styles.tilt}><CardBack /></View></View>
         <Text style={styles.title}>{T.app.name}</Text>
@@ -60,16 +60,16 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  content: { flexGrow: 1, paddingHorizontal: 20, gap: 20, justifyContent: 'space-between' },
-  head: { alignItems: 'center', gap: 6 },
-  backs: { flexDirection: 'row', height: 100, marginBottom: 8 },
+  content: { flexGrow: 1, paddingHorizontal: SPACE.l, gap: SPACE.l, justifyContent: 'space-between' },
+  head: { alignItems: 'center', gap: SPACE.s },
+  backs: { flexDirection: 'row', height: 100, marginBottom: SPACE.s },
   tilt: { marginLeft: -30, transform: [{ rotate: '12deg' }] },
-  title: { color: C.accent, fontSize: 40, fontWeight: '800' },
-  tagline: { color: C.dim, fontSize: 16 },
-  panel: { gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
-  label: { color: C.dim, fontSize: 14, marginTop: 4 },
-  note: { color: C.dim, fontSize: 14 },
-  actions: { gap: 10 },
-  row: { flexDirection: 'row', gap: 10 },
+  title: { color: C.accent, fontSize: TYPE.display, fontWeight: '800' },
+  tagline: { color: C.dim, fontSize: TYPE.body },
+  panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
+  note: { color: C.dim, fontSize: TYPE.caption },
+  actions: { gap: SPACE.m },
+  row: { flexDirection: 'row', gap: SPACE.m },
   cell: { flex: 1 },
 });

@@ -10,7 +10,7 @@ import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
-import { C, RADIUS } from '../ui/theme';
+import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { isCode, nameProblem } from '../state/protocol';
 import type { QuickView } from '../state/protocol';
 import { NetError } from '../state/net';
@@ -126,7 +126,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   useEffect(() => () => { if (searching.current) void net.quickCancel().catch(() => {}); }, []);
 
   if (!ready) return <View style={styles.root} />;
-  const pad = { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 };
+  const pad = { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.l };
 
   if (!adult || !named) {
     return (
@@ -208,13 +208,13 @@ export const adultNow = isAdult;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  content: { paddingHorizontal: 20, gap: 16 },
-  title: { color: C.accent, fontSize: 28, fontWeight: '800' },
-  panel: { gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
-  label: { color: C.dim, fontSize: 14, marginTop: 4 },
-  note: { color: C.dim, fontSize: 14 },
-  big: { color: C.text, fontSize: 19, fontWeight: '700' },
-  input: { color: C.text, fontSize: 18, borderWidth: 1, borderColor: C.glassLine, borderRadius: 12, paddingHorizontal: 12, minHeight: 48 },
-  err: { color: C.danger, fontSize: 15 },
-  errBox: { gap: 8 },
+  content: { paddingHorizontal: SPACE.l, gap: SPACE.l },
+  title: { color: C.accent, fontSize: TYPE.title, fontWeight: '800' },
+  panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
+  note: { color: C.dim, fontSize: TYPE.caption },
+  big: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },
+  input: { color: C.text, fontSize: TYPE.button, borderWidth: 1, borderColor: C.glassLine, borderRadius: RADIUS.small, paddingHorizontal: SPACE.m, minHeight: 48 },
+  err: { color: C.danger, fontSize: TYPE.body },
+  errBox: { gap: SPACE.s },
 });
