@@ -2,7 +2,7 @@
 // пока игрок не выбрал сам — ADR устава 0023, правило 6), скорость ботов, порядок руки,
 // четырёхцветная колода, «Помощь памяти (для учёбы)», персональная реклама (этап Е, как в «Нардах»).
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
@@ -12,6 +12,7 @@ import { Toggle } from '../ui/Toggle';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { setSettings, useSettings } from '../state/store';
 import { setPersonalAds } from '../money';
+import { APP_VERSION } from '../version';
 
 type Motion = 'system' | 'on' | 'off';
 
@@ -25,7 +26,7 @@ function Row({ title, note, children }: { title: string; note?: string; children
   );
 }
 
-export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onReport: () => void }) {
+export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => void; onReport: () => void; onBench?: () => void }) {
   const insets = useInsets();
   const s = useSettings();
   const motion: Motion = s.lessMotion === undefined ? 'system' : s.lessMotion ? 'on' : 'off';
@@ -51,6 +52,10 @@ export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onRep
         <Toggle id="personal-ads" title={T.settings.personalAds} note={T.settings.personalAdsNote} value={s.personalAds} onChange={v => { setSettings({ personalAds: v }); setPersonalAds(v); }} />
       </View>
       <Button label={T.settings.report} kind="ghost" onPress={onReport} testID="report" />
+      {/* скрытый вход в «Замер» (docs/06-testing.md): долгое нажатие на версию */}
+      <Pressable onLongPress={onBench} delayLongPress={800} testID="version" accessibilityRole="text">
+        <Text style={styles.version}>{T.settings.version(APP_VERSION)}</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -62,4 +67,5 @@ const styles = StyleSheet.create({
   row: { gap: SPACE.s },
   label: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   note: { color: C.dim, fontSize: TYPE.caption },
+  version: { color: C.dim, fontSize: TYPE.caption, textAlign: 'center', paddingVertical: SPACE.s },
 });

@@ -9,6 +9,7 @@ import type { Choice } from './src/screens/MenuScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
+import { BenchScreen } from './src/screens/BenchScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { DeckSheet, deckSheetWanted } from './src/render/DeckSheet';
 import { RulesScreen } from './src/screens/RulesScreen';
@@ -29,7 +30,10 @@ import type { SavedGame } from './src/state/save';
 
 installCrashHandlers();
 
-type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'rules';
+/** Быстрый «Замер» для сценария в браузере: `?bench=quick`. */
+const quickBench = typeof globalThis.location !== 'undefined' && /[?&]bench=quick/.test(globalThis.location.search);
+
+type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'bench' | 'rules';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('menu');
@@ -70,7 +74,7 @@ export default function App() {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (route === 'menu') return false;
-      setRoute(route === 'report' ? 'settings' : 'menu');
+      setRoute(route === 'report' || route === 'bench' ? 'settings' : 'menu');
       return true;
     });
     return () => sub.remove();
@@ -104,7 +108,9 @@ export default function App() {
         ) : route === 'store' ? (
           <StoreScreen onBack={() => setRoute('menu')} />
         ) : route === 'settings' ? (
-          <SettingsScreen onBack={() => setRoute('menu')} onReport={() => setRoute('report')} />
+          <SettingsScreen onBack={() => setRoute('menu')} onReport={() => setRoute('report')} onBench={() => setRoute('bench')} />
+        ) : route === 'bench' ? (
+          <BenchScreen onBack={() => setRoute('settings')} quick={quickBench} />
         ) : route === 'report' ? (
           <ReportScreen onBack={() => setRoute('settings')} />
         ) : (
