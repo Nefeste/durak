@@ -228,7 +228,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   };
 
   if (showReview) {
-    return <ReviewScreen review={review} at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
+    return <ReviewScreen review={review} record={record} counting at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
   }
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
