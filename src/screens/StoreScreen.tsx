@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { Button } from '../ui/Button';
+import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { T } from '../i18n';
 import { ON_SALE, billing, buy, getRights, isPro, onRights, openRuStore, syncRights } from '../money';
@@ -58,7 +59,7 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={[styles.pad, { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]} testID="store">
-      <Text style={styles.title} maxFontSizeMultiplier={1.3}>{T.money.title}</Text>
+      <Header title={T.money.title} back={T.money.back} onBack={onBack} backTestID="store-back" />
       {billing.test ? <Text style={styles.note} testID="store-test" maxFontSizeMultiplier={1.3}>{T.money.test}</Text> : null}
       {why ? (
         <View style={styles.banner} testID="store-why">
@@ -88,7 +89,6 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
       {msg ? <Text style={styles.text} testID="store-msg" maxFontSizeMultiplier={1.3}>{msg.text}</Text> : null}
       {msg?.detail ? <Text style={styles.note} testID="store-msg-detail" selectable maxFontSizeMultiplier={1.3}>{T.money.detail(msg.detail)}</Text> : null}
       <Button testID="store-restore" kind="ghost" label={T.money.restore} onPress={restore} />
-      <Button testID="store-back" kind="ghost" label={T.money.back} onPress={onBack} />
     </ScrollView>
   );
 }
@@ -96,7 +96,6 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   pad: { paddingHorizontal: SPACE.l, gap: SPACE.l },
-  title: { color: C.text, fontSize: TYPE.title, fontWeight: '800' },
   banner: { backgroundColor: C.sheet, borderRadius: RADIUS.panel, padding: SPACE.l, gap: SPACE.m, borderWidth: 1, borderColor: C.glassLine },
   card: { padding: SPACE.l, gap: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   name: { color: C.accent, fontSize: TYPE.section, fontWeight: '800' },

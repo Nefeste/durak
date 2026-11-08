@@ -13,6 +13,7 @@ import { YOU } from './table';
 import { T } from '../i18n';
 import { isPro, isUnlocked, onRights, prepareRewarded, reviewAccess, rewardedReady, watchForReview } from '../money';
 import { Button } from '../ui/Button';
+import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { actionText, whyText, worstText } from './words';
 
@@ -63,10 +64,7 @@ export function ReviewScreen({ review: given, record, at, lastToday, onBack, onS
   };
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="review">
-      <View style={styles.top}>
-        <Button label={T.review.back} kind="ghost" onPress={onBack} testID="review-back" />
-        <Text style={styles.title}>{T.review.title}</Text>
-      </View>
+      <Header title={T.review.title} back={T.review.back} onBack={onBack} backTestID="review-back" />
       {!review ? <Text style={styles.text}>{T.result.counting}</Text> : (
         <ScrollView contentContainerStyle={styles.list}>
           <Text style={styles.head} testID="review-worst">{review.worst ? worstText(review.worst) : T.result.clean}</Text>
@@ -89,8 +87,6 @@ export function ReviewScreen({ review: given, record, at, lastToday, onBack, onS
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.m },
-  top: { flexDirection: 'row', alignItems: 'center', gap: SPACE.m },
-  title: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },
   list: { gap: SPACE.m, paddingBottom: SPACE.xl },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   row: { gap: SPACE.xs, padding: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },

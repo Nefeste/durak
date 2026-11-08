@@ -9,6 +9,7 @@ import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
+import { Header } from '../ui/Header';
 import { Chips } from '../ui/Chips';
 import { Checkbox } from '../ui/Toggle';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
@@ -132,7 +133,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   if (!adult || !named) {
     return (
       <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="online-profile">
-        <Text style={styles.title}>{mode === 'quick' ? T.online.quickTitle : T.online.title}</Text>
+        <Header title={mode === 'quick' ? T.online.quickTitle : T.online.title} back={T.online.back} onBack={onBack} backTestID="online-back" />
         <View style={styles.panel}>
           <Checkbox id="adult" label={T.online.adult} value={adult} onChange={on => { setAdultState(on); void setAdult(on); }} />
           <Text style={styles.note}>{T.online.adultNote}</Text>
@@ -146,7 +147,6 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
           ) : null}
           {errorBlock}
         </View>
-        <Button label={T.online.back} kind="ghost" onPress={onBack} testID="online-back" />
       </ScrollView>
     );
   }
@@ -155,7 +155,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
     const q = quick;
     return (
       <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="quick">
-        <Text style={styles.title}>{T.online.quickTitle}</Text>
+        <Header title={T.online.quickTitle} back={T.online.back} onBack={onBack} backTestID="online-back" />
         <View style={styles.panel}>
           <Chips id="q-variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={variant} label={v => T.variant[v]} onChange={setVariant} />
           {q?.status === 'searching' ? (
@@ -175,14 +175,13 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
           )}
           {errorBlock}
         </View>
-        <Button label={T.online.back} kind="ghost" onPress={onBack} testID="online-back" />
       </ScrollView>
     );
   }
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="friends">
-      <Text style={styles.title}>{T.online.title}</Text>
+      <Header title={T.online.title} back={T.online.back} onBack={onBack} backTestID="online-back" />
       <View style={styles.panel}>
         <Text style={styles.label}>{T.menu.variant}</Text>
         <Chips id="f-variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={variant} label={v => T.variant[v]} onChange={setVariant} />
@@ -199,7 +198,6 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         <Button label={T.online.join} kind="ghost" onPress={join} disabled={busy} testID="join" />
         {errorBlock}
       </View>
-      <Button label={T.online.back} kind="ghost" onPress={onBack} testID="online-back" />
     </ScrollView>
   );
 }
@@ -209,7 +207,6 @@ export const adultNow = isAdult;
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
   content: { paddingHorizontal: SPACE.l, gap: SPACE.l },
-  title: { color: C.accent, fontSize: TYPE.title, fontWeight: '800' },
   panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
   note: { color: C.dim, fontSize: TYPE.caption },
