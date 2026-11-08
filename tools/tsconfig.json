@@ -21,6 +21,7 @@
   "exclude": [
     "./e2e/**",
     "./art/**",
-    "./store/**"
+    "./store/**",
+    "./design/**"
   ]
 }
