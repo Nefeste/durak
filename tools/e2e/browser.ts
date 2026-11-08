@@ -174,6 +174,9 @@ try {
   ok(first.ended, 'партия дошла до итога');
   ok(first.played > 0, `свои карты ложились касанием: ${first.played}`);
   await page.screenshot({ path: `${OUT}/03-result.png` });
+  // итог — лист снизу: прижат к нижнему краю, стол над ним виден
+  const sheet = await page.getByTestId('result').boundingBox();
+  ok(!!sheet && sheet.y + sheet.height >= 915 - 2 && sheet.y > 915 / 2, `итог — лист снизу: ${sheet ? `${Math.round(sheet.y)}…${Math.round(sheet.y + sheet.height)}` : 'нет'}`, JSON.stringify(sheet));
   const result = await page.getByTestId('result').innerText().catch(() => '');
   ok(!/дурак/i.test(result), 'итог без слова «дурак»', result);
   ok(/Остались с картами|Вы вышли|Ничья/.test(result), 'итог «остались с картами» или «вышли»', result);

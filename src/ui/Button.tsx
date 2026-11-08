@@ -11,12 +11,16 @@ export function Button({ label, onPress, kind = 'main', disabled, testID, small 
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}
       hitSlop={small ? 4 : undefined}
-      style={({ pressed }) => [styles.base, small && styles.small, kind === 'main' ? styles.main : styles.ghost, (pressed || disabled) && styles.dim]}
+      // нажатие и недоступность — разные (аудит 08.11.2026, находка 13): нажатая чуть темнее и опускается на точку,
+      // недоступная — стекло без золота и бледная, даже если она главная
+      style={({ pressed }) => [styles.base, small && styles.small, kind === 'main' && !disabled ? styles.main : styles.ghost,
+        pressed && !disabled && styles.pressed, disabled && styles.off]}
     >
-      <Text style={[styles.label, small && styles.smallLabel, kind === 'main' ? styles.mainText : styles.ghostText]} maxFontSizeMultiplier={1.3} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.label, small && styles.smallLabel, kind === 'main' && !disabled ? styles.mainText : styles.ghostText]} maxFontSizeMultiplier={1.3} numberOfLines={1}>{label}</Text>
     </Pressable>
   );
 }
@@ -26,7 +30,8 @@ const styles = StyleSheet.create({
   main: { backgroundColor: C.accent },
   ghost: { backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   small: { minHeight: 40, paddingHorizontal: SPACE.l },
-  dim: { opacity: 0.55 },
+  pressed: { opacity: 0.85, transform: [{ translateY: 1 }] },
+  off: { opacity: 0.4 },
   label: { fontSize: TYPE.button, fontWeight: '700' },
   smallLabel: { fontSize: TYPE.body },
   mainText: { color: C.accentText },
