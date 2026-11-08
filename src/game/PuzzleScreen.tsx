@@ -17,6 +17,7 @@ import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
+import { useTableCues } from './useTableCues';
 import { useLessMotion, useSettings } from '../state/store';
 import { dateOfDay, loadPuzzleLog, todayKey, updateDay } from '../state/puzzles';
 import type { PuzzleLog } from '../state/puzzles';
@@ -37,6 +38,8 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   const [picked, setPicked] = useState<{ card: Card; options: Action[] } | null>(null);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [shared, setShared] = useState<string | null>(null);
+  // «Ещё раз» ставит позицию заново — для звуков стола это новая партия
+  const [round, setRound] = useState(0);
   const font = useFont(Onest_700Bold, 15);
   const small = useFont(Onest_700Bold, 26);
   const you = p.you, opp = 1 - you;
@@ -73,7 +76,7 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
     }
     step(apply(state, you, a));
   };
-  const again = () => { setState(stateOf(p)); setStatus('play'); setPicked(null); };
+  const again = () => { setState(stateOf(p)); setStatus('play'); setPicked(null); setRound(r => r + 1); };
   const showAnswer = () => { setStatus('shown'); void updateDay(day, d => ({ ...d, shown: true })); };
   const share = () => {
     const text = T.puzzle.shareText(day, date, tries, status === 'shown');
@@ -85,6 +88,7 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   // в задаче партия не сыграна на глазах игрока — взятое в открытую входит в условие, его видно всегда
   const origins = useOrigins(view);
+  useTableCues(view, round, less, false);
   const layout = useMemo(() => (size ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: true }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, origins, size, settings.handOrder, picked]);
