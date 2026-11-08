@@ -1,0 +1,40 @@
+# Проверки на PR (устав студии, ADR 0019): типы, линтер, тесты — те же команды, что агент
+# гоняет перед push (AGENTS.md). Без prebuild, Gradle и APK: сборка — android.yml, по тегу.
+# Проверка обязательна для слияния в `main` и нужна автослиянию (automerge.yml), поэтому
+# отвечает на каждом PR — и на PR только с документами: `paths-ignore` здесь нет и не будет,
+# иначе обязательная проверка повиснет «ожидающей» (ADR 0019).
+name: Проверки PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # Имя задания — имя обязательной проверки в защите `main`: менять вместе с настройкой.
+    name: Типы, линтер, тесты
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Типы приложения и инструментов
+        run: npm run typecheck
+      - name: Линтер
+        run: npm run lint
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - name: Тесты
+        run: bun test tools/test

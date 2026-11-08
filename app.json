@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Kozyr",
+    "slug": "durak",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B1A1E",
+    "android": {
+      "package": "games.gornitsa.durak",
+      "versionCode": 1,
+      "allowBackup": false,
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "locales": {
+      "ru": {
+        "android": {
+          "app_name": "Козырь"
+        }
+      }
+    },
+    "plugins": [
+      "./plugins/with-release-signing"
+    ]
+  }
+}

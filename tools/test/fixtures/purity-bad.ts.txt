@@ -1,0 +1,5 @@
+// Заведомо «грязный» файл для tools/test/purity.test.ts: проверка должна найти всё ниже.
+// Лежит как .txt, чтобы его не проверял tsc; тест читает его как текст.
+import React from 'react';
+import { rollDie } from '../state/dice';
+export const t = Date.now() + Math.random() + (React ? 1 : 0) + rollDie();
