@@ -3,7 +3,7 @@
 import { describe, expect, test } from 'bun:test';
 import { apply, legalActions, newGame, observe, RULES_V1 } from '../../src/engine';
 import type { State } from '../../src/engine';
-import { chooseAction, LEVELS, makeRng, unseen } from '../../src/bot';
+import { chooseAction, LEVELS, makeRng, RULE_LEVELS, unseen } from '../../src/bot';
 import { layout } from '../../src/bot/legal';
 import { actorOf, shuffled } from '../sim/play';
 import { stateFrom } from '../../src/engine';
@@ -46,7 +46,10 @@ describe('наблюдение', () => {
       for (let n = 0; n < 25 && s.phase !== 'end'; n++) {
         const seat = actorOf(s);
         const t = twin(s, seat, g * 1000 + n);
-        for (const level of LEVELS) {
+        // поиск по раскладам дорогой: «Опытный» — на каждой двадцатой позиции, «Сильный» и «Мастер» — на
+        // каждой восьмидесятой; уровни по правилам — на всех
+        const k = g * 25 + n;
+        for (const level of LEVELS.filter(l => RULE_LEVELS.includes(l) || (l === 'experienced' ? k % 20 === 0 : k % 80 === 0))) {
           const a = chooseAction(observe(s, seat), level, makeRng(g * 31 + n));
           const b = chooseAction(observe(t, seat), level, makeRng(g * 31 + n));
           expect(b).toEqual(a);
@@ -54,5 +57,5 @@ describe('наблюдение', () => {
         s = apply(s, seat, chooseAction(observe(s, seat), 'average', rng));
       }
     }
-  });
+  }, 300_000);
 });

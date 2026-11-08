@@ -9,10 +9,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
-import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
+import { apply, dealOf, deckFrom, firstOf, legalActions, nameOf, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
 import type { Action, Card, GameRecord, Result, State, Variant } from '../engine';
-import { chooseAction, makeRng } from '../bot';
-import type { Level } from '../bot';
+import { adviseThink, makeRng, think, THINK_MS } from '../bot';
+import type { Advice, Level } from '../bot';
+import { thinkSliced } from './think';
+import type { ThinkJob } from './think';
 import { T } from '../i18n';
 import { gameEnded, gameStarted, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
@@ -42,6 +44,20 @@ function newRecord(variant: Variant, seats: number, history: (Result | null)[]):
     first: after ?? lowest.seat, firstWhy: after !== null ? 'afterFool' : lowest.why,
   };
 }
+/** Слова подсказки для действия. */
+function adviceText(a: Action, s: State): string {
+  const list = (cs: Card[]) => cs.map(nameOf).join(' ');
+  switch (a.type) {
+    case 'attack': return T.game.adviceAttack(list(a.cards));
+    case 'throwIn':
+    case 'give': return T.game.adviceThrow(list(a.cards));
+    case 'beat': return T.game.adviceBeat(nameOf(a.on), nameOf(a.card));
+    case 'transfer': return T.game.adviceTransfer(list(a.cards));
+    case 'take': return T.game.adviceTake;
+    case 'pass': return s.table.every(([, d]) => d !== null) ? T.game.adviceDone : T.game.advicePass;
+  }
+}
+
 const stateOf = (r: GameRecord): State => newGame({ rules: r.rules, variant: r.variant, seats: r.seats, first: r.first }, r.deck);
 
 export function GameScreen({ variant, bots, level, restored, onExit }: {
@@ -82,13 +98,32 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
     }
   };
 
-  // ход ботов: первый бот с действиями от ходящего, с паузой, — человек может успеть раньше
+  // ход ботов: первый бот с действиями от ходящего, с паузой, — человек может успеть раньше. Бот думает
+  // кусками во время паузы (src/game/think.ts): экран не замирает; пауза та же, пока ему её хватает
   useEffect(() => {
     const seat = botToAct(state, s => s !== YOU);
     if (seat < 0) return;
-    const t = setTimeout(() => act(seat, chooseAction(observe(state, seat), lvl, rng.current)), fast ? 60 : botDelay(settings.botSpeed, rng.current.next()));
-    return () => clearTimeout(t);
-  });
+    let live = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const pause = fast ? 60 : botDelay(settings.botSpeed, rng.current.next()), from = Date.now();
+    const job = thinkSliced(think(observe(state, seat), lvl, rng.current), THINK_MS[lvl]);
+    job.promise.then(a => { if (live) timer = setTimeout(() => act(seat, a), Math.max(0, pause - (Date.now() - from))); }, () => {});
+    return () => { live = false; job.cancel(); if (timer) clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, record, lvl, settings.botSpeed]);
+
+  // «Подсказка»: что сделал бы «Мастер» — кусками, пока игрок ждёт (docs/09-game-design.md)
+  const [advising, setAdvising] = useState(false);
+  const adviseJob = useRef<ThinkJob<Advice> | null>(null);
+  useEffect(() => () => adviseJob.current?.cancel(), [state]);
+  const advise = () => {
+    if (advising) return;
+    setAdvising(true);
+    setNote(T.game.thinking);
+    const job = thinkSliced(adviseThink(observe(state, YOU), makeRng(record.actions.length + 1)), THINK_MS.master);
+    adviseJob.current = job;
+    job.promise.then(a => { setAdvising(false); setNote(T.game.advice(adviceText(a.action, state), a.chance, a.exact)); }, () => setAdvising(false));
+  };
 
   // «бито» само: всё покрыто, а подкинуть нечего
   useEffect(() => {
@@ -184,6 +219,7 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
         <View style={styles.topRight}>
           {settings.seenCards ? <Button label={T.game.seen} kind="ghost" onPress={() => setShowSeen(v => !v)} testID="seen" /> : null}
           {canUndo(record, YOU) && state.phase !== 'end' ? <Button label={T.game.undo} kind="ghost" onPress={undo} testID="undo" /> : null}
+          {state.phase !== 'end' && mine.length > 0 ? <Button label={T.game.advise} kind="ghost" onPress={advise} testID="advise" /> : null}
         </View>
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">

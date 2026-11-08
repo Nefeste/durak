@@ -8,6 +8,7 @@ import { pluralRu } from './plural';
 
 const LEVEL_NAME: Record<Level, string> = {
   novice: 'Новичок', beginner: 'Начинающий', amateur: 'Любитель', average: 'Средний',
+  experienced: 'Опытный', strong: 'Сильный', master: 'Мастер',
 };
 
 const REASON: Record<Reason, string> = {
@@ -128,6 +129,19 @@ export const T = {
     seen: 'Вышедшие',
     undo: 'Отменить',
     menu: 'В меню',
+    advise: 'Подсказка',
+    thinking: 'Думаю…',
+    /** Строка подсказки: что сделать и шанс (docs/09-game-design.md, «Подсказки»). */
+    advice: (what: string, chance: number | null, exact: boolean) => chance === null ? what
+      : exact ? `${what} — ${chance === 1 ? 'при лучшей игре вы выходите' : chance === 0.5 ? 'при лучшей игре — ничья' : 'проигрыш при лучшей игре соперника, так труднее всего'}`
+      : `${what} — шанс выйти без карт ${Math.round(chance * 100)} %`,
+    adviceAttack: (cards: string) => `Ходите ${cards}`,
+    adviceThrow: (cards: string) => `Подкиньте ${cards}`,
+    adviceBeat: (on: string, by: string) => `Побейте ${on} картой ${by}`,
+    adviceTransfer: (cards: string) => `Переведите: ${cards}`,
+    adviceTake: 'Берите',
+    advicePass: 'Пас',
+    adviceDone: 'Бито',
   },
   online: {
     title: 'С друзьями',

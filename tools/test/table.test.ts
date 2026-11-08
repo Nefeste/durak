@@ -154,7 +154,7 @@ describe('сохранение партии', () => {
     expect(restoreGame('мусор')).toBeNull();
     expect(restoreGame({ record: { ...mid, v: 2 }, level: 'amateur', history: [] })).toBeNull();
     expect(restoreGame({ record: { ...mid, rules: { ...RULES_V1, id: 'other' } }, level: 'amateur', history: [] })).toBeNull();
-    expect(restoreGame({ record: mid, level: 'master', history: [] })).toBeNull();
+    expect(restoreGame({ record: mid, level: 'grandmaster', history: [] })).toBeNull();
     const bad = { ...mid, actions: [...mid.actions, { seat: 0, action: { type: 'take' }, at: 0 }, { seat: 0, action: { type: 'take' }, at: 0 }] };
     expect(restoreGame({ record: bad, level: 'amateur', history: [] })).toBeNull();
     expect(restoreGame({ record, level: 'amateur', history: [] })).toBeNull();

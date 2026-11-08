@@ -28,7 +28,7 @@ function cheapestBeater(hand: Card[], on: Card, ts: number, used: Set<Card>): Ca
 }
 
 /** Покрыть все непокрытые: жадно, начиная с самых дорогих карт атаки. */
-function coverPlan(o: Observation): { pairs: [Card, Card][]; cost: number; maxTrump: number } | null {
+export function coverPlan(o: Pick<Observation, 'hand' | 'table' | 'trump'>): { pairs: [Card, Card][]; cost: number; maxTrump: number } | null {
   const ts = suitOf(o.trump);
   const open = o.table.filter(([, d]) => d === null).map(([a]) => a).sort((x, y) => costOf(y, ts) - costOf(x, ts));
   const used = new Set<Card>();
@@ -96,8 +96,7 @@ function addOn(o: Observation, legal: Action[], p: RuleParams): Action {
 }
 
 /** Действие по правилам уровня. */
-export function chooseByRules(o: Observation, p: RuleParams, rng: Rng): Action {
-  const legal = legalFor(o);
+export function chooseByRules(o: Observation, p: RuleParams, rng: Rng, legal: Action[] = legalFor(o)): Action {
   if (legal.length === 0) throw new Error('bot has no legal action');
   if (p.random > 0 && rng.next() < p.random) return legal[rng.int(legal.length)];
   if (o.seat === o.defender && o.phase === 'bout' && o.table.length > 0) return defend(o, legal, p);
