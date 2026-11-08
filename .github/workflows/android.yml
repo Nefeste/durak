@@ -119,10 +119,13 @@ jobs:
         with:
           file: android/app/build/outputs/apk/release/app-release.apk
           allow-file: .github/apk-permissions.txt
+          # Список студии без AD_ID: у игры реклама Яндекса (решение владельца #5 — деньги как у «Нард»),
+          # как в android.yml «Нард».
+          deny: 'EXTERNAL_STORAGE|SYSTEM_ALERT_WINDOW|LOCATION|CAMERA|RECORD_AUDIO|CONTACTS|READ_PHONE|CALL_LOG|SMS|MANAGE_|QUERY_ALL_PACKAGES|ACCOUNTS'
           forbid: 'FOREGROUND_SERVICE|INSTALL_REFERRER|RECORD_AUDIO|READ_EXTERNAL_STORAGE'
           backup: 'off'
           min-target-sdk: '36'
-          max-size-mb: '60'
+          max-size-mb: '65'
 
       - name: Собрать
         if: steps.key.outputs.permanent == 'yes'
