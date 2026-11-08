@@ -3,7 +3,7 @@
  * «Ещё партию» → сохранение: пара ходов, «В меню», перезагрузка страницы, «Продолжить партию» →
  * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, «Помощь памяти») →
  * переводной с двумя ботами до итога → «Мастер» и «Подсказка» до итога → магазин: «Без рекламы» в тестовом
- * магазине, перезагрузка, «Восстановить покупки» (этап Е). Сначала — правки 0.5.1 по игре владельца на телефоне:
+ * магазине, перезагрузка, «Восстановить покупки» (этап Е) → быстрый «Замер» (долгое нажатие на версию в настройках). Сначала — правки 0.5.1 по игре владельца на телефоне:
  * экран 412 × 780 с отступом снизу 48 (`?inset=48`, как кнопки «Назад / Домой / Недавние»): нижние кнопки меню
  * и стола над ним; стол и карты одного размера в свой ход и в чужой; «колода N»; «Помощь памяти» выключена. Карты руки — прозрачные «кнопки» поверх холста: касание
  * идёт в обработчик стола, поэтому щелчки — `force`. Ловит пустой экран, неработающие касания,
@@ -424,6 +424,31 @@ try {
   await page.screenshot({ path: `${OUT}/06-advice.png` });
   const third = await playOut(page, 'против «Мастера»');
   ok(third.ended, 'партия с «Мастером» дошла до итога');
+
+  console.log('«Замер» (быстрый)');
+  await page.goto(`${web.url}?fast=1&bench=quick`);
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.getByTestId('settings-open').click();
+  await page.getByTestId('settings').waitFor({ timeout: 5000 });
+  await page.getByTestId('version').scrollIntoViewIfNeeded();
+  // скрытый вход: долгое нажатие на версию
+  const ver = (await page.getByTestId('version').boundingBox())!;
+  await page.mouse.move(ver.x + ver.width / 2, ver.y + ver.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(1000);
+  await page.mouse.up();
+  await page.getByTestId('bench').waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await visible(page, 'bench'), '«Замер» открывается долгим нажатием на версию');
+  await page.getByTestId('bench-run').click();
+  await page.getByTestId('bench-copy').waitFor({ timeout: 120000 }).catch(() => {});
+  const bench = await page.getByTestId('bench-result').innerText().catch(() => '');
+  ok(['Раздача вчетвером', '«Беру» с 12 картами', '36 карт в полёте', '«Мастер» думает'].every(t => bench.includes(t)) && /решение: 1 поз\./.test(bench),
+    '«Замер»: четыре сцены и время решения «Мастера»', bench);
+  ok(/UI: кадров [1-9]/.test(bench) && /JS: кадров [1-9]/.test(bench), '«Замер»: кадры обоих потоков сосчитаны', bench);
+  console.log(bench.split('\n').map(l => `      ${l}`).join('\n'));
+  await page.screenshot({ path: `${OUT}/09-bench.png` });
+  await page.getByTestId('bench-back').click();
+  await page.getByTestId('settings').waitFor({ timeout: 5000 });
 } finally {
   ok(errors.length === 0, 'ошибок в консоли нет', errors.join('\n'));
   await browser.close();
