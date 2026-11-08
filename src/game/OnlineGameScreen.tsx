@@ -17,6 +17,7 @@ import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { SeatPlate } from './SeatPlate';
 import { CONTROLS, layoutTable } from '../render/layout';
+import { useOrigins } from '../render/useOrigins';
 import { useLessMotion, useSettings } from '../state/store';
 import type { OnlineTable } from '../state/online';
 import type { SeatView, TableView } from '../state/protocol';
@@ -149,9 +150,10 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   };
 
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
-  const lay = useMemo(() => (size && view ? layoutTable(view, { ...size, order: settings.handOrder, picked: picked?.card ?? null, targets }) : null),
+  const origins = useOrigins(view);
+  const lay = useMemo(() => (size && view ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, size, settings.handOrder, picked]);
+    [view, origins, size, settings.handOrder, picked]);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
