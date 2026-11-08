@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test';
 import { apply, deckFrom, dealOf, firstOf, legalActions, newGame, observe, replay, RULES_V1 } from '../../src/engine';
 import type { Card, GameRecord, State } from '../../src/engine';
 import { chooseAction, makeRng } from '../../src/bot';
-import { handCardAt, inTable, layoutTable, sortHand, tableCardAt } from '../../src/render/layout';
+import { handCardAt, inTable, layoutTable, noOrigins, originsOf, sortHand, tableCardAt } from '../../src/render/layout';
 import { autoPass, canUndo, seenGrid } from '../../src/game/flow';
 import { botDelay, DEFAULT_SETTINGS, lessMotionOf, parseSettings } from '../../src/state/settings';
 import { restoreGame } from '../../src/state/saved';
@@ -83,6 +83,41 @@ describe('раскладка стола', () => {
       }
     }
     expect(openlySeen).toBeGreaterThan(0); // проверка не пустая: в этих партиях брали в открытую
+  });
+  test('карта летит на стол от того, кто её положил, взятое — со стола, добор — из колоды (решение владельца 08.11.2026)', () => {
+    let checked = 0, took = 0;
+    for (const seats of [2, 3, 4]) {
+      for (const variant of ['podkidnoy', 'perevodnoy'] as const) {
+        for (let g = 0; g < 4; g++) {
+          const { record, states } = playGame(seats * 17 + g * 5 + (variant === 'perevodnoy' ? 1 : 0), seats, variant);
+          let origins = noOrigins();
+          for (let i = 1; i < states.length; i++) {
+            const { seat, action } = record.actions[i - 1];
+            const prev = observe(states[i - 1], 0), next = observe(states[i], 0);
+            origins = originsOf(prev, next, origins);
+            const played = action.type === 'beat' ? [action.card] : action.type === 'take' || action.type === 'pass' ? [] : action.cards;
+            const l = layoutTable(next, { ...opt, origins });
+            const at = (k: number) => (k === 0 ? { x: SIZE.width / 2 } : l.opponents.find(p => p.seat === k) ?? { x: -1 });
+            for (const c of played) {
+              if (!next.table.flat().includes(c)) continue; // отбой закрылся этим же действием
+              expect(origins.byCard.get(c)).toBe(seat);
+              const sp = l.sprites.find(x => x.key === `c${c}`);
+              expect(sp?.from.x).toBe(at(seat).x);
+              checked++;
+            }
+            if (origins.took !== null && origins.took !== 0) {
+              const fresh = l.sprites.filter(x => x.key.startsWith(`h${origins.took}-`));
+              expect(fresh.every(x => x.from.y !== 0)).toBe(true);
+              took++;
+            }
+            // ни одна карта не летит из угла экрана
+            for (const x of l.sprites) expect(x.from.x > 0 && x.from.y > 0).toBe(true);
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
+    expect(took).toBeGreaterThan(0);
   });
   test('ключи скрытых карт не выдают их номера', () => {
     const s = pos({ hands: ['6♠ 7♠ 8♠ 9♠ 10♠ В♠', '6♥ 7♥ 8♥ 9♥ 10♥ В♥'], trump: 'Т♦', talon: '6♦ 7♦' });

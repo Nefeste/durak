@@ -59,6 +59,46 @@ export interface LayoutOptions {
   targets: Card[];
   /** Показывать лицом карты, взятые соперником в открытую («Помощь памяти»); по умолчанию — рубашкой. */
   showOpenly?: boolean;
+  /** Кто положил карты на стол и кто взял стол — откуда им лететь (`originsOf`). */
+  origins?: Origins;
+}
+
+/** Откуда летят новые карты: место, положившее карту на стол, и место, взявшее стол. */
+export interface Origins {
+  byCard: Map<Card, number>;
+  /** Место, которое только что взяло карты со стола: его новые скрытые карты летят со стола. */
+  took: number | null;
+}
+
+export const noOrigins = (): Origins => ({ byCard: new Map(), took: null });
+
+/**
+ * Кто сделал то, что изменилось между двумя наблюдениями (одного и того же места): новая карта стола —
+ * от того места, у которого стало меньше карт; если стол опустел, а сброс не вырос, — отбивавшийся взял стол. Только из наблюдений — работает и с ботами, и онлайн, где ходов нет.
+ * `byCard` прошлых карт стола сохраняется, пока карта на столе.
+ */
+export function originsOf(prev: Observation | null, next: Observation, was: Origins): Origins {
+  const onTable = new Set(next.table.flatMap(([a, d]) => (d === null ? [a] : [a, d])));
+  const byCard = new Map([...was.byCard].filter(([c]) => onTable.has(c)));
+  if (!prev || prev.seats !== next.seats) return { byCard, took: null };
+  const had = new Set(prev.table.flatMap(([a, d]) => (d === null ? [a] : [a, d])));
+  const fresh = next.table.flatMap(([a, d]) => (d === null ? [a] : [a, d])).filter(c => !had.has(c));
+  // у кого убыло карт: столько карт он и положил
+  const left = next.handSizes.map((n, seat) => Math.max(0, prev.handSizes[seat] - n));
+  for (const c of fresh) {
+    // защита — от отбивающегося; атака, подкидывание и перевод — от того, у кого убыло, кроме отбивающегося
+    // (после перевода отбивается уже следующий, а карта ушла из руки переведшего)
+    const isDefence = next.table.some(([, d]) => d === c);
+    let seat = isDefence
+      ? (left[next.defender] > 0 ? next.defender : -1)
+      : left.findIndex((n, s) => n > 0 && s !== next.defender);
+    if (seat < 0) seat = isDefence ? next.defender : next.attacker;
+    if (left[seat] > 0) left[seat]--;
+    byCard.set(c, seat);
+  }
+  // стол опустел, а сброс не вырос — карты забрал отбивавшийся
+  const took = prev.table.length > 0 && next.table.length === 0 && next.discard.length === prev.discard.length ? prev.defender : null;
+  return { byCard, took };
 }
 
 /** Порядок руки: «по мастям, козыри справа» или «по старшинству» (козыри всё равно справа). */
@@ -108,6 +148,8 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
       });
     });
   }
+  // новая скрытая карта соперника — из колоды, а если он только что взял стол — со стола (ниже)
+  const fanEnd = z;
 
   // середина стола — между веерами соперников и строкой подсказки с кнопками над рукой
   const handY = Math.round(H - ch * 0.62);
@@ -138,17 +180,24 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   const n = o.table.length;
   const perRow = n <= 3 ? Math.max(1, n) : 3;
   const rows = Math.ceil(n / perRow) || 1;
-  const attacker = opponents.find(p => p.seat === o.attacker);
-  const defender = opponents.find(p => p.seat === o.defender);
   const mine = { x: W / 2, y: handY };
+  const seatPoint = (seat: number) => (seat === o.seat ? mine : opponents.find(p => p.seat === seat) ?? mine);
+  const origin = (c: Card, fallback: number) => seatPoint(opt.origins?.byCard.get(c) ?? fallback);
+  const middle = { x: tx + tw / 2, y: midY };
+  for (let i = 0; i < fanEnd; i++) {
+    const sp = sprites[i];
+    if (!sp.key.startsWith('h')) continue;
+    const seat = Number(sp.key.slice(1, sp.key.indexOf('-')));
+    sp.from = opt.origins?.took === seat ? middle : talon;
+  }
   o.table.forEach(([a, d], i) => {
     const row = Math.floor(i / perRow), col = i % perRow;
     const inRow = Math.min(perRow, n - row * perRow);
     const x = tx + tw / 2 + (col - (inRow - 1) / 2) * Math.min(pairW, tw / perRow) - cw * 0.08;
     const y = midY + (row - (rows - 1) / 2) * pairH * 0.92 - ch * 0.08;
-    sprites.push({ key: `c${a}`, card: a, x, y, rot: -3, scale: 1, z: z++, glow: opt.targets.includes(a), from: attacker ?? mine });
+    sprites.push({ key: `c${a}`, card: a, x, y, rot: -3, scale: 1, z: z++, glow: opt.targets.includes(a), from: origin(a, o.attacker) });
     if (d !== null) {
-      sprites.push({ key: `c${d}`, card: d, x: x + cw * 0.2, y: y + ch * 0.22, rot: 6, scale: 1, z: z++, glow: false, from: defender ?? mine });
+      sprites.push({ key: `c${d}`, card: d, x: x + cw * 0.2, y: y + ch * 0.22, rot: 6, scale: 1, z: z++, glow: false, from: origin(d, o.defender) });
     }
   });
 
