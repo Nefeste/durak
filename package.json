@@ -1,0 +1,45 @@
+{
+  "name": "durak",
+  "version": "0.1.0",
+  "main": "index.ts",
+  "private": true,
+  "description": "Дурак подкидной и переводной для RuStore",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tools",
+    "lint": "expo lint src App.tsx --max-warnings 0",
+    "test": "bun test tools/test",
+    "arena": "bun tools/sim/arena.ts",
+    "export:web": "expo export -p web --output-dir dist-web"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
+    "@gornitsa/kit": "github:Nefeste/gornitsa-kit#v1.1.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.24",
+    "expo-application": "~57.0.3",
+    "expo-audio": "~57.0.5",
+    "expo-clipboard": "~57.0.2",
+    "expo-crypto": "~57.0.3",
+    "expo-haptics": "~57.0.3",
+    "expo-splash-screen": "~57.0.11",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "~0.21.0",
+    "yandex-mobile-ads": "^8.6.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "bun-types": "^1.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~57.0.2",
+    "typescript": "~6.0.3",
+    "yaml": "^2.9.1"
+  }
+}

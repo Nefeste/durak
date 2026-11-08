@@ -56,15 +56,19 @@ RuStore Review or Yandex Mobile Ads code from memory — follow «Expo has chang
 
 ## Commands
 
-There is no code yet (documents only, `STATUS.md`). The planned commands follow nardy:
+Stage А is in the code (engine, rule bots, a table vs bots); the rest follows nardy.
 
 ```bash
 npm ci
 npx expo install <package>          # ALWAYS instead of npm/yarn/bun add — SDK-compatible versions
-npx tsc --noEmit                    # app; also -p tools, -p server
+npm run typecheck                   # app + tools (tsc --noEmit, -p tools)
 npm run lint                        # zero warnings
-bun test tools/test                 # rules (golden), observation test, deck, solver, bots, server, money
-bun tools/sim/arena.ts 1000 <botA> <botB>   # bot strength on mirrored deals
+bun test tools/test                 # rules (golden), random games, observation, deck, purity, texts, bots
+DURAK_LONG=1 bun test tools/test/games.test.ts   # 100 000 random games (~4 min)
+bun tools/sim/arena.ts 1000 average amateur podkidnoy   # bot strength on mirrored deals
+bun tools/test/make-deck-fixture.ts > tools/test/fixtures/deck-v1.json   # deck vectors (only on a new deck version)
+EXPO_OFFLINE=1 npm run export:web
+NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/browser.ts   # the table in a browser, real taps
 ```
 
 ## Hard rules
@@ -87,5 +91,7 @@ This project's own rules:
   another player's hand or the talon order before the reveal; a test checks every route.
 - **No bot, hints, card counting or review during an online game** — for anyone, paid or not (ADR 0006).
 - **Portrait only** (ADR 0007).
+- **Own look, not the studio brand book** (ADR 0012, owner's decision): dark table with glass, colours only in
+  `src/ui/theme.ts`. Unique card backs «including 18+» are a post-1.0 owner decision (the age rating changes).
 - **Cards are drawn by code** (ADR 0010): own deck with Russian indices (В, Д, К, Т), no copied deck art.
-- `applicationId` is `games.gornitsa.durak` — choose once, it is eternal (charter ADR 0006); the owner confirms.
+- `applicationId` is `games.gornitsa.durak` — eternal (charter ADR 0006); confirmed by the owner (#1). In the game the app is «Козырь».

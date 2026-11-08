@@ -10,15 +10,19 @@
 
 ### Позиция
 
+Код — `src/engine/types.ts`; здесь коротко.
+
 ```ts
 type State = {
-  rules: 'durak-rules-v1'; variant: 'podkidnoy' | 'perevodnoy'; seats: number;   // 2..4
+  rules: RuleSet;             // свод: id 'durak-rules-v1', пределы атаки, firstBoutTransfer
+  variant: 'podkidnoy' | 'perevodnoy'; seats: number;   // 2..4
   hands: number[][];          // руки по местам
   talon: number[];            // прикуп сверху вниз; последний — козырь
   trump: number;              // козырная карта (масть = козырь)
   table: [number, number | null][]; // пары «атака — защита»
   discard: number[];          // сброс
   openly: number[][];         // по местам: карты, взятые в открытую и ещё не сыгранные
+  starter: number;            // кто начал отбой — для добора после перевода
   attacker: number; defender: number; passed: boolean[];
   boutLimit: number;          // предел карт атаки этого отбоя
   bout: number;               // номер отбоя с нуля
@@ -32,9 +36,10 @@ type State = {
 
 ```ts
 type Action =
-  | { type: 'attack' | 'throwIn' | 'transfer' | 'give'; cards: number[] }
+  | { type: 'attack' | 'transfer'; cards: number[] }   // одна или несколько одного достоинства
+  | { type: 'throwIn' | 'give'; cards: [number] }       // подкинуть и вдогонку — по одной
   | { type: 'beat'; card: number; on: number }
-  | { type: 'take' | 'pass' | 'done' };
+  | { type: 'take' | 'pass' };
 ```
 
 ### Запись партии

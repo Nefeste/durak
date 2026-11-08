@@ -1,0 +1,12 @@
+# Пути владельца (устав студии, ADR 0018 «Права по классам изменений»): PR, который их
+# трогает, сливает только владелец — automerge.yml такой PR не сливает. Проект может добавить
+# сюда свои пути, но не убрать эти. Этот файл — тоже путь владельца (он в `.github/`).
+
+/deploy/        @Nefeste
+/.github/       @Nefeste
+/server/        @Nefeste
+/src/money/     @Nefeste
+/store/forms.md @Nefeste
+/store/privacy* @Nefeste
+/app.json       @Nefeste
+/plugins/       @Nefeste
