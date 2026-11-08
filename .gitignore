@@ -7,3 +7,4 @@ dist-web/
 tools/e2e/out/
 *.log
 public/canvaskit.wasm
+dist-web-online/
