@@ -11,7 +11,8 @@ import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
 import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
 import type { Action, Card, GameRecord, Result, State, Variant } from '../engine';
-import { adviseThink, makeRng, reviewThink, think, THINK_MS, TOP } from '../bot';
+import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
+import { reviewGame } from './review';
 import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
 import type { ThinkJob } from './think';
@@ -85,7 +86,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     const at = gameAt(rec);
     void addFinished({ record: rec, level: lvl, at, end: Date.now(), hinted: hinted.current, review: null });
     reviewJob.current?.cancel();
-    const job = thinkSliced(reviewThink(rec, YOU), 1e9);
+    const job = thinkSliced(reviewGame(rec, YOU), 1e9);
     reviewJob.current = job;
     job.promise.then(r => { setReview(r); void storeReview(at, r); }, () => {});
   };

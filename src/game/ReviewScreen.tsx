@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { reviewThink } from '../bot';
+import { reviewGame } from './review';
 import type { Decision, Review } from '../bot';
 import type { GameRecord } from '../engine';
 import { setReview } from '../state/history';
@@ -46,7 +46,7 @@ export function ReviewScreen({ review: given, record, at, lastToday, onBack, onS
   const review = given ?? local;
   useEffect(() => {
     if (given || !record) return;
-    const job = thinkSliced(reviewThink(record, YOU), 1e9);
+    const job = thinkSliced(reviewGame(record, YOU), 1e9);
     job.promise.then(r => { setLocal(r); void setReview(at, r); }, () => {});
     return () => job.cancel();
   }, [given, record, at]);

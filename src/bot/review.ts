@@ -1,8 +1,9 @@
 // Разбор партии (docs/10-bot.md, «Разбор»): каждое решение игрока, у которого был выбор, сравнивается с лучшим.
 // В концовке вдвоём — точный расчёт; до неё — шанс не остаться с картами по раскладам. Разбор видит только
 // наблюдение игрока в ту минуту (ADR 0005): чужие карты он подставляет так же, как бот, — расклады.
-import { apply, legalActions, newGame, observe, suitOf } from '../engine';
-import type { Action, Card, GameRecord, Observation } from '../engine';
+import { suitOf } from '../engine';
+import type { Action, Card, Observation } from '../engine';
+import { legalFor } from './legal';
 import { isEndgame, solveThink } from './endgame';
 import { makeRng } from './rng';
 import { best, scoreActions } from './search';
@@ -68,21 +69,20 @@ export function whyOf(o: Observation, played: Action, bestA: Action, exact: bool
   return { kind: 'better' };
 }
 
-/** Разбор решений места `seat` — кусками (`yield` после каждой порции поиска). */
-export function* reviewThink(r: GameRecord, seat: number, samples = REVIEW_SAMPLES, budget = REVIEW_BUDGET, seed = 1): Thinking<Review> {
-  let s = newGame({ rules: r.rules, variant: r.variant, seats: r.seats, first: r.first }, r.deck);
+/** Одно решение игрока: его наблюдение в ту минуту, сделанное действие и его номер в записи партии. */
+export interface Move { at: number; o: Observation; played: Action }
+
+/**
+ * Разбор решений места `seat` — кусками (`yield` после каждой порции поиска). Бот получает только наблюдения
+ * (ADR 0005): запись партии разворачивает в них `src/game/review.ts`. Решения без выбора пропускаются.
+ */
+export function* reviewThink(moves: Iterable<Move>, seat: number, samples = REVIEW_SAMPLES, budget = REVIEW_BUDGET, seed = 1): Thinking<Review> {
   const decisions: Decision[] = [];
-  for (let i = 0; i < r.actions.length; i++) {
-    const { seat: who, action } = r.actions[i];
-    if (who === seat) {
-      const legal = legalActions(s, seat);
-      if (legal.length > 1) {
-        const o = observe(s, seat);
-        const d = yield* judge(o, legal, action, i, samples, budget, seed + i);
-        if (d) decisions.push(d);
-      }
-    }
-    s = apply(s, who, action);
+  for (const { at, o, played } of moves) {
+    const legal = legalFor(o);
+    if (legal.length < 2) continue;
+    const d = yield* judge(o, legal, played, at, samples, budget, seed + at);
+    if (d) decisions.push(d);
   }
   const worst = decisions.filter(d => d.grade !== 'ok').reduce<Decision | null>((w, d) => (!w || d.loss > w.loss ? d : w), null);
   return { seat, decisions, worst };

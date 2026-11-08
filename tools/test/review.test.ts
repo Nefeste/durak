@@ -3,7 +3,8 @@
 import { describe, expect, test } from 'bun:test';
 import { dealOf, firstOf, observe, RULES_V1 } from '../../src/engine';
 import type { Action, GameRecord, State } from '../../src/engine';
-import { chooseAction, gradeOf, levelOf, LEVELS, LOCKED_LEVEL, makeRng, reviewThink, sameAction, thinkSync, TOP, whyOf } from '../../src/bot';
+import { chooseAction, gradeOf, levelOf, LEVELS, LOCKED_LEVEL, makeRng, sameAction, thinkSync, TOP, whyOf } from '../../src/bot';
+import { reviewGame } from '../../src/game/review';
 import { restoreGame } from '../../src/state/saved';
 import { normalizeHistory } from '../../src/state/history';
 import type { FinishedGame } from '../../src/state/history';
@@ -70,7 +71,7 @@ describe('разбор', () => {
 
   test('разбор партии: только решения игрока с выбором, главная ошибка — самое большое падение, повторяется', () => {
     const rec = botGame(11, 'novice', 'average');
-    const r = thinkSync(reviewThink(rec, 0, 32));
+    const r = thinkSync(reviewGame(rec, 0, 32));
     expect(r.decisions.length).toBeGreaterThan(3);
     for (const d of r.decisions) {
       expect(rec.actions[d.at].seat).toBe(0);
@@ -83,12 +84,12 @@ describe('разбор', () => {
     else expect(r.worst).toBeNull();
     // «Новичок» ошибается: разбор это видит
     expect(bad.length).toBeGreaterThan(0);
-    expect(thinkSync(reviewThink(rec, 0, 32))).toEqual(r);
+    expect(thinkSync(reviewGame(rec, 0, 32))).toEqual(r);
   }, 60_000);
 
   test('концовка вдвоём — точный расчёт: проигрывающий ход при выигрывающем — ошибка', () => {
     const rec = botGame(5, 'novice', 'average');
-    const r = thinkSync(reviewThink(rec, 0, 16));
+    const r = thinkSync(reviewGame(rec, 0, 16));
     const exact = r.decisions.filter(d => d.exact);
     for (const d of exact) {
       expect([0, 0.5, 1]).toContain(d.bestChance);
