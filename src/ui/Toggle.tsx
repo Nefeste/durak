@@ -10,7 +10,7 @@ export function Toggle({ id, title, note, value, onChange }: {
 }) {
   return (
     <Pressable testID={id} accessibilityRole="switch" accessibilityState={{ checked: value }} aria-checked={value}
-      accessibilityLabel={title} onPress={() => onChange(!value)} style={styles.row}>
+      accessibilityLabel={title} onPress={() => onChange(!value)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.line}>
         <Text style={styles.title}>{title}</Text>
         <View style={[styles.track, value && styles.trackOn]}>
@@ -25,7 +25,7 @@ export function Toggle({ id, title, note, value, onChange }: {
 export function Checkbox({ id, label, value, onChange }: { id: string; label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <Pressable testID={id} accessibilityRole="checkbox" accessibilityState={{ checked: value }} aria-checked={value}
-      onPress={() => onChange(!value)} style={styles.check}>
+      onPress={() => onChange(!value)} style={({ pressed }) => [styles.check, pressed && styles.pressed]}>
       <View style={[styles.box, value && styles.boxOn]}>{value ? <Text style={styles.tick}>✓</Text> : null}</View>
       <Text style={styles.title}>{label}</Text>
     </Pressable>
@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
   trackOn: { borderColor: C.accent },
   knob: { width: KNOB, height: KNOB, borderRadius: RADIUS.pill, marginLeft: (TRACK_H - KNOB) / 2 - 1, backgroundColor: C.dim },
   knobOn: { marginLeft: TRACK_W - KNOB - (TRACK_H - KNOB) / 2 - 1, backgroundColor: C.accent },
+  pressed: { opacity: 0.85 },
   check: { flexDirection: 'row', alignItems: 'center', gap: SPACE.m, minHeight: 48 },
   box: { width: 26, height: 26, borderRadius: RADIUS.playing, borderWidth: 2, borderColor: C.glassLine, alignItems: 'center', justifyContent: 'center' },
   boxOn: { borderColor: C.accent },
