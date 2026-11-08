@@ -82,6 +82,7 @@ DURAK_WEB_DIR=dist-web-online NODE_PATH=/opt/node22/lib/node_modules bun tools/e
 NODE_PATH=/opt/node22/lib/node_modules bun tools/art/icon.ts   # icon, adaptive icon, splash + passport assets/LICENSES.md
 NODE_PATH=/opt/node22/lib/node_modules bun tools/store/shots.ts # after export:web: store/graphics (icon 512, feature, og) and store/screenshots/ru (1080×1920)
 NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts # after export:web: every screen at 412×915 ×2 → docs/design/ (audits, before/after sheets)
+NODE_PATH=/opt/node22/lib/node_modules bun tools/design/deck.ts out.png [--four]   # after export:web: all 36 faces (`?deck=1`); `--pair a.png b.png sheet.png` — before/after sheet
 ```
 
 ## Design work
