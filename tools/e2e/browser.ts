@@ -1,5 +1,5 @@
 /**
- * Браузерный прогон этапов Б и В: меню → партия с ботом на холсте Skia настоящими касаниями до итога →
+ * Браузерный прогон этапов Б и В: меню → «Правила» с картинками → партия с ботом на холсте Skia настоящими касаниями до итога →
  * «Ещё партию» → сохранение: пара ходов, «В меню», перезагрузка страницы, «Продолжить партию» →
  * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, «Помощь памяти») →
  * переводной с двумя ботами до итога → «Мастер» и «Подсказка» до итога → магазин: «Без рекламы» в тестовом
@@ -110,6 +110,22 @@ try {
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   ok(await page.getByText('Козырь').first().isVisible(), 'главный экран: название «Козырь»');
   await page.screenshot({ path: `${OUT}/01-menu.png` });
+
+  console.log('Правила');
+  await page.getByTestId('rules-open').click();
+  await page.getByTestId('rules').waitFor({ timeout: 5000 });
+  for (const id of ['goal', 'deal', 'beat', 'throw', 'take', 'done', 'draw', 'transfer', 'end', 'draw-game']) {
+    ok(await page.getByTestId(`rules-${id}`).count() === 1, `правила: раздел «${id}»`);
+  }
+  await page.getByTestId('rules-beat').scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+  ok(await page.getByTestId('rules-picture-beat').locator('canvas').count() === 1, 'правила: картинка отбоя — холст карт');
+  ok(/Козырь бьёт только старший козырь/.test(await page.getByTestId('rules-beat').innerText()), 'правила: как бить — своими словами');
+  ok(/В первом отбое партии переводить нельзя/.test(await page.getByTestId('rules-transfer').innerText()), 'правила: перевод — по своду (п. 6.6)');
+  ok(!/Остались с картами: вы/.test(await page.getByTestId('rules').innerText()), 'правила — не экран итога');
+  await page.screenshot({ path: `${OUT}/01-rules.png` });
+  await page.getByTestId('rules-back').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   console.log('Телефон 0.5.1: отступ снизу, постоянный стол, «колода», без помощи памяти');
   {

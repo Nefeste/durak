@@ -11,6 +11,7 @@ import { StoreScreen } from './src/screens/StoreScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
 import { BenchScreen } from './src/screens/BenchScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
+import { RulesScreen } from './src/screens/RulesScreen';
 import { PuzzleScreen } from './src/game/PuzzleScreen';
 import { GameScreen } from './src/game/GameScreen';
 import { OnlineGameScreen } from './src/game/OnlineGameScreen';
@@ -31,7 +32,7 @@ installCrashHandlers();
 /** Быстрый «Замер» для сценария в браузере: `?bench=quick`. */
 const quickBench = typeof globalThis.location !== 'undefined' && /[?&]bench=quick/.test(globalThis.location.search);
 
-type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'bench';
+type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'bench' | 'rules';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('menu');
@@ -91,13 +92,15 @@ export default function App() {
           <MenuScreen choice={choice} onChange={setChoice} onPlay={() => play(null)}
             onResume={saved ? () => play(saved) : null} onSettings={() => setRoute('settings')}
             onFriends={() => setRoute('friends')} onQuick={() => setRoute('quick')} onStore={() => setRoute('store')}
-            onPuzzle={() => setRoute('puzzle')} onStats={() => setRoute('stats')} />
+            onPuzzle={() => setRoute('puzzle')} onStats={() => setRoute('stats')} onRules={() => setRoute('rules')} />
         ) : route === 'friends' || route === 'quick' ? (
           <OnlineScreen mode={route === 'quick' ? 'quick' : 'friends'} invite={invite} onBack={() => setRoute('menu')} onTable={seat} />
         ) : route === 'online' && online ? (
           <OnlineGameScreen table={online} onExit={() => { setOnline(null); setRoute('menu'); }} />
         ) : route === 'puzzle' ? (
           <PuzzleScreen onBack={() => setRoute('menu')} />
+        ) : route === 'rules' ? (
+          <RulesScreen onBack={() => setRoute('menu')} />
         ) : route === 'stats' ? (
           <StatsScreen onBack={() => setRoute('menu')} onStore={() => setRoute('store')} />
         ) : route === 'store' ? (
