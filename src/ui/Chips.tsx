@@ -3,8 +3,10 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { C } from './theme';
 
-export function Chips<V extends string | number>({ items, value, label, onChange, id }: {
+export function Chips<V extends string | number>({ items, value, label, onChange, id, locked }: {
   items: readonly V[]; value: V; label: (v: V) => string; onChange: (v: V) => void; id: string;
+  /** Закрытое место в конце ряда: его нельзя выбрать, касание объясняет почему. */
+  locked?: { key: string; label: string; onPress: () => void };
 }) {
   return (
     <View style={styles.chips}>
@@ -14,6 +16,12 @@ export function Chips<V extends string | number>({ items, value, label, onChange
           <Text style={[styles.chipText, v === value && styles.chipTextOn]}>{label(v)}</Text>
         </Pressable>
       ))}
+      {locked ? (
+        <Pressable testID={`${id}-${locked.key}`} accessibilityRole="button" accessibilityState={{ disabled: true }}
+          onPress={locked.onPress} style={[styles.chip, styles.chipLocked]}>
+          <Text style={[styles.chipText, styles.chipTextLocked]}>{locked.label}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -24,4 +32,6 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: C.accent, borderColor: C.accent },
   chipText: { color: C.text, fontSize: 15 },
   chipTextOn: { color: C.accentText, fontWeight: '700' },
+  chipLocked: { borderStyle: 'dashed' },
+  chipTextLocked: { color: C.dim },
 });

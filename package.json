@@ -1,6 +1,6 @@
 {
   "name": "durak",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "main": "index",
   "private": true,
   "description": "Дурак подкидной и переводной для RuStore",

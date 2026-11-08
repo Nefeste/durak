@@ -6,7 +6,7 @@ import {
   apply, ascii, commitOf, dealOf, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, RULES_V1, serverDeck, sha256, toHex,
 } from '../../src/engine';
 import type { Action, Card, Result, State, Variant } from '../../src/engine';
-import { chooseAction, isLevel, LEVELS, makeRng } from '../../src/bot';
+import { chooseAction, isLevel, levelOf, makeRng, TOP } from '../../src/bot';
 import type { Level, Rng } from '../../src/bot';
 import { autoPass } from '../../src/game/flow';
 import { CODE_ALPHABET, isCode, isCommit, isKey, isSeed, nameProblem, ONLINE } from '../../src/state/protocol';
@@ -28,6 +28,9 @@ interface TableRow {
   bots: Level | null; status: TableStatus; game: number; version: number; created: number; closed: number | null;
 }
 interface SeatRow { seat: number; player: number | null; bot: Level | null }
+
+/** Строка стола из базы: уровень ботов — через levelOf (столы до 0.5.0 могли держать `strong`, #15). */
+const fixTable = <T extends TableRow | null>(t: T): T => (t && t.bots !== null ? { ...t, bots: levelOf(t.bots) ?? TOP } : t);
 interface GameRow {
   table_id: string; no: number; server_seed: string; commit_: string; seeds: string; first: number | null;
   actions: string; banks: string; rematch: string; result: string | null; started: number | null; finished: number | null;
@@ -69,7 +72,7 @@ const cardList = (x: unknown): Card[] | null =>
   Array.isArray(x) && x.length >= 1 && x.length <= 6 && x.every(isCard) && new Set(x).size === x.length ? (x as Card[]) : null;
 
 /** Уровень, который садится за отключившегося: «Сильный», а пока его нет — сильнейший из готовых. */
-export const standInLevel = (): Level => (isLevel('strong') ? ('strong' as Level) : LEVELS[LEVELS.length - 1]);
+export const standInLevel = (): Level => TOP;
 
 /** Действие из тела запроса: только известные поля, карты — числа 0…35. */
 export function parseAction(a: unknown): Action | null {
@@ -201,7 +204,7 @@ export class Core {
   deletePlayer(id: number): void {
     this.tx(() => {
       const rows = this.db.query(`SELECT t.* FROM tables t JOIN table_seats s ON s.table_id = t.id
-        WHERE s.player = ? AND t.status IN ('waiting', 'playing', 'finished')`).all(id) as TableRow[];
+        WHERE s.player = ? AND t.status IN ('waiting', 'playing', 'finished')`).all(id).map(r => fixTable(r as TableRow));
       for (const t of rows) {
         if (t.status === 'waiting' && t.host === id) this.close(t);
         else {
@@ -221,13 +224,15 @@ export class Core {
   // ——— столы ———
 
   private tableRow(id: unknown): TableRow {
-    const t = typeof id === 'string' ? this.db.query('SELECT * FROM tables WHERE id = ?').get(id) as TableRow | null : null;
+    const t = typeof id === 'string' ? fixTable(this.db.query('SELECT * FROM tables WHERE id = ?').get(id) as TableRow | null) : null;
     if (!t) throw new ApiError('no-table');
     return t;
   }
 
   private seats(tableId: string): SeatRow[] {
-    return this.db.query('SELECT seat, player, bot FROM table_seats WHERE table_id = ? ORDER BY seat').all(tableId) as SeatRow[];
+    // уровень из базы — через levelOf: столы до 0.5.0 могли держать `strong`, теперь это «Мастер» (#15)
+    return (this.db.query('SELECT seat, player, bot FROM table_seats WHERE table_id = ? ORDER BY seat').all(tableId) as SeatRow[])
+      .map(r => (r.bot === null ? r : { ...r, bot: levelOf(r.bot) ?? TOP }));
   }
 
   private gameRow(tableId: string, no: number): GameRow | null {
@@ -286,7 +291,7 @@ export class Core {
   /** Первый шаг входа: телефон записывает отпечаток до того, как отдаст своё зерно. */
   codeInfo(code: unknown, p: Player): CodeInfo {
     if (!isCode(code)) throw new ApiError('bad-code');
-    const t = this.db.query("SELECT * FROM tables WHERE code = ? AND status != 'cancelled'").get(code) as TableRow | null;
+    const t = fixTable(this.db.query("SELECT * FROM tables WHERE code = ? AND status != 'cancelled'").get(code) as TableRow | null);
     if (!t) throw new ApiError('no-table');
     const seats = this.seats(t.id), g = this.gameRow(t.id, t.game)!;
     const host = this.db.query('SELECT name FROM players WHERE id = ?').get(t.host) as { name: string };
@@ -305,7 +310,7 @@ export class Core {
     const seed = body.seed, commit = body.commit, code = body.code;
     let seat = -1, tableId = '';
     this.tx(() => {
-      const t = this.db.query("SELECT * FROM tables WHERE code = ? AND status != 'cancelled'").get(code) as TableRow | null;
+      const t = fixTable(this.db.query("SELECT * FROM tables WHERE code = ? AND status != 'cancelled'").get(code) as TableRow | null);
       if (!t) throw new ApiError('no-table');
       tableId = t.id;
       const g = this.gameRow(t.id, t.game)!;
@@ -742,7 +747,7 @@ export class Core {
 
   /** Пара не подтвердила вход вовремя: стол закрывается. */
   dropQuick(id: string): boolean {
-    const t = this.db.query("SELECT * FROM tables WHERE id = ? AND kind = 'quick'").get(id) as TableRow | null;
+    const t = fixTable(this.db.query("SELECT * FROM tables WHERE id = ? AND kind = 'quick'").get(id) as TableRow | null);
     if (!t || t.status !== 'waiting') return false;
     this.tx(() => this.close(t));
     return true;

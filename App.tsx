@@ -9,6 +9,8 @@ import type { Choice } from './src/screens/MenuScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
+import { StatsScreen } from './src/screens/StatsScreen';
+import { PuzzleScreen } from './src/game/PuzzleScreen';
 import { GameScreen } from './src/game/GameScreen';
 import { OnlineGameScreen } from './src/game/OnlineGameScreen';
 import { OnlineScreen } from './src/screens/OnlineScreen';
@@ -25,7 +27,7 @@ import type { SavedGame } from './src/state/save';
 
 installCrashHandlers();
 
-type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store';
+type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('menu');
@@ -84,11 +86,16 @@ export default function App() {
         {route === 'menu' ? (
           <MenuScreen choice={choice} onChange={setChoice} onPlay={() => play(null)}
             onResume={saved ? () => play(saved) : null} onSettings={() => setRoute('settings')}
-            onFriends={() => setRoute('friends')} onQuick={() => setRoute('quick')} onStore={() => setRoute('store')} />
+            onFriends={() => setRoute('friends')} onQuick={() => setRoute('quick')} onStore={() => setRoute('store')}
+            onPuzzle={() => setRoute('puzzle')} onStats={() => setRoute('stats')} />
         ) : route === 'friends' || route === 'quick' ? (
           <OnlineScreen mode={route === 'quick' ? 'quick' : 'friends'} invite={invite} onBack={() => setRoute('menu')} onTable={seat} />
         ) : route === 'online' && online ? (
           <OnlineGameScreen table={online} onExit={() => { setOnline(null); setRoute('menu'); }} />
+        ) : route === 'puzzle' ? (
+          <PuzzleScreen onBack={() => setRoute('menu')} />
+        ) : route === 'stats' ? (
+          <StatsScreen onBack={() => setRoute('menu')} onStore={() => setRoute('store')} />
         ) : route === 'store' ? (
           <StoreScreen onBack={() => setRoute('menu')} />
         ) : route === 'settings' ? (
@@ -97,7 +104,7 @@ export default function App() {
           <ReportScreen onBack={() => setRoute('settings')} />
         ) : (
           <GameScreen key={game} variant={r?.variant ?? choice.variant} bots={(r?.seats ?? choice.bots + 1) - 1}
-            level={resume?.level ?? choice.level} restored={resume} onExit={() => setRoute('menu')} />
+            level={resume?.level ?? choice.level} restored={resume} onExit={() => setRoute('menu')} onStore={() => setRoute('store')} />
         )}
       </View>
     </SafeAreaProvider>

@@ -115,11 +115,11 @@ test('сверка с магазином — правда: кончилась п
   expect(normalizeRights({ noAds: 'да', proUntil: -5 })).toEqual(NO_RIGHTS);
 });
 
-test('разбор: «Про» или реклама — всё; без них — главная ошибка последней партии', () => {
+test('разбор: «Про», реклама или последняя партия дня — всё; иначе — итог и главная ошибка', () => {
   expect(reviewAccess(true, false, false)).toBe('full');
   expect(reviewAccess(false, true, false)).toBe('full');
-  expect(reviewAccess(false, false, true)).toBe('worst');
-  expect(reviewAccess(false, false, false)).toBe('locked');
+  expect(reviewAccess(false, false, true)).toBe('full');
+  expect(reviewAccess(false, false, false)).toBe('worst');
 });
 
 // ── Е2: ответы RuStore Pay, просьба об оценке, плагин сборки ──
@@ -288,10 +288,9 @@ test('сборка `other` (EXPO_PUBLIC_STORE=other) — без RuStore Pay: т�
 
 import { ON_SALE, PRO_ON_SALE } from '../../src/money/types';
 
-test('«Про» не продаётся, пока нет разбора и статистики (устав, «Честность»): на витрине — одна «Без рекламы»', () => {
-  // этап Д включает PRO_ON_SALE одной строкой — вместе с разбором; до этого продавать нечего
-  expect(PRO_ON_SALE).toBe(false);
-  expect(ON_SALE).toEqual(['no_ads']);
+test('«Про» в продаже с этапа Д: разбор и подробная статистика есть (устав, «Честность»)', () => {
+  expect(PRO_ON_SALE).toBe(true);
+  expect(ON_SALE).toEqual(['no_ads', 'pro_month', 'pro_year']);
 });
 
 test('платное не открывает силу: подсказка, вышедшие карты и отмена не смотрят на права', () => {
@@ -299,5 +298,6 @@ test('платное не открывает силу: подсказка, вы�
   const src = join(import.meta.dir, '../../src');
   const readers = (readdirSync(src, { recursive: true }) as string[])
     .filter(f => /\.tsx?$/.test(f) && !f.startsWith('money') && /\b(isPro|isAdsOff|getRights|reviewAccess)\(/.test(readFileSync(join(src, f), 'utf8')));
-  expect(readers.sort()).toEqual(['screens/StoreScreen.tsx']);
+  // права читают только экраны денег, разбора и статистики — не стол, не подсказка, не бот
+  expect(readers.sort()).toEqual(['game/ReviewScreen.tsx', 'screens/StatsScreen.tsx', 'screens/StoreScreen.tsx']);
 });

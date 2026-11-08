@@ -2,7 +2,7 @@
 // восстановление переигрыванием. Битая или чужая запись не роняет игру: её нет. Хранилище — save.ts.
 import { replay, RULES_V1 } from '../engine';
 import type { Action, GameRecord, Result, State } from '../engine';
-import { LEVELS } from '../bot';
+import { levelOf } from '../bot';
 import type { Level } from '../bot';
 
 export interface SavedGame {
@@ -25,11 +25,12 @@ export function restoreGame(raw: unknown): { saved: SavedGame; state: State } | 
     const s = raw as SavedGame;
     if (!s || typeof s !== 'object' || !s.record || s.record.v !== 1) return null;
     if (s.record.rules?.id !== RULES_V1.id) return null;
-    if (!LEVELS.includes(s.level)) return null;
+    const level = levelOf(s.level);
+    if (!level) return null;
     if (!Array.isArray(s.record.actions) || !s.record.actions.every(x => x && Number.isInteger(x.seat) && isAction(x.action))) return null;
     const state = replay(s.record);
     if (state.phase === 'end') return null;
-    return { saved: { record: s.record, level: s.level, history: Array.isArray(s.history) ? s.history : [] }, state };
+    return { saved: { record: s.record, level, history: Array.isArray(s.history) ? s.history : [] }, state };
   } catch {
     return null;
   }
