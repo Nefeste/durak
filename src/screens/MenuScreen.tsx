@@ -14,8 +14,9 @@ import { CardBack } from '../render/PlayingCard';
 
 export interface Choice { variant: Variant; bots: number; level: Level }
 
-export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings }: {
+export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick }: {
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
+  onFriends: () => void; onQuick: () => void;
 }) {
   const insets = useSafeAreaInsets();
   return (
@@ -36,6 +37,10 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings }: {
       <View style={styles.actions}>
         {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
         <Button label={T.menu.play} onPress={onPlay} testID="play" />
+        <View style={styles.row}>
+          <View style={styles.cell}><Button label={T.menu.friends} kind="ghost" onPress={onFriends} testID="friends-open" /></View>
+          <View style={styles.cell}><Button label={T.menu.quick} kind="ghost" onPress={onQuick} testID="quick-open" /></View>
+        </View>
         <Button label={T.menu.settings} kind="ghost" onPress={onSettings} testID="settings-open" />
       </View>
     </View>
@@ -52,4 +57,6 @@ const styles = StyleSheet.create({
   panel: { gap: 10, padding: 16, borderRadius: RADIUS.card, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   label: { color: C.dim, fontSize: 14, marginTop: 4 },
   actions: { gap: 10 },
+  row: { flexDirection: 'row', gap: 10 },
+  cell: { flex: 1 },
 });

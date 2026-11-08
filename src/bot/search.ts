@@ -119,7 +119,7 @@ export function* searchThink(o: Observation, p: SearchParams, rng: Rng): Thinkin
  *  выходу. Работает по наблюдению игрока — бот за столом этих расчётов не видит. */
 export interface Advice { action: Action; chance: number | null; exact: boolean }
 
-export function* adviseThink(o: Observation, rng: Rng, samples = 512, budget = 15_000): Thinking<Advice> {
+export function* adviseThink(o: Observation, rng: Rng, samples = 128, budget = 15_000): Thinking<Advice> {
   const legal = legalFor(o);
   if (legal.length === 1) return { action: legal[0], chance: null, exact: false };
   if (isEndgame(o)) {

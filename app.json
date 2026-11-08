@@ -8,7 +8,7 @@
     "backgroundColor": "#0B1A1E",
     "android": {
       "package": "games.gornitsa.durak",
-      "versionCode": 3,
+      "versionCode": 4,
       "allowBackup": false,
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
@@ -22,7 +22,24 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#123238"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "durak.gornitsa.games",
+              "pathPrefix": "/t/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "locales": {
       "ru": {

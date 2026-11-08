@@ -56,13 +56,14 @@ RuStore Review or Yandex Mobile Ads code from memory — follow «Expo has chang
 
 ## Commands
 
-Stages А, Б and В are in the code (engine, rule bots, search bots and the exact endgame, the Skia table vs bots,
-saves, settings, the hint); the rest follows nardy.
+Stages А, Б, В and Г are in the code (engine, rule bots, search bots and the exact endgame, the Skia table vs bots,
+saves, settings, the hint; online: `server/`, per-seat views, friend tables, quick match, deck check); the rest
+follows nardy.
 
 ```bash
 npm ci
 npx expo install <package>          # ALWAYS instead of npm/yarn/bun add — SDK-compatible versions
-npm run typecheck                   # app + tools (tsc --noEmit, -p tools)
+npm run typecheck                   # app + tools + server (tsc --noEmit, -p tools, -p server)
 npm run lint                        # zero warnings
 bun test tools/test                 # rules (golden), random games, observation, deck, purity, texts, bots
 DURAK_LONG=1 bun test tools/test/games.test.ts   # 100 000 random games (~4 min)
@@ -74,6 +75,10 @@ bun tools/test/make-deck-fixture.ts > tools/test/fixtures/deck-v1.json   # deck 
 EXPO_OFFLINE=1 npm run export:web       # setup-skia-web puts canvaskit.wasm into public/ first
 NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/browser.ts   # the table in a browser, real taps
 bun tools/hermes/deck.ts            # durak-deck-v1 vectors on Hermes 0.12 (downloads it to /tmp/hermes)
+npm run server                      # online server locally: 127.0.0.1:8792 (DURAK_DB=durak.db)
+bun test tools/test/server.test.ts  # server in-process: per-seat views (ADR 0008), stale, clocks, quick match, rematch, restart
+EXPO_PUBLIC_DURAK_SERVER=http://127.0.0.1:8796 EXPO_OFFLINE=1 npx expo export -p web --output-dir dist-web-online --clear
+DURAK_WEB_DIR=dist-web-online NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/online.ts   # two browsers: friend table with a bot to the end, deck check, rematch, quick match
 NODE_PATH=/opt/node22/lib/node_modules bun tools/art/icon.ts   # icon, adaptive icon, splash + passport assets/LICENSES.md
 ```
 

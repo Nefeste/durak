@@ -8,12 +8,13 @@
     "start": "expo start",
     "android": "expo run:android",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tools",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tools && tsc --noEmit -p server",
     "lint": "expo lint src App.tsx --max-warnings 0",
     "test": "bun test tools/test",
     "arena": "bun tools/sim/arena.ts",
     "export:web": "setup-skia-web public && expo export -p web --output-dir dist-web",
-    "hermes": "bun tools/hermes/deck.ts"
+    "hermes": "bun tools/hermes/deck.ts",
+    "server": "bun server/src/main.ts"
   },
   "dependencies": {
     "@expo-google-fonts/onest": "^0.4.2",

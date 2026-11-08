@@ -24,15 +24,15 @@ const RULES: Partial<Record<Level, RuleParams>> = {
 };
 
 export const SEARCH: Partial<Record<Level, SearchParams>> = {
-  experienced: { samples: 32, endgame: 0 },
-  strong: { samples: 128, endgame: 8_000 },
-  master: { samples: 512, endgame: 15_000 },
+  experienced: { samples: 4, endgame: 0 },
+  strong: { samples: 32, endgame: 8_000 },
+  master: { samples: 128, endgame: 15_000 },
 };
 
 /** Сколько уровень думает самое большее в приложении, мс (docs/10-bot.md, «Скорость»): на медленном
  *  телефоне бот чуть слабее, а не медленнее. В арене бюджет — число раскладов, а не время. */
 export const THINK_MS: Record<Level, number> = {
-  novice: 50, beginner: 50, amateur: 50, average: 50, experienced: 800, strong: 1500, master: 1500,
+  novice: 50, beginner: 50, amateur: 50, average: 50, experienced: 300, strong: 1000, master: 1500,
 };
 
 /** С какого отбоя партии бот рвёт круг (обычная партия вдвоём — 15–25 отбоев). */

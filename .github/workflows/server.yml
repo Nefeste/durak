@@ -1,0 +1,77 @@
+# из nardy: .github/workflows/server.yml @ 1d2bdff — сервер «Козыря» (docs/02-architecture.md,
+# «Сервер»): после слияния в `main` — типы и тесты сервера, сборка в один файл, пробный запуск и
+# принудительный push в ветку `vps`; вручную на другой ветке — только проверки (на PR тесты сервера
+# гоняет pr.yml вместе с остальными). Ветку `vps` раз в 2 минуты забирает машина gornitsa.games
+# (Nefeste/gornitsagames, deploy/durak/) и сама откатывает сборку, не ответившую на /v1/ping.
+# В `vps` пишет только это задание. Версия Bun закреплена: та же — в server/package.json (engines)
+# и на машине (deploy/durak/setup.sh в репозитории сайта).
+name: Сервер
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'src/engine/**'
+      - 'src/bot/**'
+      - 'src/game/flow.ts'
+      - 'src/state/protocol.ts'
+      - 'src/ui/theme.ts'
+      - 'tools/test/server.test.ts'
+      - '.github/workflows/server.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Тесты и сборка сервера
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+      - name: Тесты сервера
+        run: bun test tools/test/server.test.ts
+      - name: Сборка
+        env:
+          CERT: ${{ vars.ANDROID_CERT_SHA256 }}
+        run: |
+          mkdir -p vps
+          bun build server/src/main.ts --target=bun --outfile vps/server.js
+          printf '{"commit": "%s", "bun": "%s"}\n' "$GITHUB_SHA" "$(bun --version)" > vps/build.json
+          # отпечаток сертификата подписи — для App Links (/.well-known/assetlinks.json)
+          hex() { tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]*sha-?256:?//' | tr -d ': \t\n'; }
+          HEX="$(printf '%s' "$CERT" | hex)"
+          if printf '%s' "$HEX" | grep -qE '^[0-9a-f]{64}$'; then
+            printf '%s\n' "$HEX" > vps/cert.sha256
+          elif [ -n "$CERT" ]; then
+            echo "::warning::ANDROID_CERT_SHA256 задана, но это не отпечаток SHA-256 — App Links не будут работать, пока её не поправить."
+          fi
+      - name: Пробный запуск
+        run: |
+          DURAK_DB="$RUNNER_TEMP/try.db" PORT=8792 nohup bun vps/server.js > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 20); do
+            curl -fsS -m 2 http://127.0.0.1:8792/v1/ping && exit 0
+            sleep 0.5
+          done
+          cat "$RUNNER_TEMP/server.log"; exit 1
+      - name: Ветка vps
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd vps
+          git init -q -b vps
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Сборка сервера ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:vps
+          echo "### Сборка сервера — в ветке \`vps\` (${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"

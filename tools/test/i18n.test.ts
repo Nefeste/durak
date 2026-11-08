@@ -9,6 +9,8 @@ const CYR = /[А-Яа-яЁё]/;
 const ALLOWED: Record<string, string[]> = {
   // запись карт для тестов и журнала — данные движка, а не текст интерфейса (docs/04-data-model.md)
   'src/engine/cards.ts': ['В', 'Д', 'К', 'Т'],
+  // запрещённые ники — правило сервера и телефона, не текст интерфейса (docs/03-server-api.md)
+  'src/state/protocol.ts': ['Игрок', 'Бот'],
 };
 
 function files(dir: string): string[] {
