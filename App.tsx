@@ -10,6 +10,7 @@ import { SettingsScreen } from './src/screens/SettingsScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
+import { DeckSheet, deckSheetWanted } from './src/render/DeckSheet';
 import { RulesScreen } from './src/screens/RulesScreen';
 import { PuzzleScreen } from './src/game/PuzzleScreen';
 import { GameScreen } from './src/game/GameScreen';
@@ -80,6 +81,7 @@ export default function App() {
     setRoute('game');
   };
   const r = resume?.record;
+  if (deckSheetWanted()) return <DeckSheet />;
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />

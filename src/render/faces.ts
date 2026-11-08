@@ -1,6 +1,6 @@
 // Лица и рубашка карт, нарисованные кодом (ADR 0010): индекс в двух углах русскими буквами
-// (В, Д, К, Т), масть — путь, нарисованный здесь же, у В, Д, К — крупная буква с орнаментом
-// масти вместо фигуры. Каждое лицо записывается один раз в SkPicture размера карты; холст
+// (В, Д, К, Т), масть — путь, нарисованный здесь же, у В, Д, К — «двуглавая» картинка буквой в рамке-картуше
+// с мастями (`courtArt`) вместо фигуры. Каждое лицо записывается один раз в SkPicture размера карты; холст
 // только ставит картинки на места (дёшево на кадр, docs/specs/2026-11-v1.md, «Бюджет»).
 import { PaintStyle, Skia } from '@shopify/react-native-skia';
 import type { SkCanvas, SkFont, SkPath, SkPicture } from '@shopify/react-native-skia';
@@ -69,6 +69,46 @@ function fill(color: string) {
   return paint;
 }
 
+/** В, Д, К (ADR 0010, лист стиля 13-art.md): фигуры людей нет — вместо неё «двуглавая» картинка, как у настоящих
+ *  фигур, но буквой: рамка-картуш с ромбиками в открытых углах, по середине — перевязь с мастями (у В одна, у Д две, у К три, чтобы
+ *  картинки различались не только буквой), на её концах — масть на рамке; буква сверху и та же вверх ногами снизу.
+ *  Углы рамки у индексов прячутся под «ярлыки» индекса (рисует `makeFaces` поверх). Всё — путями и шрифтом Onest. */
+function courtArt(cv: SkCanvas, cw: number, ch: number, r: number, suit: number, rank: number, label: string, color: string, small: SkFont) {
+  const ink = fill(color);
+  const line = (w: number) => { const p = fill(color); p.setStyle(PaintStyle.Stroke); p.setStrokeWidth(w); return p; };
+  const halo = fill(C.face);
+  const a = cw * 0.33, b = ch * 0.38;
+  cv.drawRRect(Skia.RRectXY(Skia.XYWHRect(-a, -b, a * 2, b * 2), r * 0.7, r * 0.7), line(1.2));
+  // открытые углы рамки (у индексов угол уходит под ярлык) — ромбик масти-орнамента
+  for (const [x, y] of [[a, -b], [-a, b]]) {
+    const d = suitPath(2, cw * 0.09);
+    d.offset(x, y);
+    cv.drawCircle(x, y, cw * 0.06, halo);
+    cv.drawPath(d, ink);
+  }
+  // перевязь: линия от рамки до рамки, масти на ней — на кружке цвета лица, линия под ними прерывается
+  cv.drawLine(-a, 0, a, 0, line(0.8));
+  const n = rank - 4, step = cw * 0.13, size = cw * 0.11;
+  const spots: [number, number][] = [[-a, size * 1.05], [a, size * 1.05]];
+  for (let k = 0; k < n; k++) spots.push([(k - (n - 1) / 2) * step, size]);
+  for (const [x, s] of spots) {
+    cv.drawCircle(x, 0, s * 0.62, halo);
+    const d = suitPath(suit, s);
+    d.offset(x, 0);
+    cv.drawPath(d, ink);
+  }
+  // буква — в верхней половине и та же вверх ногами в нижней; мельче шрифта стола, чтобы не касаться перевязи и рамки
+  const k = 0.8, w = widthOf(small, label) * k;
+  for (const turn of [0, 180]) {
+    cv.save();
+    cv.rotate(turn, 0, 0);
+    cv.translate(-w / 2, -ch * 0.1);
+    cv.scale(k, k);
+    cv.drawText(label, 0, 0, ink, small);
+    cv.restore();
+  }
+}
+
 /** Все 36 лиц и рубашка размера `cw × ch`; шрифт индекса — Onest (OFL, `assets/fonts/`). */
 export function makeFaces(cw: number, ch: number, font: SkFont, small: SkFont, fourColor: boolean): Faces {
   const r = Math.round(cw * 0.1);
@@ -89,29 +129,24 @@ export function makeFaces(cw: number, ch: number, font: SkFont, small: SkFont, f
       const label = T.ranks[rank];
       const ink = fill(color);
       const ix = -cw / 2 + cw * 0.09, iy = -ch / 2 + font.getSize() * 0.95;
-      cv.drawText(label, ix, iy, ink, font);
       const pip = suitPath(suit, cw * 0.2);
       pip.offset(ix + widthOf(font, label === '10' ? '1' : label) * 0.35 + cw * 0.06, iy + cw * 0.16);
-      cv.drawPath(pip, ink);
-      // нижний угол — тот же индекс вверх ногами
-      cv.save();
-      cv.rotate(180, 0, 0);
-      cv.drawText(label, ix, iy, ink, font);
-      cv.drawPath(pip, ink);
-      cv.restore();
-      if (rank >= 5 && rank <= 7) {
-        // В, Д, К — крупная буква в рамке-орнаменте масти
-        const frame = fill(color);
-        frame.setStyle(PaintStyle.Stroke); frame.setStrokeWidth(1.2);
-        cv.drawRRect(Skia.RRectXY(Skia.XYWHRect(-cw * 0.28, -ch * 0.3, cw * 0.56, ch * 0.6), r * 0.6, r * 0.6), frame);
-        const w = widthOf(small, label);
-        cv.drawText(label, -w / 2, small.getSize() * 0.36, ink, small);
-        for (const [dx, dy] of [[-0.18, -0.22], [0.18, -0.22], [-0.18, 0.22], [0.18, 0.22]]) {
-          const d = suitPath(suit, cw * 0.11);
-          d.offset(dx * cw, dy * ch);
-          cv.drawPath(d, ink);
+      const court = rank >= 5 && rank <= 7;
+      if (court) courtArt(cv, cw, ch, r, suit, rank, label, color, small);
+      // индекс: верхний угол и тот же вверх ногами в нижнем; у картинок под ним — «ярлык» цвета лица поверх рамки
+      for (const turn of [0, 180]) {
+        cv.save();
+        cv.rotate(turn, 0, 0);
+        if (court) {
+          const b = pip.computeTightBounds();
+          const pad = cw * 0.03;
+          cv.drawRRect(Skia.RRectXY(Skia.XYWHRect(-cw / 2 + 1, -ch / 2 + 1, b.x + b.width + pad + cw / 2 - 1, b.y + b.height + pad + ch / 2 - 1), r, r), fill(C.face));
         }
-      } else {
+        cv.drawText(label, ix, iy, ink, font);
+        cv.drawPath(pip, ink);
+        cv.restore();
+      }
+      if (!court) {
         const big = suitPath(suit, cw * (rank === 8 ? 0.5 : 0.36));
         cv.drawPath(big, ink);
       }
