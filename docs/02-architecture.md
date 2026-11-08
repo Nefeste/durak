@@ -232,7 +232,7 @@ SDK из зависимостей убран, чтобы APK не нёс его 
 ### Этап Д, 08.11.2026 — разбор, задача дня, статистика, шесть уровней
 
 - Уровни — шесть и закрытое седьмое место «Нейросеть» (#15): `LEVELS`, `TOP`, `LOCKED_LEVEL`, `levelOf` в
-  `src/bot/index.ts`; закрытое место — `Chips` с `locked` в меню.
+  `src/bot/index.ts`; закрытое место — последний шаг `Stepper` в меню («‹ Средний ›», `src/ui/Stepper.tsx`, с 1.0).
 - Разбор — `src/bot/review.ts` (`reviewThink`: кусками, только по наблюдениям игрока — запись партии разворачивает в них `src/game/review.ts`, ADR 0005; точная концовка вдвоём или расклады,
   `whyOf`); экран — `src/game/ReviewScreen.tsx`, слова — `src/game/words.ts`. Считается после партии
   (`GameScreen`), хранится с партией в `src/state/history.ts`.

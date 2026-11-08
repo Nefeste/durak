@@ -62,6 +62,15 @@ async function checkReviewTable(p: Page) {
   }
 }
 mkdirSync(OUT, { recursive: true });
+/** Уровень стрелками «‹ ›» до подписи `name`. */
+async function setLevel(p: Page, name: string) {
+  const order = ['Новичок', 'Начинающий', 'Любитель', 'Средний', 'Опытный', 'Мастер', 'Нейросеть · скоро'];
+  for (let k = 0; k < 8; k++) {
+    const now = (await p.getByTestId('level-value').innerText()).trim();
+    if (now === name) return;
+    await p.getByTestId(order.indexOf(now) < order.indexOf(name) ? 'level-next' : 'level-prev').click();
+  }
+}
 /** Строки подсказки новичка (T.game.newbie). */
 const NEWBIE = /положите любую карту|Бейте старшей|Бейте, переводите|Нечем побить|Подкиньте то же достоинство/;
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
@@ -137,8 +146,11 @@ try {
     ph.on('pageerror', e => errors.push(String(e)));
     await ph.goto(`${web.url}?inset=${INSET}`); // без ?fast: боты думают как на телефоне
     await ph.getByTestId('menu').waitFor({ timeout: 20000 });
+    // меню выше экрана — прокручиваем до конца: нижний ряд должен встать над кнопками телефона, а не под ними
+    // (scrollIntoViewIfNeeded не прокручивает, если кнопка видна, пусть и под ними; scrollTo в RN-web — свой)
+    await ph.getByTestId('menu').evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await ph.waitForTimeout(200);
     for (const id of ['store-open', 'settings-open']) {
-      await ph.getByTestId(id).scrollIntoViewIfNeeded();
       const b = await ph.getByTestId(id).boundingBox();
       ok(!!b && b.y + b.height <= H - INSET, `меню: «${id}» над кнопками телефона`, JSON.stringify(b));
     }
@@ -331,6 +343,18 @@ try {
   await page.getByTestId('settings-open').click();
   await page.getByTestId('settings').waitFor({ timeout: 5000 });
   ok(await visible(page, 'motion-system'), '«Меньше движения»: по умолчанию — как в системе');
+  // отчёт об ошибке: партия свёрнута одной строкой, касание раскрывает запись (аудит, находка 15)
+  await page.getByTestId('report').scrollIntoViewIfNeeded();
+  await page.getByTestId('report').click();
+  await page.getByTestId('report-screen').waitFor({ timeout: 5000 });
+  const gl = await page.getByTestId('report-game').innerText().catch(() => '');
+  ok(/Партия: подкидной, 2 места, \d+ ход/.test(gl), `отчёт: партия одной строкой — «${gl.split('\n')[0]}»`, gl);
+  ok(!(await visible(page, 'report-game-json')) && !/"deck"/.test(await page.getByTestId('report-preview').innerText()), 'отчёт: запись партии свёрнута');
+  await page.getByTestId('report-game').click();
+  ok(/"deck"/.test(await page.getByTestId('report-game-json').innerText().catch(() => '')), 'отчёт: касание раскрывает запись целиком');
+  await page.screenshot({ path: `${OUT}/05-report.png` });
+  await page.getByTestId('report-back').click();
+  await page.getByTestId('settings').waitFor({ timeout: 5000 });
   await page.getByTestId('motion-on').click();
   await page.getByTestId('four').click();
   await page.getByTestId('memory').click();
@@ -451,14 +475,22 @@ try {
   await page.getByTestId('puzzle-back').click();
   await page.getByTestId('puzzle-back').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
+  // уровень — одной строкой «‹ Средний ›» (аудит, находка 12); седьмой шаг закрыт
+  ok(await page.getByTestId('level-value').innerText() === 'Средний', 'уровень одной строкой: «Средний»', await page.getByTestId('level-value').innerText());
+  await page.getByTestId('level-prev').click();
+  ok(await page.getByTestId('level-value').innerText() === 'Любитель', '«‹» — уровень слабее: «Любитель»');
   ok(!(await visible(page, 'locked-note')), 'седьмой уровень закрыт');
-  await page.getByTestId('level-neural').click();
-  ok(await visible(page, 'locked-note'), '«Нейросеть · скоро»: касание объясняет, выбрать нельзя');
+  await setLevel(page, 'Нейросеть · скоро');
+  ok(await visible(page, 'locked-note'), '«Нейросеть · скоро»: последний шаг объясняет, выбрать нельзя');
+  ok(await page.getByTestId('level-next').isDisabled(), 'дальше седьмого шага стрелки нет');
+  ok(await page.getByTestId('play').isDisabled(), 'на закрытом уровне «Играть» недоступна');
+  await page.screenshot({ path: `${OUT}/08-level-locked.png` });
 
   console.log('«Мастер» и подсказка');
   await page.getByTestId('variant-podkidnoy').click();
   await page.getByTestId('bots-1').click();
-  await page.getByTestId('level-master').click();
+  await setLevel(page, 'Мастер');
+  ok(!(await visible(page, 'locked-note')) && await page.getByTestId('play').isEnabled(), '«‹» с закрытого — «Мастер», можно играть');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
   await page.waitForTimeout(300);

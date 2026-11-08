@@ -1,6 +1,6 @@
 /**
  * Снимки экранов для аудита вида и листа стиля (docs/reports/2026-11-08-design-audit.md, docs/13-art.md):
- * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, окно «Что такое перевод» — 21.
+ * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, окно «Что такое перевод» — 21, отчёт с раскрытой партией — 22, закрытый уровень — 23.
  *
  *   EXPO_OFFLINE=1 npm run export:web
  *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка]   # по умолчанию docs/design
@@ -151,6 +151,16 @@ try {
   await page.getByTestId('report').click().catch(() => {});
   await page.waitForTimeout(500);
   if (await visible(page, 'report-screen')) await shot(page, '15-report');
+  if (await visible(page, 'report-game')) {
+    await page.getByTestId('report-game').click();
+    await shot(page, '22-report-open');
+  }
+  await page.getByTestId('report-back').click().catch(() => {});
+  await page.getByTestId('settings-back').click().catch(() => {});
+  await page.getByTestId('menu').waitFor({ timeout: 5000 }).catch(() => {});
+  // седьмой, закрытый шаг уровня: «Нейросеть · скоро», «Играть» недоступна
+  for (let k = 0; k < 6 && await page.getByTestId('level-next').isEnabled().catch(() => false); k++) await page.getByTestId('level-next').click();
+  await shot(page, '23-level-locked');
 } finally {
   await browser.close();
   web.stop();
