@@ -9,6 +9,7 @@ import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
+import { Stepper } from '../ui/Stepper';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { CardBack } from '../render/PlayingCard';
 
@@ -19,7 +20,8 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void; onRules: () => void;
 }) {
   const insets = useInsets();
-  const [lockedNote, setLockedNote] = useState(false);
+  // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна
+  const [onLocked, setOnLocked] = useState(false);
   return (
     // прокрутка: на невысоком экране или с крупным шрифтом нижний ряд не уходит под кнопки телефона (0.5.1)
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.xl, paddingBottom: insets.bottom + SPACE.l }]} testID="menu">
@@ -36,13 +38,15 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
         <Text style={styles.label}>{T.menu.opponents}</Text>
         <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => onChange({ ...choice, bots })} />
         <Text style={styles.label}>{T.menu.level}</Text>
-        <Chips id="level" items={LEVELS} value={choice.level} label={l => T.level[l]} onChange={level => { setLockedNote(false); onChange({ ...choice, level }); }}
-          locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel, onPress: () => setLockedNote(v => !v) }} />
-        {lockedNote ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
+        <Stepper<string> id="level" items={LEVELS} value={onLocked ? LOCKED_LEVEL : choice.level} label={l => T.level[l as Level]}
+          prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp}
+          onChange={l => { if (l === LOCKED_LEVEL) { setOnLocked(true); return; } setOnLocked(false); onChange({ ...choice, level: l as Level }); }}
+          locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel }} />
+        {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
       </View>
       <View style={styles.actions}>
         {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
-        <Button label={T.menu.play} onPress={onPlay} testID="play" />
+        <Button label={T.menu.play} onPress={onPlay} disabled={onLocked} testID="play" />
         <View style={styles.row}>
           <View style={styles.cell}><Button label={T.menu.friends} kind="ghost" onPress={onFriends} testID="friends-open" /></View>
           <View style={styles.cell}><Button label={T.menu.quick} kind="ghost" onPress={onQuick} testID="quick-open" /></View>
