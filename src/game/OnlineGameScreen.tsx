@@ -16,6 +16,7 @@ import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { SeatPlate } from './SeatPlate';
+import { ResultSheet, sheetText } from './ResultSheet';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { useLessMotion, useSettings } from '../state/store';
 import type { OnlineTable } from '../state/online';
@@ -81,6 +82,7 @@ function Lobby({ t, onExit, pad }: { t: TableView; onExit: () => void; pad: obje
 }
 
 function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableView; onExit: () => void; pad: object; down: boolean }) {
+  const insets = useInsets();
   const settings = useSettings();
   const less = useLessMotion();
   const font = useFont(Onest_700Bold, 15);
@@ -221,20 +223,18 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
             </View>
           </View>
         ) : null}
-        {t.status === 'finished' && g.result ? (
-          <View style={styles.result} testID="result">
-            <Text style={styles.resultText}>{result(g.result)}</Text>
-            {table.check ? (
-              <Text style={table.check.ok ? styles.ok : styles.err} testID="deck-check">
-                {table.check.ok ? T.online.deckOk(table.check.cards) : T.online.deckBad}
-              </Text>
-            ) : null}
-            {asked || g.rematch[t.you] ? <Text style={styles.dim} testID="rematch-wait">{T.online.rematchWait}</Text>
-              : <Button label={T.online.rematch} onPress={rematch} testID="rematch" />}
-            <Button label={T.game.menu} kind="ghost" onPress={() => { leavingEnd({ wonVsBot: false }); onExit(); }} testID="result-menu" />
-          </View>
-        ) : null}
       </View>
+      {t.status === 'finished' && g.result ? (
+        <ResultSheet bottom={insets.bottom} title={result(g.result)}
+          lines={table.check ? (
+            <Text style={[sheetText.line, table.check.ok ? styles.ok : styles.err]} testID="deck-check">
+              {table.check.ok ? T.online.deckOk(table.check.cards) : T.online.deckBad}
+            </Text>
+          ) : null}
+          main={asked || g.rematch[t.you] ? <Text style={sheetText.line} testID="rematch-wait">{T.online.rematchWait}</Text>
+            : <Button label={T.online.rematch} onPress={rematch} testID="rematch" />}
+          rest={[<Button key="menu" label={T.game.menu} kind="ghost" onPress={() => { leavingEnd({ wonVsBot: false }); onExit(); }} testID="result-menu" />]} />
+      ) : null}
     </View>
   );
 }
@@ -257,6 +257,4 @@ const styles = StyleSheet.create({
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
   hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
   buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: SPACE.m, minHeight: 48 },
-  result: { position: 'absolute', left: 16, right: 16, top: '25%', gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
-  resultText: { color: C.text, fontSize: TYPE.section, fontWeight: '700', textAlign: 'center' },
 });

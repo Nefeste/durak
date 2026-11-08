@@ -19,7 +19,7 @@ import type { ThinkJob } from './think';
 import { T } from '../i18n';
 import { gameEnded, gameStarted, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
-import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
+import { C, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
 import { botDelay } from '../state/settings';
@@ -30,6 +30,7 @@ import { botToAct, tapCard, YOU } from './table';
 import { autoPass, canUndo, seenGrid } from './flow';
 import { SeenCards } from './SeenCards';
 import { SeatPlate } from './SeatPlate';
+import { ResultSheet, sheetText } from './ResultSheet';
 import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
@@ -272,17 +273,17 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
             </View>
           </View>
         ) : null}
-        {state.phase === 'end' && state.result ? (
-          <View style={styles.result} testID="result">
-            <Text style={styles.resultText}>{resultText(state.result)}</Text>
-            <Text style={styles.worst} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>
-            <Button label={T.result.again} onPress={again} testID="again" />
-            <Button label={T.result.review} kind="ghost" onPress={() => setShowReview(true)} testID="result-review" />
-            <Button label={T.game.menu} kind="ghost" onPress={() => { leaveEnd(); onExit(); }} testID="result-menu" />
-          </View>
-        ) : null}
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
+      {state.phase === 'end' && state.result ? (
+        <ResultSheet bottom={insets.bottom} title={resultText(state.result)}
+          lines={<Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>}
+          main={<Button label={T.result.again} onPress={again} testID="again" />}
+          rest={[
+            <Button key="review" label={T.result.review} kind="ghost" onPress={() => setShowReview(true)} testID="result-review" />,
+            <Button key="menu" label={T.game.menu} kind="ghost" onPress={() => { leaveEnd(); onExit(); }} testID="result-menu" />,
+          ]} />
+      ) : null}
     </View>
   );
 }
@@ -299,7 +300,4 @@ const styles = StyleSheet.create({
   buttons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.s, minHeight: 48 },
   helpers: { flexDirection: 'row', gap: SPACE.s, flexShrink: 1 },
   actions: { flexDirection: 'row', gap: SPACE.s, marginLeft: 'auto' },
-  result: { position: 'absolute', left: 16, right: 16, top: '30%', gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.sheet, borderWidth: 1, borderColor: C.glassLine },
-  resultText: { color: C.text, fontSize: TYPE.section, fontWeight: '700', textAlign: 'center' },
-  worst: { color: C.dim, fontSize: TYPE.body, textAlign: 'center' },
 });
