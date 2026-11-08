@@ -5,7 +5,8 @@ import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AccessibilityInfo } from 'react-native';
 import { KEYS } from './storage';
-import { DEFAULT_SETTINGS, lessMotionOf, parseSettings } from './settings';
+import { DEFAULT_SETTINGS, hasNewbie, lessMotionOf, parseSettings, taughtBefore } from './settings';
+import { loadHistory } from './history';
 import type { Settings } from './settings';
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
@@ -20,7 +21,10 @@ export async function loadSettings(): Promise<void> {
   if (loaded) return;
   loaded = true;
   try {
-    settings = parseSettings(await AsyncStorage.getItem(KEYS.settings));
+    const raw = await AsyncStorage.getItem(KEYS.settings);
+    settings = parseSettings(raw);
+    // обновились с версии без подсказок новичка: учим только тех, кто ещё не доиграл ни одной партии
+    if (!hasNewbie(raw)) settings = taughtBefore(settings, (await loadHistory()).map(g => g.record));
   } catch { /* хранилище недоступно — по умолчанию */ }
   try {
     systemLess = await AccessibilityInfo.isReduceMotionEnabled();

@@ -3,7 +3,7 @@
 // партии»). Партия — запись (расстановка, колода, действия): каждое действие сохраняется, после
 // перезапуска партия переигрывается (ADR 0002). Боты видят только своё наблюдение.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
@@ -25,7 +25,7 @@ import { CONTROLS, layoutTable } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { botDelay } from '../state/settings';
-import { useLessMotion, useSettings } from '../state/store';
+import { getSettings, setSettings, useLessMotion, useSettings } from '../state/store';
 import { dropGame, saveGame } from '../state/save';
 import type { SavedGame } from '../state/save';
 import { botToAct, tapCard, YOU } from './table';
@@ -36,6 +36,11 @@ import { ResultSheet, sheetText } from './ResultSheet';
 import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
+import { Dialog } from '../ui/dialog';
+import { CardPicture } from '../render/CardPicture';
+import { RulesScreen } from '../screens/RulesScreen';
+import { RULES_PICTURES } from './rulesPictures';
+import { newbieDone, newbieTip } from './newbie';
 
 const fast = typeof globalThis.location !== 'undefined' && /[?&]fast=1/.test(globalThis.location.search);
 /** Пауза перед «бито» само, когда подкинуть нечего (docs/09-game-design.md, «Темп»). */
@@ -76,6 +81,14 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const font = useFont(Onest_700Bold, 15);
   const small = useFont(Onest_700Bold, 26);
   const lvl = restored?.level ?? level;
+  // первая партия (docs/09-game-design.md, «Первая партия»): окно о переводе перед первым переводным столом и
+  // «Правила» поверх стола; пока они открыты, боты ждут
+  const [told, setTold] = useState(() => variant === 'perevodnoy' && !restored && !settings.transferTold);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const paused = told || rulesOpen;
+  const { width: winW } = useWindowDimensions();
+  // подсказки новичка гаснут после партии, которую начали с ними (включённые посреди партии — со следующей)
+  const teaching = useRef(settings.newbie);
   // деньги (src/money): полноэкранная грузится в начале партии и показывается только при уходе с итога
   const startedAt = useRef(0);
   useEffect(() => { startedAt.current = Date.now(); gameStarted(); }, [deal]);
@@ -115,7 +128,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   // кусками во время паузы (src/game/think.ts): экран не замирает; пауза та же, пока ему её хватает
   useEffect(() => {
     const seat = botToAct(state, s => s !== YOU);
-    if (seat < 0) return;
+    if (seat < 0 || paused) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const pause = fast ? 60 : botDelay(settings.botSpeed, rng.current.next()), from = Date.now();
@@ -123,7 +136,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     job.promise.then(a => { if (live) timer = setTimeout(() => act(seat, a), Math.max(0, pause - (Date.now() - from))); }, () => {});
     return () => { live = false; job.cancel(); if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, record, lvl, settings.botSpeed]);
+  }, [state, record, lvl, settings.botSpeed, paused]);
 
   // «Подсказка»: что сделал бы «Мастер» — кусками, пока игрок ждёт (docs/09-game-design.md)
   const [advising, setAdvising] = useState(false);
@@ -139,9 +152,14 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     job.promise.then(a => { setAdvising(false); setNote(T.game.advice(adviceText(a.action, state), a.chance, a.exact)); }, () => setAdvising(false));
   };
 
+  // учили в этой партии три отбоя — дальше игрок сам
+  useEffect(() => {
+    if (teaching.current && settings.newbie && newbieDone(state)) { teaching.current = false; setSettings({ newbie: false }); }
+  }, [state, settings.newbie]);
+
   // «бито» само: всё покрыто, а подкинуть нечего
   useEffect(() => {
-    if (!autoPass(state, YOU)) return;
+    if (paused || !autoPass(state, YOU)) return;
     const t = setTimeout(() => act(YOU, { type: 'pass' }), AUTO_PASS);
     return () => clearTimeout(t);
   });
@@ -213,9 +231,11 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     setReview(null);
     setShowReview(false);
     hinted.current = false;
+    teaching.current = getSettings().newbie;
   };
 
-  const hint = state.phase === 'end' ? '' : picked ? (transfer ? T.game.pickTargetOrTransfer : T.game.pickTarget) : iDefend
+  const tip = settings.newbie ? newbieTip(state, YOU) : null;
+  const hint = state.phase === 'end' ? '' : picked ? (transfer ? T.game.pickTargetOrTransfer : T.game.pickTarget) : tip ? T.game.newbie[tip] : iDefend
     ? (variant === 'perevodnoy' ? T.game.hintDefendTransfer : T.game.hintDefend)
     : mine.some(a => a.type === 'attack') ? T.game.hintAttack
     : state.phase === 'giving' && canPass ? T.game.hintGive
@@ -231,6 +251,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
   };
 
+  if (rulesOpen) return <RulesScreen section="transfer" onBack={() => setRulesOpen(false)} />;
   if (showReview) {
     return <ReviewScreen review={review} record={record} counting at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
   }
@@ -277,6 +298,16 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
             </View>
           </View>
         ) : null}
+        {/* окно о переводе — один раз, перед первым переводным столом; «Правила перевода» — поверх стола */}
+        <Dialog onClose={() => { setTold(false); setSettings({ transferTold: true }); }} spec={told ? {
+          title: T.game.transferWhat.title, text: T.game.transferWhat.text, cancel: null,
+          body: <CardPicture spec={{ slots: RULES_PICTURES.transfer ?? [], labels: T.game.transferWhat.labels }}
+            width={Math.min(winW - SPACE.xl * 2, 520) - SPACE.l * 2} testID="transfer-picture" />,
+          actions: [
+            { label: T.game.transferWhat.ok, testID: 'transfer-ok' },
+            { label: T.game.transferWhat.rules, kind: 'ghost', testID: 'transfer-rules', onPress: () => setRulesOpen(true) },
+          ],
+        } : null} />
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
       {state.phase === 'end' && state.result ? (
