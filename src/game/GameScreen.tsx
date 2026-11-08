@@ -22,6 +22,7 @@ import { Button } from '../ui/Button';
 import { C, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
+import { useOrigins } from '../render/useOrigins';
 import { botDelay } from '../state/settings';
 import { useLessMotion, useSettings } from '../state/store';
 import { dropGame, saveGame } from '../state/save';
@@ -151,9 +152,10 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const iDefend = state.defender === YOU && state.phase === 'bout' && state.table.length > 0;
   const view = useMemo(() => observe(state, YOU), [state]);
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
-  const layout = useMemo(() => (size ? layoutTable(view, { ...size, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid }) : null),
+  const origins = useOrigins(view);
+  const layout = useMemo(() => (size ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, size, settings.handOrder, settings.memoryAid, picked]);
+    [view, origins, size, settings.handOrder, settings.memoryAid, picked]);
 
   const explain = (c: Card) => {
     const probe: Action = state.table.length === 0 ? { type: 'attack', cards: [c] }

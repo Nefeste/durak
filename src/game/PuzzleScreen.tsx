@@ -16,6 +16,7 @@ import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS, layoutTable } from '../render/layout';
+import { useOrigins } from '../render/useOrigins';
 import { useLessMotion, useSettings } from '../state/store';
 import { dateOfDay, loadPuzzleLog, todayKey, updateDay } from '../state/puzzles';
 import type { PuzzleLog } from '../state/puzzles';
@@ -83,9 +84,10 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   const view = useMemo(() => observe(state, you), [state, you]);
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   // в задаче партия не сыграна на глазах игрока — взятое в открытую входит в условие, его видно всегда
-  const layout = useMemo(() => (size ? layoutTable(view, { ...size, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: true }) : null),
+  const origins = useOrigins(view);
+  const layout = useMemo(() => (size ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: true }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, size, settings.handOrder, picked]);
+    [view, origins, size, settings.handOrder, picked]);
   const mine = status === 'play' && actorOf(state) === you ? legalActions(state, you) : [];
   const take = mine.find(a => a.type === 'take');
   const pass = mine.find(a => a.type === 'pass');
