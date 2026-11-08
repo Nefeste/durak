@@ -3,6 +3,7 @@
 // говорит «остались с картами» (docs/specs/2026-11-v1.md, «Решения агента»).
 import type { Reason, Variant } from '../engine';
 import type { Level } from '../bot';
+import type { MainProductId, Unavailable } from '../money/types';
 import { pluralRu } from './plural';
 
 const LEVEL_NAME: Record<Level, string> = {
@@ -46,6 +47,7 @@ export const T = {
     settings: 'Настройки',
     friends: 'С друзьями',
     quick: 'Быстрая игра',
+    store: 'Магазин',
   },
   settings: {
     title: 'Настройки',
@@ -67,6 +69,8 @@ export const T = {
     fourColorNote: '♠ чёрные, ♣ зелёные, ♦ синие, ♥ красные.',
     seenCards: 'Вышедшие карты',
     seenCardsNote: 'Таблица того, что ушло в сброс, — в игре против ботов.',
+    personalAds: 'Персональная реклама',
+    personalAdsNote: 'Подбирать рекламу по интересам. Выключено — реклама обычная, её не меньше.',
     on: 'Вкл.',
     off: 'Выкл.',
     report: 'Сообщить об ошибке',
@@ -199,6 +203,38 @@ export const T = {
       upgrade: 'Обновите игру',
       other: 'Не получилось — попробуйте ещё раз',
     } as Record<string, string>,
+  },
+  money: {
+    title: 'Магазин',
+    back: 'Назад',
+    /** одной строкой на итоге, не чаще раза за запуск (когда «Про» в продаже) */
+    offer: 'Полный разбор — в «Про»',
+    products: {
+      no_ads: { title: 'Без рекламы', text: 'Рекламы между партиями больше не будет — навсегда. Всё остальное в игре и так бесплатно.' },
+      pro_month: { title: '«Про» на месяц', text: 'Полный разбор всех партий и подробная статистика. Без рекламы.' },
+      pro_year: { title: '«Про» на год', text: 'То же, что «Про» на месяц, — на год и дешевле.' },
+    } satisfies Record<MainProductId, { title: string; text: string }>,
+    /** что бесплатно всем — пишем на витрине, чтобы не было похоже на продажу силы */
+    free: 'Подсказка, вышедшие карты и отмена хода против ботов — бесплатно всем.',
+    buy: (price: string | null) => (price ? `Купить — ${price}` : 'Купить'),
+    owned: 'Куплено',
+    proUntil: (ms: number) => `«Про» до ${new Date(ms).toLocaleDateString('ru-RU')}`,
+    restore: 'Восстановить покупки',
+    restored: 'Покупки сверены с RuStore',
+    thanksNoAds: 'Спасибо! Реклама отключена',
+    thanksPro: (ms: number) => `Спасибо! «Про» действует до ${new Date(ms).toLocaleDateString('ru-RU')}`,
+    failed: 'Оплата не прошла. Деньги не списаны — попробуйте ещё раз',
+    why: {
+      'other-build': 'Покупки доступны в версии из RuStore',
+      'not-ready': 'Покупки подключаются и появятся в одной из следующих сборок',
+      'no-rustore': 'Покупки работают через RuStore. Установите RuStore и войдите в аккаунт',
+      'not-signed-in': 'Покупки работают через RuStore. Откройте RuStore и войдите в аккаунт',
+      error: 'Покупки сейчас недоступны: RuStore отказал или не ответил. Попробуйте позже',
+    } satisfies Record<Unavailable, string>,
+    /** что ответил RuStore, как есть, — мелкой строкой под причиной */
+    detail: (text: string) => `Ответ RuStore: ${text}`,
+    openRuStore: 'Открыть RuStore',
+    test: 'Тестовый магазин: настоящей оплаты здесь нет',
   },
   result: {
     win: 'Вы вышли — без карт',

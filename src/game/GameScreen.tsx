@@ -16,6 +16,7 @@ import type { Advice, Level } from '../bot';
 import { thinkSliced } from './think';
 import type { ThinkJob } from './think';
 import { T } from '../i18n';
+import { gameEnded, gameStarted, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
 import { C, RADIUS } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
@@ -78,6 +79,9 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
   const font = useFont(Onest_700Bold, 15);
   const small = useFont(Onest_700Bold, 26);
   const lvl = restored?.level ?? level;
+  // деньги (src/money): полноэкранная грузится в начале партии и показывается только при уходе с итога
+  const startedAt = useRef(0);
+  useEffect(() => { startedAt.current = Date.now(); gameStarted(); }, [deal]);
 
   const act = (seat: number, a: Action) => {
     if (reasonOf(state, seat, a) !== null) return;
@@ -87,6 +91,7 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
     setRecord(rec);
     if (next.phase === 'end') {
       if (next.result) history.current.push(next.result);
+      gameEnded(Date.now() - startedAt.current);
       dropGame();
     } else {
       saveGame({ record: rec, level: lvl, history: history.current });
@@ -178,7 +183,10 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
     setPicked(null);
     saveGame({ record: rec, level: lvl, history: history.current });
   };
+  /** Уход с экрана итога: оценка RuStore или реклама между партиями, если пора (src/money). */
+  const leaveEnd = () => { leavingEnd({ wonVsBot: !!state.result && !state.result.draw && state.result.fool !== YOU }); };
   const again = () => {
+    leaveEnd();
     setPicked(null);
     setNote(null);
     const rec = newRecord(variant, seats, history.current);
@@ -240,7 +248,7 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
         ) : null}
         {layout ? (
           <View pointerEvents="box-none" style={[styles.controls, { top: layout.handTop - CONTROLS + 8 }]}>
-            <Text style={styles.hint} testID="hint">{note ?? hint}</Text>
+            <Text style={styles.hint} testID="hint">{state.phase === 'end' ? '' : note ?? hint}</Text>
             <View style={styles.buttons} pointerEvents="box-none">
               {transfer ? <Button label={T.game.transfer} kind="ghost" onPress={() => { setPicked(null); act(YOU, transfer); }} testID="transfer" /> : null}
               {canTake ? <Button label={T.game.take} kind="ghost" onPress={() => act(YOU, { type: 'take' })} testID="take" /> : null}
@@ -252,7 +260,7 @@ export function GameScreen({ variant, bots, level, restored, onExit }: {
           <View style={styles.result} testID="result">
             <Text style={styles.resultText}>{resultText(state.result)}</Text>
             <Button label={T.result.again} onPress={again} testID="again" />
-            <Button label={T.game.menu} kind="ghost" onPress={onExit} testID="result-menu" />
+            <Button label={T.game.menu} kind="ghost" onPress={() => { leaveEnd(); onExit(); }} testID="result-menu" />
           </View>
         ) : null}
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}

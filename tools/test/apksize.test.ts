@@ -1,9 +1,10 @@
-// из nardy: tools/test/apksize.test.ts @ c06342c — без проверок денег: модуля денег здесь пока нет (этап Е).
+// из nardy: tools/test/apksize.test.ts @ c06342c — с этапа Е и с проверкой правила R8 для исключений RuStore.
 // Размер APK: плагин сборки включает R8, оставляет ресурсы только русские и английские и
 // выключает GIF и WebP из Fresco. Тег v0.2.0 без него собрал APK на 65 МБ при пределе 60.
 import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { KNOWN } from '@gornitsa/kit/rustore-pay/rules';
 
 const ROOT = join(import.meta.dir, '..', '..');
 
@@ -51,9 +52,17 @@ describe('плагин размера APK', () => {
     for (const l of Object.keys(app.expo.locales)) expect(t.LOCALES).toContain(l);
   });
 
-  test('правило R8 дописывается один раз', () => {
-    const rules = t.proguard('# шаблон\n');
+  test('R8 не переименовывает исключения RuStore, по которым игра узнаёт причину', () => {
+    const rules = t.proguard('# шаблон\n-keep class com.facebook.react.turbomodule.** { *; }\n');
     expect(t.proguard(rules)).toBe(rules);
+    expect(rules).toContain('-keepnames class ru.rustore.** extends java.lang.Throwable');
+    // коды, которые читают src/money/rustoreRules.ts и набор: все — классы RuStore-исключений
+    const codes = [...KNOWN.map(k => k[0]), 'RuStorePaymentNetworkException', 'ProductPurchaseCancelled'];
+    const money = readFileSync(join(ROOT, 'src/money/rustoreRules.ts'), 'utf8');
+    for (const c of money.matchAll(/code === '([A-Za-z]+)'/g)) codes.push(c[1]);
+    for (const c of codes) expect(c).toMatch(/Exception$|Cancelled$|^RuStorePay[A-Za-z]+$|^ApplicationScheme/);
+    expect(rules).toContain('ru.rustore.sdk.core.exception.**');
+    expect(rules).toContain('RuStorePaymentException$*');
   });
 
   test('app.json: плагин подключён, INSTALL_REFERRER запрещён', () => {

@@ -16,10 +16,12 @@ export interface Settings {
   fourColor: boolean;
   /** Таблица вышедших карт против ботов; по умолчанию выключена. */
   seenCards: boolean;
+  /** Персональная реклама (по интересам), как в «Нардах»; выключено — обычная, её не меньше. */
+  personalAds: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, seenCards: false,
+  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, seenCards: false, personalAds: true,
 };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], dflt: T): T => (allowed.includes(v as T) ? (v as T) : dflt);
@@ -40,6 +42,7 @@ export function parseSettings(raw: string | null): Settings {
     handOrder: pick(v.handOrder, ['suit', 'rank'] as const, d.handOrder),
     fourColor: flag(v.fourColor, d.fourColor),
     seenCards: flag(v.seenCards, d.seenCards),
+    personalAds: flag(v.personalAds, d.personalAds),
   };
   if (typeof v.lessMotion === 'boolean') s.lessMotion = v.lessMotion;
   return s;

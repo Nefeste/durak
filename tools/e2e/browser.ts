@@ -2,7 +2,8 @@
  * Браузерный прогон этапов Б и В: меню → партия с ботом на холсте Skia настоящими касаниями до итога →
  * «Ещё партию» → сохранение: пара ходов, «В меню», перезагрузка страницы, «Продолжить партию» →
  * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, вышедшие карты) →
- * переводной с двумя ботами до итога → «Мастер» и «Подсказка» до итога. Карты руки — прозрачные «кнопки» поверх холста: касание
+ * переводной с двумя ботами до итога → «Мастер» и «Подсказка» до итога → магазин: «Без рекламы» в тестовом
+ * магазине, перезагрузка, «Восстановить покупки» (этап Е). Карты руки — прозрачные «кнопки» поверх холста: касание
  * идёт в обработчик стола, поэтому щелчки — `force`. Ловит пустой экран, неработающие касания,
  * зависшую партию, потерянное сохранение и ошибки в консоли. Снимки — в tools/e2e/out/.
  *
@@ -179,6 +180,32 @@ try {
   await page.getByTestId('result-menu').click();
   await page.waitForTimeout(300);
   ok(!(await visible(page, 'resume')), 'законченной партии нет в «Продолжить»');
+
+  // в браузере реклама — подделка (src/money/adsSdk.web.ts): после двух коротких первых партий её нет
+  const ads = await page.evaluate(() => (globalThis as unknown as { __kozyrAds?: { shown: string[] } }).__kozyrAds?.shown ?? []);
+  ok(ads.length === 0, 'первые партии — без рекламы (правило 1 частоты)', ads.join(','));
+
+  console.log('Магазин');
+  await page.getByTestId('store-open').click();
+  await page.getByTestId('store').waitFor({ timeout: 5000 });
+  ok(await visible(page, 'store-test'), 'тестовый магазин подписан');
+  ok(await visible(page, 'product-no_ads'), 'на витрине «Без рекламы»');
+  ok(!(await visible(page, 'product-pro_month')), '«Про» не продаётся, пока нет разбора');
+  await page.getByTestId('buy-no_ads').click();
+  await page.getByTestId('owned-no_ads').waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await visible(page, 'owned-no_ads'), '«Без рекламы» куплена');
+  await page.screenshot({ path: `${OUT}/06-store.png` });
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.getByTestId('store-open').click();
+  await page.getByTestId('store').waitFor({ timeout: 5000 });
+  await page.getByTestId('store-restore').click();
+  await page.getByTestId('owned-no_ads').waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await visible(page, 'owned-no_ads'), 'покупка пережила перезагрузку и «Восстановить покупки»');
+  await page.getByTestId('store-back').click();
+  await page.getByTestId('settings-open').click();
+  ok(await visible(page, 'personal-ads-on'), 'настройка «Персональная реклама» на месте');
+  await page.getByTestId('settings-back').click();
 
   console.log('«Мастер» и подсказка');
   await page.getByTestId('variant-podkidnoy').click();

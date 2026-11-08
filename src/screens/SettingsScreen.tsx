@@ -1,6 +1,6 @@
 // Настройки (docs/09-game-design.md, «Настройки»): звук, вибрация, «Меньше движения» (как в системе,
 // пока игрок не выбрал сам — ADR устава 0023, правило 6), скорость ботов, порядок руки,
-// четырёхцветная колода, вышедшие карты. Онлайн и ник — с этапа Г.
+// четырёхцветная колода, вышедшие карты, персональная реклама (этап Е, как в «Нардах»).
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
 import { C, RADIUS } from '../ui/theme';
 import { setSettings, useSettings } from '../state/store';
+import { setPersonalAds } from '../money';
 
 type Motion = 'system' | 'on' | 'off';
 
@@ -53,6 +54,10 @@ export function SettingsScreen({ onBack, onReport }: { onBack: () => void; onRep
         </Row>
         <Row title={T.settings.seenCards} note={T.settings.seenCardsNote}>
           <Chips id="seencards" items={['on', 'off'] as const} value={onOff(s.seenCards)} label={v => (v === 'on' ? T.settings.on : T.settings.off)} onChange={v => setSettings({ seenCards: v === 'on' })} />
+        </Row>
+        <Row title={T.settings.personalAds} note={T.settings.personalAdsNote}>
+          <Chips id="personal-ads" items={['on', 'off'] as const} value={onOff(s.personalAds)} label={v => (v === 'on' ? T.settings.on : T.settings.off)}
+            onChange={v => { setSettings({ personalAds: v === 'on' }); setPersonalAds(v === 'on'); }} />
         </Row>
       </View>
       <Button label={T.settings.report} kind="ghost" onPress={onReport} testID="report" />

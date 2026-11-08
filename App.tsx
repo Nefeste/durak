@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MenuScreen } from './src/screens/MenuScreen';
 import type { Choice } from './src/screens/MenuScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { StoreScreen } from './src/screens/StoreScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
 import { GameScreen } from './src/game/GameScreen';
 import { OnlineGameScreen } from './src/game/OnlineGameScreen';
@@ -18,12 +19,13 @@ import { inviteCode } from './src/state/invite';
 import { C } from './src/ui/theme';
 import { installCrashHandlers } from './src/state/crashlog';
 import { loadSettings } from './src/state/store';
+import { startMoney } from './src/money';
 import { loadGame } from './src/state/save';
 import type { SavedGame } from './src/state/save';
 
 installCrashHandlers();
 
-type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online';
+type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('menu');
@@ -33,7 +35,8 @@ export default function App() {
   const [game, setGame] = useState(0);
   const [invite, setInvite] = useState<string | null>(null);
   const [online, setOnline] = useState<OnlineTable | null>(null);
-  useEffect(() => { loadSettings(); }, []);
+  // деньги — после настроек: SDK рекламы стартует с выбором «Персональная реклама»
+  useEffect(() => { void loadSettings().then(() => startMoney()); }, []);
   // сохранённая партия — при каждом возврате в меню: «Продолжить партию»
   useEffect(() => {
     if (route !== 'menu') return;
@@ -81,11 +84,13 @@ export default function App() {
         {route === 'menu' ? (
           <MenuScreen choice={choice} onChange={setChoice} onPlay={() => play(null)}
             onResume={saved ? () => play(saved) : null} onSettings={() => setRoute('settings')}
-            onFriends={() => setRoute('friends')} onQuick={() => setRoute('quick')} />
+            onFriends={() => setRoute('friends')} onQuick={() => setRoute('quick')} onStore={() => setRoute('store')} />
         ) : route === 'friends' || route === 'quick' ? (
           <OnlineScreen mode={route === 'quick' ? 'quick' : 'friends'} invite={invite} onBack={() => setRoute('menu')} onTable={seat} />
         ) : route === 'online' && online ? (
           <OnlineGameScreen table={online} onExit={() => { setOnline(null); setRoute('menu'); }} />
+        ) : route === 'store' ? (
+          <StoreScreen onBack={() => setRoute('menu')} />
         ) : route === 'settings' ? (
           <SettingsScreen onBack={() => setRoute('menu')} onReport={() => setRoute('report')} />
         ) : route === 'report' ? (

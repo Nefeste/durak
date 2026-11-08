@@ -1,6 +1,6 @@
 {
   "name": "durak",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "main": "index",
   "private": true,
   "description": "Дурак подкидной и переводной для RuStore",
@@ -37,7 +37,8 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "yandex-mobile-ads": "8.6.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

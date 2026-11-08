@@ -2,13 +2,13 @@
   "expo": {
     "name": "Kozyr",
     "slug": "durak",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B1A1E",
     "android": {
       "package": "games.gornitsa.durak",
-      "versionCode": 4,
+      "versionCode": 5,
       "allowBackup": false,
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
@@ -52,6 +52,13 @@
     "plugins": [
       "./plugins/with-release-signing",
       "./plugins/with-small-apk",
+      [
+        "@gornitsa/kit/rustore-pay/plugin",
+        {
+          "scheme": "gornitsadurakpay",
+          "otherStore": "maven"
+        }
+      ],
       [
         "expo-audio",
         {
