@@ -177,8 +177,18 @@ async function until(p: Page, re: RegExp, steps = 80): Promise<boolean> {
 }
 async function toEnd(p: Page): Promise<boolean> {
   const t0 = Date.now();
-  for (let i = 0; i < 700 && Date.now() - t0 < 240_000 && !(await visible(p, 'result')); i++) await stepOnce(p);
+  for (let i = 0; i < 3000 && Date.now() - t0 < 600_000 && !(await visible(p, 'result')); i++) await stepOnce(p);
   return visible(p, 'result');
+}
+/** Из партии в меню: «В меню» итога или верхней полосы — что есть (итог мог выйти, пока ждали). */
+async function leaveTable(p: Page) {
+  for (let i = 0; i < 40; i++) {
+    for (const id of ['result-menu', 'game-menu']) {
+      if (await visible(p, id)) { await p.getByTestId(id).click().catch(() => {}); if (await p.getByTestId('menu').isVisible().catch(() => false)) return; }
+    }
+    if (await p.getByTestId('menu').isVisible().catch(() => false)) return;
+    await p.waitForTimeout(250);
+  }
 }
 /** Строка уровня `id` — до самого длинного названия уровня («Начинающий»). */
 async function longestLevel(p: Page, id: string) {
@@ -273,9 +283,8 @@ async function offline(browser: Browser, url: string, phone: { width: number; he
   await check(p, phone, 'стол втроём, переводной');
   if (await visible(p, 'seen')) { await p.getByTestId('seen').click(); await check(p, phone, 'вышедшие карты'); await p.getByTestId('seen-close').click(); }
   if (await toEnd(p)) await check(p, phone, 'итог втроём');
-  else console.log(`  … ${phone.width} dp: переводной втроём не дошёл до итога за 4 минуты — итог втроём не проверен`);
-  if (await visible(p, 'result-menu')) await p.getByTestId('result-menu').click();
-  else await p.getByTestId('game-menu').click();
+  else console.log(`  … ${phone.width} dp: переводной втроём не дошёл до итога за 10 минут — итог втроём не проверен`);
+  await leaveTable(p);
   await p.getByTestId('menu').waitFor({ timeout: 5000 });
 
   await p.getByTestId('store-open').click();
