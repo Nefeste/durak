@@ -60,19 +60,26 @@ async function until(p: Page, re: RegExp, steps = 80): Promise<boolean> {
 /** Середина партии: на столе не меньше двух пар, в руке не меньше пяти карт — снимок после того, как карты
  *  долетели. С закреплённой колодой момент один и тот же в каждой сборке. */
 async function midGame(p: Page, name: string) {
-  for (let i = 0; i < 60 && !(await visible(p, 'result')); i++) {
+  for (let i = 0; i < 100 && !(await visible(p, 'result')); i++) {
     const pairs = await p.getByTestId('table').locator('[data-testid^="table-"]').count();
-    if (pairs >= 2 && await hand(p).count() >= 5) { await shot(p, name, 900); return; }
+    // пары считаются по картам атаки; покрытая есть, когда подсказка — про подкидывание или «бито», а не про отбой
+    const covered = /Подкиньте|Подкидывать|«Пас»|Бито/.test(await p.getByTestId('hint').innerText().catch(() => ''));
+    if (pairs >= 2 && covered && await hand(p).count() >= 5) { await shot(p, name, 900); return; }
     await step(p);
     await p.waitForTimeout(120);
   }
 }
 
-/** До итога. */
+/** До итога. Стол не меняется 40 шагов подряд — снимок `stall` для разбора и выход, а не минуты ожидания. */
 async function toEnd(p: Page) {
+  let was = '', still = 0;
   for (let i = 0; i < 600 && !(await visible(p, 'result')); i++) {
     await step(p);
     await p.waitForTimeout(100);
+    const now = `${await hand(p).count()}:${await p.getByTestId('table').locator('[data-testid^="table-"]').count()}:${await p.getByTestId('hint').innerText().catch(() => '')}`;
+    still = now === was ? still + 1 : 0;
+    was = now;
+    if (still >= 40) { await shot(p, 'stall', 100); console.log(`  стол замер: ${now}`); return; }
   }
 }
 

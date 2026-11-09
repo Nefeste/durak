@@ -8,7 +8,7 @@ import { StyleSheet, View } from 'react-native';
 import type { GestureResponderEvent } from 'react-native';
 import { Canvas, Group, Picture } from '@shopify/react-native-skia';
 import type { SkFont } from '@shopify/react-native-skia';
-import { Easing, useDerivedValue, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import { Easing, useDerivedValue, useSharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 import type { Card } from '../engine';
 import { nameOf } from '../engine';
@@ -22,23 +22,37 @@ import type { Layout, Sprite } from './layout';
 export const FLIGHT = 180;
 /** Вся раздача, мс. */
 export const DEAL = 1200;
+/** Посадка карты после полёта: на миг чуть крупнее и садится, мс (docs/09-game-design.md, «Темп»). */
+export const SETTLE = 120;
+const SETTLE_SCALE = 1.05;
 
-function CardSprite({ s, faces, delay, less, dragX, dragY, dragged }: {
-  s: Sprite; faces: Faces; delay: number; less: boolean;
+function CardSprite({ s, faces, delay, less, dragX, dragY, dragged, ch }: {
+  s: Sprite; faces: Faces; delay: number; less: boolean; ch: number;
   dragX: SharedValue<number>; dragY: SharedValue<number>; dragged: boolean;
 }) {
   // карта появилась — она прилетает из `from`; с «Меньше движения» сразу стоит на месте
   const start = less ? s : s.from;
   const x = useSharedValue(start.x), y = useSharedValue(start.y);
   const rot = useSharedValue(less ? s.rot : 0), sc = useSharedValue(s.scale);
+  // откуда карта летит на этот раз: настоящий полёт (дальше высоты карты) кончается посадкой — на миг чуть крупнее
+  // и садится; сдвиг веера на соседнее место — без неё («Темп», docs/09-game-design.md)
+  const last = useRef({ x: start.x, y: start.y });
   useEffect(() => {
+    const flight = Math.hypot(s.x - last.current.x, s.y - last.current.y) > ch;
+    last.current = { x: s.x, y: s.y };
     const go = (v: SharedValue<number>, to: number) => {
       if (less) { v.set(to); return; }
       const t = withTiming(to, { duration: FLIGHT, easing: Easing.out(Easing.cubic) });
       v.set(delay > 0 ? withDelay(delay, t) : t);
     };
-    go(x, s.x); go(y, s.y); go(rot, s.rot); go(sc, s.scale);
-  }, [s.x, s.y, s.rot, s.scale, less, delay, x, y, rot, sc]);
+    go(x, s.x); go(y, s.y); go(rot, s.rot);
+    if (less || !flight) { go(sc, s.scale); return; }
+    const land = withSequence(
+      withTiming(s.scale * SETTLE_SCALE, { duration: FLIGHT, easing: Easing.out(Easing.cubic) }),
+      withTiming(s.scale, { duration: SETTLE, easing: Easing.out(Easing.cubic) }),
+    );
+    sc.set(delay > 0 ? withDelay(delay, land) : land);
+  }, [s.x, s.y, s.rot, s.scale, less, delay, x, y, rot, sc, ch]);
   const transform = useDerivedValue(() => [
     { translateX: x.get() + (dragged ? dragX.get() : 0) },
     { translateY: y.get() + (dragged ? dragY.get() : 0) },
@@ -147,7 +161,7 @@ export function TableCanvas({ layout, font, small, fourColor, less, hand, table,
       <Canvas style={StyleSheet.absoluteFill}>
         <Picture picture={felt} />
         {ordered.map(s => (
-          <CardSprite key={s.key} s={s} faces={faces} delay={dealing ? Math.round(s.z * step) : 0} less={less}
+          <CardSprite key={s.key} s={s} faces={faces} delay={dealing ? Math.round(s.z * step) : 0} less={less} ch={ch}
             dragX={dragX} dragY={dragY} dragged={dragCard !== null && s.key === `c${dragCard}`} />
         ))}
       </Canvas>

@@ -35,6 +35,7 @@ import { useHold } from './useHold';
 import { SeenCards } from './SeenCards';
 import { SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
+import { resultPlaces } from './outcome';
 import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
@@ -273,12 +274,10 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     : canPass ? (allCovered && autoPass(state, YOU) ? T.game.hintAutoDone : T.game.hintThrow) : T.game.hintWait;
 
   const name = (seat: number) => T.level[lvlAt(seat)];
-  const who = (seat: number) => (seat === YOU ? T.result.you : `${T.game.bot(seat)} · ${name(seat)}`);
   const resultText = (r: Result) => r.draw || r.fool === null ? T.result.draw
     : r.fool === YOU ? T.result.lose
     : seats === 2 ? T.result.win : r.order[0] === YOU ? T.result.first : T.result.win;
-  /** Втроём и вчетвером: кто вышел по порядку и кто остался с картами (specs/2026-11-art-premium.md §3). */
-  const orderText = (r: Result) => (seats > 2 && !r.draw && r.fool !== null ? T.result.order(r.order.map(who).join(', '), who(r.fool)) : null);
+
   const plate = plateOf(size?.width ?? 412, bots);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -359,7 +358,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
       {state.phase === 'end' && state.result && !holding ? (
-        <ResultSheet bottom={insets.bottom} title={resultText(state.result)} subtitle={orderText(state.result)}
+        <ResultSheet bottom={insets.bottom} title={resultText(state.result)} places={resultPlaces(state.result, seat => (seat === YOU ? { name: T.result.you } : { name: T.game.bot(seat), sub: name(seat) }), YOU)}
           lines={<Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>}
           main={<Button label={T.result.again} onPress={again} testID="again" />}
           rest={[
