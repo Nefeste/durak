@@ -4,7 +4,7 @@
 // правило 6). Касания — один обработчик на весь стол: касание карты руки, перетаскивание на
 // стол или на карту атаки. Поверх — прозрачные «кнопки» карт для чтения с экрана и сценария.
 import React, { useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import type { GestureResponderEvent } from 'react-native';
 import { Canvas, Group, Picture } from '@shopify/react-native-skia';
 import type { SkFont } from '@shopify/react-native-skia';
@@ -16,6 +16,8 @@ import { makeFaces } from './faces';
 import { makeFelt } from './felt';
 import type { Faces } from './faces';
 import { handCardAt, inTable, tableCardAt } from './layout';
+import { dragPoint, dragStart } from './drag';
+import type { DragStart } from './drag';
 import type { Layout, Sprite } from './layout';
 
 /** Полёт карты, мс (docs/09-game-design.md, «Темп»). */
@@ -25,10 +27,24 @@ export const DEAL = 1200;
 /** Посадка карты после полёта: на миг чуть крупнее и садится, мс (docs/09-game-design.md, «Темп»). */
 export const SETTLE = 120;
 const SETTLE_SCALE = 1.05;
+/** Онлайн: брошенная на стол карта ждёт ответа сервера там, где её отпустили, мс (docs/09-game-design.md, «Управление»). */
+export const PENDING = 1500;
 
-function CardSprite({ s, faces, delay, less, dragX, dragY, dragged, ch }: {
+/** Сценарий в браузере (tools/e2e/browser.ts): где карта нарисована на самом деле, кадр за кадром. Только веб и только
+ *  когда сценарий сам положил `__cardAt` до загрузки страницы; на телефоне — `null`. */
+const PROBE: ((key: string, x: number, y: number) => void) | null =
+  Platform.OS === 'web' ? (globalThis as { __cardAt?: (key: string, x: number, y: number) => void }).__cardAt ?? null : null;
+
+/** Где карта сейчас: общие значения спрайта — стол переносит в них точку, где отпустили перетаскивание. */
+interface Place { x: SharedValue<number>; y: SharedValue<number>; last: { current: { x: number; y: number } } }
+
+function CardSprite({ s, faces, delay, less, dragX, dragY, dragged, ch, places, homing }: {
   s: Sprite; faces: Faces; delay: number; less: boolean; ch: number;
   dragX: SharedValue<number>; dragY: SharedValue<number>; dragged: boolean;
+  /** Общие значения всех спрайтов по ключу — для точки, где отпустили перетаскивание. */
+  places: Map<string, Place>;
+  /** Растёт, когда эту карту отпустили: она идёт на своё место (новое или прежнее) от пальца. */
+  homing: number;
 }) {
   // карта появилась — она прилетает из `from`; с «Меньше движения» сразу стоит на месте
   const start = less ? s : s.from;
@@ -37,6 +53,10 @@ function CardSprite({ s, faces, delay, less, dragX, dragY, dragged, ch }: {
   // откуда карта летит на этот раз: настоящий полёт (дальше высоты карты) кончается посадкой — на миг чуть крупнее
   // и садится; сдвиг веера на соседнее место — без неё («Темп», docs/09-game-design.md)
   const last = useRef({ x: start.x, y: start.y });
+  useEffect(() => {
+    places.set(s.key, { x, y, last });
+    return () => { places.delete(s.key); };
+  }, [places, s.key, x, y]);
   useEffect(() => {
     const flight = Math.hypot(s.x - last.current.x, s.y - last.current.y) > ch;
     last.current = { x: s.x, y: s.y };
@@ -52,13 +72,13 @@ function CardSprite({ s, faces, delay, less, dragX, dragY, dragged, ch }: {
       withTiming(s.scale, { duration: SETTLE, easing: Easing.out(Easing.cubic) }),
     );
     sc.set(delay > 0 ? withDelay(delay, land) : land);
-  }, [s.x, s.y, s.rot, s.scale, less, delay, x, y, rot, sc, ch]);
-  const transform = useDerivedValue(() => [
-    { translateX: x.get() + (dragged ? dragX.get() : 0) },
-    { translateY: y.get() + (dragged ? dragY.get() : 0) },
-    { rotate: (rot.get() * Math.PI) / 180 },
-    { scale: sc.get() },
-  ]);
+  }, [s.x, s.y, s.rot, s.scale, less, delay, x, y, rot, sc, ch, homing]);
+  const key = s.key;
+  const transform = useDerivedValue(() => {
+    const tx = x.get() + (dragged ? dragX.get() : 0), ty = y.get() + (dragged ? dragY.get() : 0);
+    if (PROBE) PROBE(key, tx, ty);
+    return [{ translateX: tx }, { translateY: ty }, { rotate: (rot.get() * Math.PI) / 180 }, { scale: sc.get() }];
+  });
   return (
     <Group transform={transform}>
       <Picture picture={s.card === null ? faces.back : faces.face(s.card)} />
@@ -88,8 +108,9 @@ export interface TableTouch {
   onCard: (c: Card) => void;
   /** Касание карты атаки на столе. */
   onTableCard: (c: Card) => void;
-  /** Карта руки брошена на стол: на карту атаки `on` или просто на стол. */
-  onDrop: (c: Card, on: Card | null) => void;
+  /** Карта руки брошена на стол: на карту атаки `on` или просто на стол. `true` — ход сделан или отправлен: карта
+   *  ждёт на месте, где её отпустили, пока раскладка не поставит её на стол (онлайн — до `PENDING`). */
+  onDrop: (c: Card, on: Card | null) => boolean;
 }
 
 export function TableCanvas({ layout, font, small, fourColor, less, hand, table, enabled, touch }: {
@@ -112,23 +133,30 @@ export function TableCanvas({ layout, font, small, fourColor, less, hand, table,
   const step = DEAL / Math.max(1, total);
 
   const dragX = useSharedValue(0), dragY = useSharedValue(0);
-  const drag = useRef<{ card: Card; x0: number; y0: number; moved: boolean } | null>(null);
+  // палец ведёт карту по экранным координатам (pageX/pageY): на Android координаты «внутри вида» в движении считаются
+  // от того вида, что сейчас под пальцем, — над кнопкой или плашкой карта прыгала к ним и двоилась (игра владельца
+  // 09.11.2026). Точка на столе — точка касания плюс сдвиг пальца (`dragPoint`)
+  const drag = useRef<(DragStart & { card: Card; moved: boolean }) | null>(null);
   const [dragCard, setDragCard] = React.useState<Card | null>(null);
-  const pos = (e: GestureResponderEvent) => ({ x: e.nativeEvent.locationX, y: e.nativeEvent.locationY });
+  const [places] = React.useState(() => new Map<string, Place>());
+  // отпущенная карта идёт на своё место от пальца; онлайн, пока сервер не ответил, — ждёт там же
+  const [home, setHome] = React.useState<{ key: string; n: number } | null>(null);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (pending.current) clearTimeout(pending.current); }, []);
+  const goHome = (key: string) => setHome(h => ({ key, n: (h?.n ?? 0) + 1 }));
   const onGrant = (e: GestureResponderEvent) => {
-    const p = pos(e);
-    const c = handCardAt(layout, p.x, p.y, hand);
-    drag.current = c === null ? null : { card: c, x0: p.x, y0: p.y, moved: false };
+    const ne = e.nativeEvent;
+    const c = handCardAt(layout, ne.locationX, ne.locationY, hand);
+    drag.current = c === null ? null : { card: c, ...dragStart(ne), moved: false };
     if (c === null) {
-      const t = tableCardAt(layout, p.x, p.y, table);
+      const t = tableCardAt(layout, ne.locationX, ne.locationY, table);
       if (t !== null) touch.onTableCard(t);
     }
   };
   const onMove = (e: GestureResponderEvent) => {
     const d = drag.current;
     if (!d) return;
-    const p = pos(e);
-    const dx = p.x - d.x0, dy = p.y - d.y0;
+    const { dx, dy } = dragPoint(d, e.nativeEvent);
     if (!d.moved && Math.hypot(dx, dy) > 10) { d.moved = true; setDragCard(d.card); }
     if (d.moved) { dragX.set(dx); dragY.set(dy); }
   };
@@ -137,9 +165,19 @@ export function TableCanvas({ layout, font, small, fourColor, less, hand, table,
     drag.current = null;
     if (!d) return;
     if (!d.moved) { touch.onCard(d.card); return; }
-    const p = pos(e);
+    const p = dragPoint(d, e.nativeEvent);
+    // карта остаётся там, где её отпустили: сдвиг пальца переходит в её место, второго полёта из руки нет
+    const key = `c${d.card}`;
+    const at = places.get(key);
+    if (at) {
+      const x = at.x.get() + p.dx, y = at.y.get() + p.dy;
+      at.x.set(x); at.y.set(y); at.last.current = { x, y };
+    }
     dragX.set(0); dragY.set(0); setDragCard(null);
-    if (inTable(layout, p.x, p.y)) touch.onDrop(d.card, tableCardAt(layout, p.x, p.y, table));
+    const sent = inTable(layout, p.x, p.y) && touch.onDrop(d.card, tableCardAt(layout, p.x, p.y, table));
+    if (pending.current) clearTimeout(pending.current);
+    if (sent) pending.current = setTimeout(() => goHome(key), PENDING);
+    else goHome(key);
   };
 
   const ordered = useMemo(() => {
@@ -156,13 +194,25 @@ export function TableCanvas({ layout, font, small, fourColor, less, hand, table,
       onStartShouldSetResponder={() => enabled}
       onMoveShouldSetResponder={() => enabled}
       onResponderGrant={onGrant} onResponderMove={onMove} onResponderRelease={onRelease}
-      onResponderTerminate={() => { drag.current = null; dragX.set(0); dragY.set(0); setDragCard(null); }}
+      onResponderTerminate={() => {
+        const d = drag.current;
+        drag.current = null;
+        if (!d?.moved) return;
+        // жест перехватили — карта возвращается в руку от пальца
+        const at = places.get(`c${d.card}`);
+        if (at) {
+          const x = at.x.get() + dragX.get(), y = at.y.get() + dragY.get();
+          at.x.set(x); at.y.set(y); at.last.current = { x, y };
+        }
+        dragX.set(0); dragY.set(0); setDragCard(null); goHome(`c${d.card}`);
+      }}
       testID="felt">
       <Canvas style={StyleSheet.absoluteFill}>
         <Picture picture={felt} />
         {ordered.map(s => (
           <CardSprite key={s.key} s={s} faces={faces} delay={dealing ? Math.round(s.z * step) : 0} less={less} ch={ch}
-            dragX={dragX} dragY={dragY} dragged={dragCard !== null && s.key === `c${dragCard}`} />
+            dragX={dragX} dragY={dragY} dragged={dragCard !== null && s.key === `c${dragCard}`}
+            places={places} homing={home?.key === s.key ? home.n : 0} />
         ))}
       </Canvas>
       {/* карты для чтения с экрана и для сценария: касание идёт в обработчик стола; у карты руки —
