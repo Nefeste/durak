@@ -2,25 +2,30 @@
 // Каждая колода играется дважды, места меняются. Итог — доля партий, где первый уровень не остался
 // с картами (ничья — половина), и 95-процентный интервал.
 //   bun tools/sim/arena.ts 1000 average novice [podkidnoy|perevodnoy] [зерно]
+//   bun tools/sim/arena.ts 200 net:tools/gpu/nets/<дата>/best.bin master   — бот на сети (tools/sim/players.ts)
 import { firstOf, dealOf, isThrowOrder, observe, rulesWith } from '../../src/engine';
 import type { RuleSet, Variant } from '../../src/engine';
-import { chooseAction, isLevel, makeRng } from '../../src/bot';
-import type { Level } from '../../src/bot';
+import { makeRng } from '../../src/bot';
 import { playGame, shuffled } from './play';
+import { playerOf } from './players';
 
-export interface ArenaResult { a: Level; b: Level; games: number; score: number; share: number; low: number; high: number; loops: number }
+/** Игрок — уровень (`master`) или сеть (`net:<файл.bin>`, `players.ts`). */
+type Spec = string;
+
+export interface ArenaResult { a: Spec; b: Spec; games: number; score: number; share: number; low: number; high: number; loops: number }
 
 /** Партия до конца; `null` — не кончилась за 5 000 действий (круг), считается ничьей. */
-function tryPlay(deck: number[], seats: number, first: number, variant: Variant, levels: Level[], rng: ReturnType<typeof makeRng>, rules?: RuleSet) {
+function tryPlay(deck: number[], seats: number, first: number, variant: Variant, levels: Spec[], rng: ReturnType<typeof makeRng>, rules?: RuleSet) {
+  const players = levels.map(playerOf);
   try {
-    return playGame(deck, seats, first, variant, (s, seat) => chooseAction(observe(s, seat), levels[seat], rng), rules).final;
+    return playGame(deck, seats, first, variant, (s, seat) => players[seat](observe(s, seat), rng), rules).final;
   } catch (e) {
     if (e instanceof Error && e.message === 'партия не кончилась') return null;
     throw e;
   }
 }
 
-export function arena(pairs: number, a: Level, b: Level, variant: Variant, seed = 1): ArenaResult {
+export function arena(pairs: number, a: Spec, b: Spec, variant: Variant, seed = 1): ArenaResult {
   const deckRng = makeRng(seed);
   const botRng = makeRng(seed ^ 0x9e3779b9);
   let score = 0, games = 0, loops = 0;
@@ -29,7 +34,7 @@ export function arena(pairs: number, a: Level, b: Level, variant: Variant, seed 
     const { hands, trump } = dealOf(deck, 2);
     const first = firstOf(hands, trump).seat;
     for (const aSeat of [0, 1]) {
-      const levels: Level[] = aSeat === 0 ? [a, b] : [b, a];
+      const levels: Spec[] = aSeat === 0 ? [a, b] : [b, a];
       const played = tryPlay(deck, 2, first, variant, levels, botRng);
       if (!played) { loops++; score += 0.5; games++; continue; }
       const r = played.result!;
@@ -45,13 +50,11 @@ export function arena(pairs: number, a: Level, b: Level, variant: Variant, seed 
 if (import.meta.main && process.argv[2] === 'table') {
   // bun tools/sim/arena.ts table 100 master average 3 podkidnoy [зерно] [queue|free]
   const [, n = '100', a = 'master', b = 'average', seats = '3', variant = 'podkidnoy', seed = '1', order = 'free'] = process.argv.slice(2);
-  if (!isLevel(a) || !isLevel(b)) throw new Error('уровни: novice beginner amateur average experienced master');
   if (!isThrowOrder(order)) throw new Error('подкидывать: queue или free');
   const r = tableShare(Number(n), a, b, Number(seats), variant as Variant, Number(seed), order);
   console.log(`${a} за столом на ${seats} против ${b}, ${variant}, ${order}: ${r.games} партий, без карт ${(r.share * 100).toFixed(1)} % (как все — ${(r.base * 100).toFixed(1)} %), отпечаток ${r.print}`);
 } else if (import.meta.main) {
   const [n = '500', a = 'average', b = 'novice', variant = 'podkidnoy', seed = '1'] = process.argv.slice(2);
-  if (!isLevel(a) || !isLevel(b)) throw new Error('уровни: novice beginner amateur average experienced master');
   const r = arena(Number(n), a, b, variant as Variant, Number(seed));
   const pct = (x: number) => (x * 100).toFixed(1) + ' %';
   console.log(`${a} против ${b}, ${variant}: ${r.games} партий, ${pct(r.share)} [${pct(r.low)} … ${pct(r.high)}]${r.loops ? `, не кончились (круг): ${r.loops}` : ''}`);
@@ -60,7 +63,7 @@ if (import.meta.main && process.argv[2] === 'table') {
 /** За столом на 3–4 места: уровень `a` на одном месте, остальные — `b`; место `a` меняется по кругу
  *  на каждой колоде. Итог — доля партий, где `a` не остался с картами (если играет как все —
  *  около (места − 1) / места). */
-export function tableShare(deals: number, a: Level, b: Level, seats: number, variant: Variant, seed = 1, order: 'queue' | 'free' = 'free'): { games: number; share: number; base: number; print: string } {
+export function tableShare(deals: number, a: Spec, b: Spec, seats: number, variant: Variant, seed = 1, order: 'queue' | 'free' = 'free'): { games: number; share: number; base: number; print: string } {
   const rules = rulesWith(order);
   // отпечаток всех партий — по нему видно, одинаково ли сыграли боты при двух сводах
   let h = 0;

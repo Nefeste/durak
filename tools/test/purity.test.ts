@@ -52,7 +52,9 @@ describe('чистота', () => {
       const { imports, uses } = scan(f);
       for (const i of imports) {
         const inside = i.startsWith('./') || (i.startsWith('../') && join(f, '..', i).startsWith(join(ROOT, 'src/bot')));
-        if (!inside && i !== '../engine') bad.push(`${rel(f)}: импорт ${i}`);
+        // движок — из любой папки бота (`src/bot/net/` берёт его как `../../engine`)
+        const engine = i.startsWith('.') && join(f, '..', i) === join(ROOT, 'src/engine');
+        if (!inside && !engine) bad.push(`${rel(f)}: импорт ${i}`);
       }
       for (const u of uses) bad.push(`${rel(f)}:${u.line}: ${u.what}`);
       // колода и её построение — не для бота (ADR 0005): ни имён, ни вызовов
