@@ -189,6 +189,7 @@ try {
       await shot(page, '13-hint');
     }
     await page.getByTestId('game-menu').click();
+    await page.getByTestId('game-exit').click();
     await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
     await page.getByTestId('friends-open').click().catch(() => {});

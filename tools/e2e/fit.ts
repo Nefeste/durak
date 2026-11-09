@@ -200,7 +200,7 @@ async function toEnd(p: Page): Promise<boolean> {
 /** Из партии в меню: «В меню» итога или верхней полосы — что есть (итог мог выйти, пока ждали). */
 async function leaveTable(p: Page) {
   for (let i = 0; i < 40; i++) {
-    for (const id of ['result-menu', 'game-menu']) {
+    for (const id of ['result-menu', 'game-menu', 'game-exit']) {
       if (await visible(p, id)) { await p.getByTestId(id).click().catch(() => {}); if (await p.getByTestId('menu').isVisible().catch(() => false)) return; }
     }
     if (await p.getByTestId('menu').isVisible().catch(() => false)) return;
@@ -272,6 +272,8 @@ async function offline(browser: Browser, url: string, phone: { width: number; he
   await check(p, phone, 'стол вчетвером, ход');
   if (await visible(p, 'advise')) { await p.getByTestId('advise').click(); await p.waitForTimeout(1500); await check(p, phone, 'стол вчетвером, подсказка'); }
   await p.getByTestId('game-menu').click();
+  await check(p, phone, 'окно «В меню» партии');
+  await p.getByTestId('game-exit').click();
   await p.getByTestId('menu').waitFor({ timeout: 5000 });
 
   // настройки: «Помощь памяти» — для «Вышедших»; отчёт; потом переводной втроём с окном «Что такое перевод»

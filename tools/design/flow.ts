@@ -157,6 +157,7 @@ try {
     await shot(page, '18-hint');
   }
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   await page.getByTestId('puzzle-open').click().catch(() => {});

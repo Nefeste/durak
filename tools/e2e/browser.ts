@@ -318,6 +318,7 @@ try {
   await page.waitForTimeout(300);
   const handBefore = await handCount(page);
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
   await page.waitForTimeout(300);
   ok(await visible(page, 'resume'), 'в меню — «Продолжить партию»');
@@ -331,6 +332,7 @@ try {
   ok(await handCount(page) === handBefore, `партия продолжилась с той же рукой: ${handBefore}`, await handCount(page));
   // отмена: боты с обычной паузой (0,5–0,9 с) — успеваем отменить свой ход до их ответа
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.goto(web.url);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   await page.waitForTimeout(400);
@@ -439,6 +441,7 @@ try {
   await page.waitForTimeout(800);
   ok(!(await visible(page, 'transfer-ok')), 'второй переводной стол — без окна о переводе');
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   // в браузере реклама — подделка (src/money/adsSdk.web.ts): после двух коротких первых партий её нет
@@ -611,7 +614,8 @@ try {
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
   await page.waitForTimeout(400);
-  ok(await visible(page, 'resign'), 'в полосе партии — «Сдаться»');
+  await page.getByTestId('game-menu').click();
+  ok(await visible(page, 'resign') && await visible(page, 'game-exit'), '«В меню» — окно партии: «В меню» и «Сдаться»');
   await page.getByTestId('resign').click();
   ok(await visible(page, 'resign-ok'), '«Сдаться» спрашивает своим окном');
   const asked = await handCount(page);
@@ -620,6 +624,7 @@ try {
   await page.screenshot({ path: `${OUT}/11-resign-ask.png` });
   await page.getByTestId('dialog-cancel').click();
   ok(!(await visible(page, 'resign-ok')) && !(await visible(page, 'result')), '«Играть дальше» — партия идёт');
+  await page.getByTestId('game-menu').click();
   await page.getByTestId('resign').click();
   await page.getByTestId('resign-ok').click();
   await page.getByTestId('result').waitFor({ timeout: 10000 }).catch(() => {});

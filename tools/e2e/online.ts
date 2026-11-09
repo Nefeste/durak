@@ -247,9 +247,16 @@ async function main() {
   await a.waitForTimeout(1500);
   ok(await hand(a).count() === 6, 'пара найдена, партия один на один началась');
   await a.screenshot({ path: `${OUT}/online-04-quick.png` });
+  // «Сдаться» вдвоём (п. 8): окно подтверждения, партия кончена — у Саши победа, «Колода проверена» и «Реванш»
   await a.getByTestId('online-exit').click();
+  ok(await visible(a, 'resign-ok'), 'быстрая игра: «Сдаться» спрашивает своим окном');
+  await a.getByTestId('resign-ok').click();
   await b.getByTestId('result').waitFor({ timeout: 10_000 });
-  ok(/Остались с картами: Миша/.test(await b.getByTestId('result').innerText()), 'сдача Миши — итог у Саши');
+  ok(/Миша сдался — остался с картами/.test(await b.getByTestId('result').innerText()), 'сдача Миши — итог у Саши', await b.getByTestId('result').innerText());
+  await a.getByTestId('result').waitFor({ timeout: 10_000 }).catch(() => {});
+  ok(/Вы сдались — остались с картами/.test(await a.getByTestId('result').innerText().catch(() => '')), 'у Миши — «Вы сдались»');
+  await b.waitForTimeout(800);
+  ok(/Колода проверена/.test(await b.getByTestId('deck-check').innerText().catch(() => '')) && await visible(b, 'rematch'), 'у Саши — «Колода проверена» и «Реванш»');
 
   ok(errors.length === 0, 'ошибок в консоли нет', errors.join('\n'));
   await browser.close();

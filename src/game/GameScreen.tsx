@@ -110,7 +110,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const [rulesOpen, setRulesOpen] = useState(false);
   // «Сдаться» (docs/08-rules.md, п. 8; решение владельца #58): своё окно подтверждения, не Alert; пока оно открыто, боты ждут
   const [resignAsk, setResignAsk] = useState(false);
-  const paused = told || rulesOpen || resignAsk;
+  const [menuAsk, setMenuAsk] = useState(false);
+  const paused = told || rulesOpen || resignAsk || menuAsk;
   const { width: winW, fontScale } = useWindowDimensions();
   // плашка бота: имя, уровень, число карт, роль — каждая строкой (docs/13-art.md, §3 «Надписи целиком»)
   // подсказки новичка гаснут после партии, которую начали с ними (включённые посреди партии — со следующей)
@@ -306,12 +307,12 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
       <View style={styles.top}>
-        <Button small label={T.game.menu} kind="ghost" onPress={onExit} testID="game-menu" />
+        {/* «В меню» — окно партии: выйти (партия сохранится) или «Сдаться» (п. 8, #58); после конца — сразу в меню */}
+        <Button small label={T.game.menu} kind="ghost" onPress={() => { if (state.phase === 'end') { onExit(); return; } hold.skip(); setMenuAsk(true); }} testID="game-menu" />
         {/* в полосе — только стол: уровень каждого бота — на его плашке («Переводной · Начинающий» с «Вышедшими» на 360 точках
             обрезался); название растёт с шрифтом телефона до ×1,15 — так на 360 точках рядом помещаются обе кнопки */}
         <Text style={styles.variant} maxFontSizeMultiplier={TITLE_SCALE} testID="game-title">{T.variant[variant]}</Text>
         {settings.memoryAid ? <Button small label={T.game.seen} kind="ghost" onPress={() => setShowSeen(v => !v)} testID="seen" /> : null}
-        {state.phase !== 'end' ? <Button small label={T.game.resign} kind="ghost" onPress={() => { hold.skip(); setResignAsk(true); }} testID="resign" /> : null}
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
         {layout && font && small ? (
@@ -367,6 +368,13 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
           actions: [
             { label: T.game.transferWhat.ok, testID: 'transfer-ok' },
             { label: T.game.transferWhat.rules, kind: 'ghost', testID: 'transfer-rules', onPress: () => setRulesOpen(true) },
+          ],
+        } : null} />
+        <Dialog onClose={() => setMenuAsk(false)} spec={menuAsk && state.phase !== 'end' ? {
+          title: T.game.menuAsk.title, text: T.game.menuAsk.text, cancel: T.game.resignAsk.cancel,
+          actions: [
+            { label: T.game.menu, testID: 'game-exit', onPress: () => { setMenuAsk(false); onExit(); } },
+            { label: T.game.resign, kind: 'ghost', testID: 'resign', onPress: () => { setMenuAsk(false); setResignAsk(true); } },
           ],
         } : null} />
         <Dialog onClose={() => setResignAsk(false)} spec={resignAsk && state.phase !== 'end' ? {
