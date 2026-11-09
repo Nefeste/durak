@@ -9,3 +9,5 @@ tools/e2e/out/
 public/canvaskit.wasm
 dist-web-online/
 store/video/
+.venv-gpu/
+__pycache__/

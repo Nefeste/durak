@@ -5,13 +5,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import type { Variant } from '../engine';
-import { LEVELS } from '../bot';
+import { LEVELS, LOCKED_LEVEL } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Glass } from '../ui/Glass';
 import { Header } from '../ui/Header';
 import { Chips } from '../ui/Chips';
+import { Stepper } from '../ui/Stepper';
 import { Checkbox } from '../ui/Toggle';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { isCode, nameProblem } from '../state/protocol';
@@ -53,7 +54,11 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   const [busy, setBusy] = useState(false);
   const [variant, setVariant] = useState<Variant>('podkidnoy');
   const [seats, setSeats] = useState(2);
-  const [bots, setBots] = useState<Level | 'none'>('average');
+  // кто займёт свободные места: боты какого уровня или никто (аудит 09.11.2026, находка 9 — уровень одной строкой
+  // «‹ Средний ›», как в меню и в сборе стола; «Мастер · скоро» показан, но закрыт — «Создать стол» тогда недоступна)
+  const [withBots, setWithBots] = useState(true);
+  const [botLevel, setBotLevel] = useState<Level>('average');
+  const [lockedShown, setLockedShown] = useState(false);
   const [code, setCode] = useState(invite ?? '');
   /** Стол по коду, где выбирают место. */
   const [picking, setPicking] = useState<{ code: string; info: CodeInfo } | null>(null);
@@ -94,7 +99,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   });
 
   const create = () => run(async () => {
-    const t = await net.createTable(variant, seats, bots === 'none' ? null : bots, newSeed());
+    const t = await net.createTable(variant, seats, withBots ? botLevel : null, newSeed());
     onTable(await sitByCode(t.code!));
   });
   const join = () => run(async () => {
@@ -223,8 +228,18 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         <Text style={styles.label}>{T.online.seats}</Text>
         <Chips id="f-seats" items={[2, 3, 4]} value={seats} label={T.online.seatsN} onChange={setSeats} />
         <Text style={styles.label}>{T.online.bots}</Text>
-        <Chips id="f-bots" items={['none', ...LEVELS] as (Level | 'none')[]} value={bots} label={l => (l === 'none' ? T.online.noBots : T.level[l])} onChange={setBots} />
-        <Button label={T.online.create} onPress={create} disabled={busy} testID="create" />
+        <Chips id="f-bots" items={['bots', 'none'] as const} value={withBots ? 'bots' : 'none'} label={v => (v === 'bots' ? T.online.withBots : T.online.noBots)}
+          onChange={v => { setWithBots(v === 'bots'); setLockedShown(false); }} />
+        {withBots ? (
+          <>
+            <Text style={styles.label}>{T.online.botsLevel}</Text>
+            <Stepper<string> id="f-level" items={LEVELS} value={lockedShown ? LOCKED_LEVEL : botLevel} label={l => T.level[l as Level]}
+              prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp} locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel }}
+              onChange={l => { if (l === LOCKED_LEVEL) { setLockedShown(true); return; } setLockedShown(false); setBotLevel(l as Level); }} />
+            {lockedShown ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
+          </>
+        ) : null}
+        <Button label={T.online.create} onPress={create} disabled={busy || (withBots && lockedShown)} testID="create" />
       </Glass>
       <Glass style={styles.panel}>
         <Text style={styles.label}>{T.online.joinByCode}</Text>
