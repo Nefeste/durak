@@ -62,13 +62,13 @@ async function checkReviewTable(p: Page) {
   }
 }
 mkdirSync(OUT, { recursive: true });
-/** Уровень стрелками «‹ ›» до подписи `name`. */
-async function setLevel(p: Page, name: string) {
+/** Уровень стрелками «‹ ›» до подписи `name`; `id` — строка: `level` — общая, `level-N` — бота N. */
+async function setLevel(p: Page, name: string, id = 'level') {
   const order = ['Новичок', 'Начинающий', 'Любитель', 'Средний', 'Сильный', 'Опытный', 'Мастер · скоро'];
   for (let k = 0; k < 8; k++) {
-    const now = (await p.getByTestId('level-value').innerText()).trim();
+    const now = (await p.getByTestId(`${id}-value`).innerText()).trim();
     if (now === name) return;
-    await p.getByTestId(order.indexOf(now) < order.indexOf(name) ? 'level-next' : 'level-prev').click();
+    await p.getByTestId(order.indexOf(now) < order.indexOf(name) ? `${id}-next` : `${id}-prev`).click();
   }
 }
 /** Строки подсказки новичка (T.game.newbie). */
@@ -516,6 +516,58 @@ try {
   ok(await page.getByTestId('level-next').isDisabled(), 'дальше седьмого шага стрелки нет');
   ok(await page.getByTestId('play').isDisabled(), 'на закрытом уровне «Играть» недоступна');
   await page.screenshot({ path: `${OUT}/08-level-locked.png` });
+
+  console.log('Разные уровни: два бота, у каждого свой');
+  await page.getByTestId('level-prev').click();
+  await page.getByTestId('variant-podkidnoy').click();
+  await page.getByTestId('bots-1').click();
+  ok(!(await visible(page, 'levels-mixed')), 'с одним ботом «Разных уровней» нет');
+  await page.getByTestId('bots-2').click();
+  ok(await visible(page, 'levels-mixed') && await page.getByTestId('levels-mixed').getAttribute('aria-checked') === 'false', 'с двумя ботами — «Разные уровни», выключено');
+  await setLevel(page, 'Любитель');
+  await page.getByTestId('levels-mixed').click();
+  ok(!(await visible(page, 'level-value')) && await visible(page, 'level-1-value') && await visible(page, 'level-2-value'), 'включили — строка у каждого бота вместо общей');
+  ok(await page.getByTestId('level-1-value').innerText() === 'Любитель' && await page.getByTestId('level-2-value').innerText() === 'Любитель', 'строки ботов начинаются с общего уровня');
+  await setLevel(page, 'Новичок', 'level-1');
+  await setLevel(page, 'Средний', 'level-2');
+  await setLevel(page, 'Мастер · скоро', 'level-2');
+  ok(await visible(page, 'locked-note') && await page.getByTestId('play').isDisabled(), '«Мастер · скоро» в строке бота закрыт, «Играть» недоступна');
+  await page.getByTestId('level-2-prev').click();
+  await setLevel(page, 'Средний', 'level-2');
+  await page.getByTestId('bots-3').click();
+  ok(await visible(page, 'level-3-value'), 'три бота — три строки');
+  await page.screenshot({ path: `${OUT}/10-levels-mixed.png` });
+  await page.getByTestId('bots-2').click();
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  ok(await page.getByTestId('level-1-value').innerText() === 'Новичок' && await page.getByTestId('level-2-value').innerText() === 'Средний', 'разные уровни пережили перезагрузку');
+  await page.getByTestId('play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(300);
+  const plate1 = await page.getByTestId('opp-1').innerText().catch(() => '');
+  const plate2 = await page.getByTestId('opp-2').innerText().catch(() => '');
+  ok(/Новичок/.test(plate1) && !/Средний/.test(plate1), `плашка бота 1 — «Новичок»: ${plate1.replace(/\n/g, ' ')}`);
+  ok(/Средний/.test(plate2) && !/Новичок/.test(plate2), `плашка бота 2 — «Средний»: ${plate2.replace(/\n/g, ' ')}`);
+  ok(await page.getByTestId('game-title').innerText().catch(() => '') === 'Подкидной', 'в верхней полосе — только стол, уровни — на плашках');
+  await page.screenshot({ path: `${OUT}/10-levels-table.png` });
+  const mixedGame = await playOut(page, 'разные уровни');
+  ok(mixedGame.ended, 'партия с ботами разных уровней дошла до итога');
+  await page.getByTestId('result-menu').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
+  await page.getByTestId('stats-open').click();
+  await page.getByTestId('stats').waitFor({ timeout: 5000 });
+  const statsText = await page.getByTestId('stats').innerText().catch(() => '');
+  ok(/Разные уровни: 1 партия/.test(statsText), 'статистика: стол с разными уровнями — своей строкой', statsText);
+  ok(/Новичок, Средний/.test(statsText), 'последние партии: уровни ботов по местам');
+  await page.getByTestId('stats-back').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
+  // незаконченная партия прошлой версии (один `level`) не переносится: её нет, меню без «Продолжить», ошибок нет
+  await page.evaluate(() => localStorage.setItem('durak.current', JSON.stringify({ record: { v: 1, seats: 2, actions: [] }, level: 'amateur', history: [] })));
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(500);
+  ok(!(await visible(page, 'resume')), 'партия прошлой версии стёрта молча: «Продолжить» нет');
+  ok(await page.evaluate(() => localStorage.getItem('durak.current')) === null, 'запись прошлой версии удалена из хранилища');
 
   console.log('«Опытный» и подсказка');
   await page.getByTestId('variant-podkidnoy').click();

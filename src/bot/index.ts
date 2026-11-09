@@ -54,6 +54,19 @@ export function levelOf(x: unknown): Level | null {
   return isLevel(x) ? x : null;
 }
 
+/** Уровни ботов стола по местам (место 1, 2, …) → один уровень, если он у всех, иначе `null` («разные»). */
+export function oneLevel(levels: readonly Level[]): Level | null {
+  return levels.length > 0 && levels.every(l => l === levels[0]) ? levels[0] : null;
+}
+
+/** Уровни ботов из сохранения или истории: список по местам `1 … seats − 1`, каждый читается `levelOf`;
+ *  не тот размер или чужое слово — `null`. */
+export function levelsOf(x: unknown, bots: number): Level[] | null {
+  if (!Array.isArray(x) || x.length !== bots || bots < 1) return null;
+  const out = x.map(levelOf);
+  return out.every((l): l is Level => l !== null) ? out : null;
+}
+
 /** Размышление уровня кусками (`think.ts`): для приложения — `thinkSliced`, для арены — `thinkSync`. */
 export function think(o: Observation, level: Level, rng: Rng): Thinking<Action> {
   // круг: в концовке оба могут брать карты друг друга без конца. После LOOP_BOUT отбоев бот иногда

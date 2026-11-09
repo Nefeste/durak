@@ -2,7 +2,7 @@
 // разбор и восстановление — src/state/saved.ts.
 import { KEYS, loadJson, remove, saveJson } from './storage';
 import { logError } from './crashlog';
-import { restoreGame } from './saved';
+import { isOldSave, restoreGame } from './saved';
 import type { SavedGame } from './saved';
 import type { State } from '../engine';
 
@@ -17,7 +17,7 @@ export async function loadGame(): Promise<{ saved: SavedGame; state: State } | n
   if (raw === null) return null;
   const r = restoreGame(raw);
   if (!r) {
-    logError('save', new Error('saved game did not restore'), 'loadGame');
+    if (!isOldSave(raw)) logError('save', new Error('saved game did not restore'), 'loadGame');
     await remove(KEYS.current);
   }
   return r;

@@ -5,7 +5,8 @@ import { describe, expect, test } from 'bun:test';
 import { apply } from '../../src/engine';
 import type { State } from '../../src/engine';
 import { NEWBIE_BOUTS, newbieDone, newbieTip } from '../../src/game/newbie';
-import { DEFAULT_SETTINGS, hasNewbie, parseSettings, taughtBefore } from '../../src/state/settings';
+import { botLevels, DEFAULT_SETTINGS, hasNewbie, parseSettings, taughtBefore } from '../../src/state/settings';
+import type { Level } from '../../src/bot';
 import { T } from '../../src/i18n';
 import { c, pos } from './helpers';
 
@@ -75,13 +76,29 @@ describe('настройки новичка', () => {
 
 describe('стол в меню (спецификация 1.0, §3)', () => {
   test('первый запуск — подкидной вдвоём против «Начинающего»', () => {
-    expect(DEFAULT_SETTINGS.choice).toEqual({ variant: 'podkidnoy', bots: 1, level: 'beginner' });
+    expect(DEFAULT_SETTINGS.choice).toEqual({ variant: 'podkidnoy', bots: 1, level: 'beginner', mixed: false, levels: ['beginner', 'beginner', 'beginner'] });
     expect(parseSettings(null).choice).toEqual(DEFAULT_SETTINGS.choice);
+    expect(botLevels(DEFAULT_SETTINGS.choice)).toEqual(['beginner']);
   });
   test('выбор игрока запоминается, мусор — по умолчанию по полю', () => {
-    const kept = { variant: 'perevodnoy', bots: 3, level: 'master' };
+    const kept = { variant: 'perevodnoy', bots: 3, level: 'master', mixed: true, levels: ['novice', 'average', 'master'] };
     expect(parseSettings(JSON.stringify({ choice: kept })).choice).toEqual(kept as never);
     expect(parseSettings(JSON.stringify({ choice: { variant: 'x', bots: 9, level: 'god' } })).choice).toEqual(DEFAULT_SETTINGS.choice);
     expect(parseSettings(JSON.stringify({ choice: 'oops' })).choice).toEqual(DEFAULT_SETTINGS.choice);
+  });
+  test('выбор прошлых версий — один уровень на всех: разные уровни выключены, у каждого бота тот же', () => {
+    const old = parseSettings(JSON.stringify({ choice: { variant: 'perevodnoy', bots: 3, level: 'amateur' } })).choice;
+    expect(old).toEqual({ variant: 'perevodnoy', bots: 3, level: 'amateur', mixed: false, levels: ['amateur', 'amateur', 'amateur'] });
+    expect(botLevels(old)).toEqual(['amateur', 'amateur', 'amateur']);
+    // `strong` до 0.5.0 — «Опытный»; битый уровень бота — общий уровень, битый флаг — выключен
+    const odd = parseSettings(JSON.stringify({ choice: { bots: 2, level: 'strong', mixed: 'yes', levels: ['novice', 'god'] } })).choice;
+    expect(odd).toMatchObject({ level: 'master', mixed: false, levels: ['novice', 'master', 'master'] });
+  });
+  test('разные уровни: бот N играет свой; один бот — всегда общий уровень', () => {
+    const c = { ...DEFAULT_SETTINGS.choice, bots: 2, mixed: true, levels: ['novice', 'average', 'master'] as Level[] };
+    expect(botLevels(c)).toEqual(['novice', 'average']);
+    expect(botLevels({ ...c, bots: 3 })).toEqual(['novice', 'average', 'master']);
+    expect(botLevels({ ...c, bots: 1 })).toEqual(['beginner']);
+    expect(botLevels({ ...c, mixed: false })).toEqual(['beginner', 'beginner']);
   });
 });

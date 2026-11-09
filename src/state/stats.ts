@@ -2,6 +2,7 @@
 // итог в целом; подробно («Про») — по столам, числу игроков и уровням, козыри и рейтинг тренировок.
 import { apply, newGame, suitOf } from '../engine';
 import type { Card, GameRecord, Variant } from '../engine';
+import { oneLevel } from '../bot';
 import type { Level } from '../bot';
 import type { FinishedGame } from './history';
 
@@ -21,7 +22,9 @@ export interface Stats {
   total: Tally;
   byVariant: Record<Variant, Tally>;
   bySeats: Record<2 | 3 | 4, Tally>;
+  /** По уровню ботов, если он у всех ботов стола один; столы с разными уровнями — в `mixed`. */
   byLevel: Partial<Record<Level, Tally>>;
+  mixed: Tally;
   /** Партий без «остались с картами» подряд — сегодня, с последней. Без наград и без «не потеряйте». */
   streakToday: number;
   /** Козырей пришло за партию — вам и в среднем одному боту (раздача и добор из колоды). */
@@ -65,7 +68,7 @@ export function trumpsDealt(r: GameRecord): number[] {
 export function computeStats(games: FinishedGame[], now: number): Stats {
   const st: Stats = {
     total: zero(), byVariant: { podkidnoy: zero(), perevodnoy: zero() }, bySeats: { 2: zero(), 3: zero(), 4: zero() },
-    byLevel: {}, streakToday: 0, trumps: { you: 0, bot: 0, games: 0 }, elo: START_ELO, eloGames: 0,
+    byLevel: {}, mixed: zero(), streakToday: 0, trumps: { you: 0, bot: 0, games: 0 }, elo: START_ELO, eloGames: 0,
   };
   let you = 0, bot = 0;
   for (const g of games) {
@@ -73,14 +76,15 @@ export function computeStats(games: FinishedGame[], now: number): Stats {
     add(st.total, r);
     add(st.byVariant[r.variant], r);
     add(st.bySeats[r.seats as 2 | 3 | 4], r);
-    add((st.byLevel[g.level] ??= zero()), r);
+    const one = oneLevel(g.levels);
+    add(one ? (st.byLevel[one] ??= zero()) : st.mixed, r);
     const t = trumpsDealt(r);
     you += t[ME];
     bot += t.slice(1).reduce((a, b) => a + b, 0) / Math.max(1, r.seats - 1);
-    if (r.seats === 2 && !g.hinted) {
+    if (r.seats === 2 && !g.hinted && one) {
       const res = r.result!;
       const score = res.draw ? 0.5 : res.fool === ME ? 0 : 1;
-      const expect = 1 / (1 + 10 ** ((LEVEL_ELO[g.level] - st.elo) / 400));
+      const expect = 1 / (1 + 10 ** ((LEVEL_ELO[one] - st.elo) / 400));
       st.elo += ELO_K * (score - expect);
       st.eloGames++;
     }

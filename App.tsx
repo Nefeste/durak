@@ -24,6 +24,7 @@ import { inviteCode } from './src/state/invite';
 import { C } from './src/ui/theme';
 import { installCrashHandlers } from './src/state/crashlog';
 import { loadSettings, setSettings, useSettings } from './src/state/store';
+import { botLevels } from './src/state/settings';
 import { startMoney } from './src/money';
 import { loadGame } from './src/state/save';
 import type { SavedGame } from './src/state/save';
@@ -117,7 +118,7 @@ export default function App() {
           <ReportScreen onBack={() => setRoute('settings')} />
         ) : (
           <GameScreen key={game} variant={r?.variant ?? choice.variant} bots={(r?.seats ?? choice.bots + 1) - 1}
-            level={resume?.level ?? choice.level} restored={resume} onExit={() => setRoute('menu')} onStore={() => setRoute('store')} />
+            levels={resume?.levels ?? botLevels(choice)} restored={resume} onExit={() => setRoute('menu')} onStore={() => setRoute('store')} />
         )}
       </View>
     </SafeAreaProvider>

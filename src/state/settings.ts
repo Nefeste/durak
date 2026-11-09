@@ -1,7 +1,7 @@
 // Настройки игрока (docs/09-game-design.md, «Настройки»). Чистые функции: разбор сохранённой строки
 // и что действует, если «Меньше движения» игрок не трогал, — как в системе телефона (ADR устава
 // 0023, правило 6; по образцу Nefeste/shelter src/state/settings.ts). Читает и пишет — src/state/store.ts.
-import { LEVELS } from '../bot';
+import { levelOf } from '../bot';
 import type { Level } from '../bot';
 import type { Variant } from '../engine';
 
@@ -29,22 +29,36 @@ export interface Settings {
   transferTold: boolean;
   /** Стол в меню: вариант, число ботов, уровень. Запоминается; первая партия — подкидной вдвоём против
    *  «Начинающего» (спецификация 1.0, §3; docs/09-game-design.md, «Первая партия»). */
-  choice: { variant: Variant; bots: number; level: Level };
+  choice: Choice;
+}
+
+/** Стол в меню (docs/09-game-design.md, «Боты за столом»): `level` — один на всех ботов; с «Разными уровнями»
+ *  (`mixed`, при 2–3 ботах) бот N играет `levels[N − 1]`. `levels` — всегда три, по местам: так выбор помнится,
+ *  когда ботов становится больше или меньше. Что играет за столом — `botLevels`. */
+export interface Choice { variant: Variant; bots: number; level: Level; mixed: boolean; levels: Level[] }
+
+/** Уровни ботов стола по местам 1 … `bots`. Один бот — всегда `level`. */
+export function botLevels(c: Choice): Level[] {
+  return Array.from({ length: c.bots }, (_, i) => (c.mixed && c.bots > 1 ? c.levels[i] ?? c.level : c.level));
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, memoryAid: false, personalAds: true,
-  newbie: true, transferTold: false, choice: { variant: 'podkidnoy', bots: 1, level: 'beginner' },
+  newbie: true, transferTold: false, choice: { variant: 'podkidnoy', bots: 1, level: 'beginner', mixed: false, levels: ['beginner', 'beginner', 'beginner'] },
 };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], dflt: T): T => (allowed.includes(v as T) ? (v as T) : dflt);
 const flag = (v: unknown, dflt: boolean): boolean => (typeof v === 'boolean' ? v : dflt);
 
-function choiceOf(v: unknown, d: Settings['choice']): Settings['choice'] {
+/** Выбор стола из строки, по полю: в прошлых версиях в нём не было `mixed` и `levels` — тогда все боты одного `level`. */
+function choiceOf(v: unknown, d: Choice): Choice {
   if (!v || typeof v !== 'object') return d;
   const c = v as Record<string, unknown>;
   const bots = typeof c.bots === 'number' && [1, 2, 3].includes(c.bots) ? c.bots : d.bots;
-  return { variant: pick(c.variant, ['podkidnoy', 'perevodnoy'] as const, d.variant), bots, level: pick(c.level, LEVELS, d.level) };
+  const level = levelOf(c.level) ?? d.level;
+  const was = Array.isArray(c.levels) ? c.levels : [];
+  const levels = [0, 1, 2].map(i => levelOf(was[i]) ?? level);
+  return { variant: pick(c.variant, ['podkidnoy', 'perevodnoy'] as const, d.variant), bots, level, mixed: flag(c.mixed, d.mixed), levels };
 }
 
 /** Сохранённая строка → настройки; мусор и пусто — по умолчанию, по полю. */

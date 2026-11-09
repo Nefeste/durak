@@ -11,7 +11,7 @@ import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
 import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
 import type { Action, Card, GameRecord, Observation, Result, State, Variant } from '../engine';
-import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
+import { adviseThink, makeRng, oneLevel, think, THINK_MS, TOP } from '../bot';
 import { reviewGame } from './review';
 import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
@@ -28,7 +28,7 @@ import { botDelay } from '../state/settings';
 import { getSettings, setSettings, useLessMotion, useSettings } from '../state/store';
 import { dropGame, saveGame } from '../state/save';
 import type { SavedGame } from '../state/save';
-import { botToAct, tapCard, YOU } from './table';
+import { botTurn, levelAt, tapCard, YOU } from './table';
 import { autoPass, canUndo, seenGrid } from './flow';
 import { heldView, holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
@@ -64,8 +64,9 @@ const adviceText = (a: Action, s: State): string => actionText(a, s.table.every(
 
 const stateOf = (r: GameRecord): State => newGame({ rules: r.rules, variant: r.variant, seats: r.seats, first: r.first }, r.deck);
 
-export function GameScreen({ variant, bots, level, restored, onExit, onStore }: {
-  variant: Variant; bots: number; level: Level; restored?: SavedGame | null; onExit: () => void; onStore: () => void;
+export function GameScreen({ variant, bots, levels, restored, onExit, onStore }: {
+  /** Уровни ботов по местам 1 … bots: у каждого бота свой (docs/09-game-design.md, «Боты за столом»). */
+  variant: Variant; bots: number; levels: Level[]; restored?: SavedGame | null; onExit: () => void; onStore: () => void;
 }) {
   const insets = useInsets();
   const settings = useSettings();
@@ -87,7 +88,11 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const holding = hold.shown !== null;
   const font = useFont(Onest_700Bold, 15);
   const small = useFont(Onest_700Bold, 26);
-  const lvl = restored?.level ?? level;
+  // уровни стола — на всю партию и «Ещё партию»: тот же массив, а не новый с каждой отрисовкой меню (иначе бот думал бы заново)
+  const [lvls] = useState(() => restored?.levels ?? levels);
+  /** Уровень бота на месте `seat` (места ботов — 1 … bots). */
+  const lvlAt = (seat: number): Level => levelAt(lvls, seat);
+  const one = oneLevel(lvls);
   // первая партия (docs/09-game-design.md, «Первая партия»): окно о переводе перед первым переводным столом и
   // «Правила» поверх стола; пока они открыты, боты ждут
   const [told, setTold] = useState(() => variant === 'perevodnoy' && !restored && !settings.transferTold);
@@ -108,7 +113,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const gameAt = (r: GameRecord) => r.actions[0]?.at ?? startedAt.current;
   const finished = (rec: GameRecord) => {
     const at = gameAt(rec);
-    void addFinished({ record: rec, level: lvl, at, end: Date.now(), hinted: hinted.current, review: null });
+    void addFinished({ record: rec, levels: lvls, at, end: Date.now(), hinted: hinted.current, review: null });
     reviewJob.current?.cancel();
     const job = thinkSliced(reviewGame(rec, YOU), 1e9);
     reviewJob.current = job;
@@ -129,15 +134,16 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
       dropGame();
       finished(rec);
     } else {
-      saveGame({ record: rec, level: lvl, history: history.current });
+      saveGame({ record: rec, levels: lvls, history: history.current });
     }
   };
 
   // ход ботов: первый бот с действиями от ходящего, с паузой, — человек может успеть раньше. Бот думает
   // кусками во время паузы (src/game/think.ts): экран не замирает; пауза та же, пока ему её хватает
   useEffect(() => {
-    const seat = botToAct(state, s => s !== YOU);
-    if (seat < 0 || paused || holding) return;
+    const turn = botTurn(state, lvls);
+    if (!turn || paused || holding) return;
+    const { seat, level: lvl } = turn;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const pause = fast ? 60 : botDelay(settings.botSpeed, rng.current.next()), from = Date.now();
@@ -145,7 +151,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     job.promise.then(a => { if (live) timer = setTimeout(() => act(seat, a), Math.max(0, pause - (Date.now() - from))); }, () => {});
     return () => { live = false; job.cancel(); if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, record, lvl, settings.botSpeed, paused, holding]);
+  }, [state, record, lvls, settings.botSpeed, paused, holding]);
 
   // «Подсказка»: что сделал бы «Опытный» — кусками, пока игрок ждёт (docs/09-game-design.md)
   const [advising, setAdvising] = useState(false);
@@ -229,7 +235,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     setRecord(rec);
     setState(replay(rec));
     setPicked(null);
-    saveGame({ record: rec, level: lvl, history: history.current });
+    saveGame({ record: rec, levels: lvls, history: history.current });
   };
   /** Уход с экрана итога: оценка RuStore или реклама между партиями, если пора (src/money). */
   const leaveEnd = () => { leavingEnd({ wonVsBot: !!state.result && !state.result.draw && state.result.fool !== YOU }); };
@@ -255,10 +261,10 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     : state.phase === 'giving' && canPass ? T.game.hintGive
     : canPass ? (allCovered && autoPass(state, YOU) ? T.game.hintAutoDone : T.game.hintThrow) : T.game.hintWait;
 
-  const name = () => T.level[lvl];
+  const name = (seat: number) => T.level[lvlAt(seat)];
   const resultText = (r: Result) => r.draw || r.fool === null ? T.result.draw
     : r.fool === YOU ? T.result.lose
-    : seats === 2 ? T.result.win : `${T.result.win}. ${T.result.other(`${T.game.bot(r.fool)} · ${name()}`)}`;
+    : seats === 2 ? T.result.win : `${T.result.win}. ${T.result.other(`${T.game.bot(r.fool)} · ${name(r.fool)}`)}`;
   const oppW = size ? Math.min(180, size.width / Math.max(1, bots) - 6) : 120;
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -273,7 +279,8 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
       <View style={styles.top}>
         <Button small label={T.game.menu} kind="ghost" onPress={onExit} testID="game-menu" />
-        <Text style={styles.variant} numberOfLines={1}>{T.variant[variant]} · {T.level[lvl]}</Text>
+        {/* у ботов разные уровни — здесь только стол: уровень каждого — на его плашке (полоса узкая, с «Вышедшими» не влезло бы) */}
+        <Text style={styles.variant} numberOfLines={1} testID="game-title">{one ? `${T.variant[variant]} · ${T.level[one]}` : T.variant[variant]}</Text>
         {settings.memoryAid ? <Button small label={T.game.seen} kind="ghost" onPress={() => setShowSeen(v => !v)} testID="seen" /> : null}
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
@@ -284,8 +291,8 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
         ) : null}
         {layout ? layout.opponents.map(p => (
           // вчетвером «Бот 1 · Средний» в строку не влезает — уровень уходит во вторую строку
-          <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={oppW >= 150 ? `${T.game.bot(p.seat)} · ${name()}` : T.game.bot(p.seat)}
-            info={`${oppW >= 150 ? '' : `${name()} · `}${shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])}`}
+          <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={oppW >= 150 ? `${T.game.bot(p.seat)} · ${name(p.seat)}` : T.game.bot(p.seat)}
+            info={`${oppW >= 150 ? '' : `${name(p.seat)} · `}${shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])}`}
             role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : null}
             active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat)}
             left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - layout.ch * 0.55 * 0.5 - 66)} />
