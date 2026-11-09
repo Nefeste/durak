@@ -178,7 +178,7 @@ export function PuzzleScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.s, gap: SPACE.s },
+  root: { flex: 1, paddingHorizontal: SPACE.s, gap: SPACE.s },
   board: { flex: 1, gap: SPACE.s },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700', textAlign: 'center' },
   opp: { color: C.dim, fontSize: TYPE.body, textAlign: 'center' },

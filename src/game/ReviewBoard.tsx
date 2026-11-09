@@ -11,7 +11,7 @@ import { suitOf } from '../engine';
 import type { Card, Observation } from '../engine';
 import { T } from '../i18n';
 import { TableCanvas } from '../render/TableCanvas';
-import { layoutTable, PLATE, plateHeight } from '../render/layout';
+import { layoutTable, PLATE, plateOf, plateHeight } from '../render/layout';
 import type { Layout, Sprite } from '../render/layout';
 import { useSettings } from '../state/store';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
@@ -70,7 +70,8 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
   }
 
   const others = layout ? layout.opponents : [];
-  const oppW = size ? Math.min(150, size.width / Math.max(1, others.length) - 6) : 120;
+  const plate = plateOf(size?.width ?? 412, others.length);
+  const oppW = Math.min(150, plate.w);
   const chipText = (c: ReviewMarks['chips'][number]) =>
     T.review.chip(c.kind === 'best' ? T.review.markBest : T.review.markPlayed, c.action === 'take' ? T.game.take : c.done ? T.game.done : T.game.pass);
 

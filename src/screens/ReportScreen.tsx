@@ -67,7 +67,7 @@ export function ReportScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   content: { paddingHorizontal: SPACE.l, gap: SPACE.m },
   label: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   input: { minHeight: 80, color: C.text, borderWidth: 1, borderColor: C.glassLine, borderRadius: RADIUS.panel, padding: SPACE.m, fontSize: TYPE.body, textAlignVertical: 'top' },

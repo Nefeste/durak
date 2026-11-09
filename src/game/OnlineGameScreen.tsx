@@ -18,7 +18,7 @@ import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { plateLines, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
-import { CONTROLS_GAP, layoutTable, plateHeight, TITLE_SCALE } from '../render/layout';
+import { CONTROLS_GAP, layoutTable, plateOf, plateHeight, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { useLessMotion, useSettings } from '../state/store';
@@ -198,7 +198,8 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
     : view.phase === 'giving' && canPass ? T.game.hintGive
     : canPass ? T.game.hintThrow : T.game.hintWait;
   const left = g.deadline && now ? Math.max(0, Math.ceil((g.deadline - now) / 1000)) : null;
-  const oppW = size ? Math.min(180, size.width / Math.max(1, t.seats.length - 1) - 6) : 120;
+  const plate = plateOf(size?.width ?? 412, t.seats.length - 1);
+  const oppW = plate.w;
 
   const result = (r: Result) => r.draw || r.fool === null ? T.result.draw
     : r.fool === t.you ? T.result.lose : T.result.other(seatName(t.seats[r.fool]));
@@ -271,7 +272,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.s },
+  root: { flex: 1, paddingHorizontal: SPACE.l, gap: SPACE.s },
   lobby: { gap: SPACE.l },
   panel: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   code: { color: C.accent, fontSize: TYPE.display, fontWeight: '800', letterSpacing: 6 },

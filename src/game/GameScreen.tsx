@@ -19,9 +19,9 @@ import type { ThinkJob } from './think';
 import { T } from '../i18n';
 import { gameEnded, gameStarted, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
-import { C, SPACE, TOP_BAR, TYPE } from '../ui/theme';
+import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
-import { CONTROLS_GAP, layoutTable, plateHeight, TITLE_SCALE } from '../render/layout';
+import { CONTROLS_GAP, layoutTable, plateOf, plateHeight, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { botDelay } from '../state/settings';
@@ -39,6 +39,7 @@ import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
 import { Dialog } from '../ui/dialog';
+import { Glass } from '../ui/Glass';
 import { CardPicture } from '../render/CardPicture';
 import { RulesScreen } from '../screens/RulesScreen';
 import { RULES_PICTURES } from './rulesPictures';
@@ -99,7 +100,6 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const paused = told || rulesOpen;
   const { width: winW, fontScale } = useWindowDimensions();
   // плашка бота: имя, уровень, число карт, роль — каждая строкой (docs/13-art.md, §3 «Надписи целиком»)
-  const plateH = plateHeight(plateLines(2), fontScale);
   // подсказки новичка гаснут после партии, которую начали с ними (включённые посреди партии — со следующей)
   const teaching = useRef(settings.newbie);
   // деньги (src/money): полноэкранная грузится в начале партии и показывается только при уходе с итога
@@ -191,9 +191,9 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   const origins = useOrigins(shown);
   useTableCues(shown, deal, less);
-  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid, plate: plateH }) : null),
+  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid, plate: plateHeight(plateLines(2), fontScale) }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shown, origins, size, settings.handOrder, settings.memoryAid, picked, plateH]);
+    [shown, origins, size, settings.handOrder, settings.memoryAid, picked, fontScale]);
 
   const explain = (c: Card) => {
     const probe: Action = state.table.length === 0 ? { type: 'attack', cards: [c] }
@@ -263,10 +263,13 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     : canPass ? (allCovered && autoPass(state, YOU) ? T.game.hintAutoDone : T.game.hintThrow) : T.game.hintWait;
 
   const name = (seat: number) => T.level[lvlAt(seat)];
+  const who = (seat: number) => (seat === YOU ? T.result.you : `${T.game.bot(seat)} · ${name(seat)}`);
   const resultText = (r: Result) => r.draw || r.fool === null ? T.result.draw
     : r.fool === YOU ? T.result.lose
-    : seats === 2 ? T.result.win : `${T.result.win}. ${T.result.other(`${T.game.bot(r.fool)} · ${name(r.fool)}`)}`;
-  const oppW = size ? Math.min(180, size.width / Math.max(1, bots) - 6) : 120;
+    : seats === 2 ? T.result.win : r.order[0] === YOU ? T.result.first : T.result.win;
+  /** Втроём и вчетвером: кто вышел по порядку и кто остался с картами (specs/2026-11-art-premium.md §3). */
+  const orderText = (r: Result) => (seats > 2 && !r.draw && r.fool !== null ? T.result.order(r.order.map(who).join(', '), who(r.fool)) : null);
+  const plate = plateOf(size?.width ?? 412, bots, plateLines(2), fontScale);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
@@ -296,17 +299,28 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
             lines={[name(p.seat), shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])]}
             role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : null}
             active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat)}
-            left={p.x - oppW / 2} width={oppW} top={layout.plate.top} height={layout.plate.height} />
+            left={p.x - plate.w / 2} width={plate.w} top={layout.plate.top} height={layout.plate.height} />
         )) : null}
         {layout && shown.talonSize > 0 ? (
-          <Text pointerEvents="none" style={[styles.talonText, { left: layout.talon.x - 40, top: layout.talon.y + layout.ch * 0.62 }]} testID="talon">{T.game.talon(shown.talonSize)}</Text>
+          <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talon.x - 44, top: layout.talon.y + layout.ch * 0.6 }]}>
+            <Text pointerEvents="none" style={styles.talonText} testID="talon">{T.game.talon(shown.talonSize)}</Text>
+          </Glass>
         ) : null}
         {layout && shown.talonSize === 0 ? (
-          <Text pointerEvents="none" style={[styles.talonText, { left: layout.talon.x - 40, top: layout.talon.y - 10 }]}>{T.game.trumpIs(T.suits[Math.floor(state.trump / 9)])}</Text>
+          <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talon.x - 44, top: layout.talon.y - 14 }]}>
+            <Text pointerEvents="none" style={styles.talonText}>{T.game.trumpIs(T.suits[Math.floor(state.trump / 9)])}</Text>
+          </Glass>
         ) : null}
         {layout ? (
           <View pointerEvents="box-none" style={[styles.controls, { bottom: (size?.height ?? 0) - layout.handTop + CONTROLS_GAP }]}>
-            <Text style={styles.hint} testID="hint">{state.phase === 'end' ? '' : note ?? hint}</Text>
+            {/* подсказка — стеклянная капсула над рукой (13-art.md §6); пустая строка — капсулы нет, место остаётся */}
+            <View style={styles.hintRow} pointerEvents="none">
+              {state.phase === 'end' || !(note ?? hint) ? <Text style={styles.hint} testID="hint">{''}</Text> : (
+                <Glass radius={RADIUS.pill} style={styles.hintPill}>
+                  <Text style={styles.hint} testID="hint" maxFontSizeMultiplier={1.3}>{note ?? hint}</Text>
+                </Glass>
+              )}
+            </View>
             <View style={styles.buttons} pointerEvents="box-none">
               <View style={styles.helpers} pointerEvents="box-none">
                 {canUndo(record, YOU) && state.phase !== 'end' ? <Button small label={T.game.undo} kind="ghost" onPress={undo} testID="undo" /> : null}
@@ -334,7 +348,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
       {state.phase === 'end' && state.result && !holding ? (
-        <ResultSheet bottom={insets.bottom} title={resultText(state.result)}
+        <ResultSheet bottom={insets.bottom} title={resultText(state.result)} subtitle={orderText(state.result)}
           lines={<Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>}
           main={<Button label={T.result.again} onPress={again} testID="again" />}
           rest={[
@@ -347,16 +361,19 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.s, gap: SPACE.xs },
+  root: { flex: 1, paddingHorizontal: SPACE.s, gap: SPACE.xs },
   // верхняя полоса постоянной высоты: что бы ни появлялось на экране, стол не меняет размер
   top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
-  variant: { color: C.dim, fontSize: TYPE.caption, flex: 1 },
+  variant: { color: C.dim, fontSize: TYPE.caption, flex: 1, textAlign: 'center' },
   area: { flex: 1 },
   /** метка паузы для сценария в браузере: невидима, ничего не ловит */
   held: { position: 'absolute', width: 1, height: 1 },
-  talonText: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
+  talonPill: { position: 'absolute', width: 88, paddingVertical: SPACE.xs },
+  talonText: { textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
-  hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
+  hintRow: { alignItems: 'center', minHeight: 28 },
+  hintPill: { paddingHorizontal: SPACE.l, paddingVertical: SPACE.xs },
+  hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center' },
   buttons: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACE.s, minHeight: 48 },
   helpers: { flexDirection: 'row', gap: SPACE.s, flexShrink: 1 },
   actions: { flexDirection: 'row', gap: SPACE.s, marginLeft: 'auto' },

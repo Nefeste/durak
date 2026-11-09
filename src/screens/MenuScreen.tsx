@@ -13,8 +13,10 @@ import { Chips } from '../ui/Chips';
 import { Stepper } from '../ui/Stepper';
 import { Toggle } from '../ui/Toggle';
 import type { Choice } from '../state/settings';
-import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
-import { CardBack } from '../render/PlayingCard';
+import { C, SPACE, TYPE } from '../ui/theme';
+import { Emblem } from '../render/Emblem';
+import { Glass } from '../ui/Glass';
+import { Ornament } from '../ui/Ornament';
 
 export type { Choice } from '../state/settings';
 
@@ -47,12 +49,14 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.xl, paddingBottom: insets.bottom + SPACE.l }]} testID="menu">
       {/* «Правила» — в углу над названием: видно с первого экрана и не ломает сетку кнопок */}
       <View style={[styles.corner, { top: insets.top + SPACE.s }]}><Button small label={T.rules.menu} kind="ghost" onPress={onRules} testID="rules-open" /></View>
+      {/* фирменная шапка (specs/2026-11-art-premium.md §3): веер карт, название с разрядкой, золотая линия с мастью */}
       <View style={styles.head}>
-        <View style={styles.backs}><CardBack /><View style={styles.tilt}><CardBack /></View></View>
-        <Text style={styles.title}>{T.app.name}</Text>
-        <Text style={styles.tagline}>{T.app.tagline}</Text>
+        <Emblem width={64} testID="emblem" />
+        <Text style={styles.title} maxFontSizeMultiplier={1.3}>{T.app.name}</Text>
+        <Ornament />
+        <Text style={styles.tagline} maxFontSizeMultiplier={1.3}>{T.app.tagline}</Text>
       </View>
-      <View style={styles.panel}>
+      <Glass style={styles.panel}>
         <Text style={styles.label}>{T.menu.variant}</Text>
         <Chips id="variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={choice.variant} label={v => T.variant[v]} onChange={variant => onChange({ ...choice, variant })} />
         <Text style={styles.label}>{T.menu.opponents}</Text>
@@ -70,7 +74,7 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
           </View>
         )) : levelRow(0)}
         {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
-      </View>
+      </Glass>
       <View style={styles.actions}>
         {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
         <Button label={T.menu.play} onPress={onPlay} disabled={onLocked} testID="play" />
@@ -92,15 +96,13 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: SPACE.l, gap: SPACE.l, justifyContent: 'space-between' },
   corner: { position: 'absolute', right: SPACE.l, zIndex: 1 },
   head: { alignItems: 'center', gap: SPACE.s },
-  backs: { flexDirection: 'row', height: 100, marginBottom: SPACE.s },
-  tilt: { marginLeft: -30, transform: [{ rotate: '12deg' }] },
-  title: { color: C.accent, fontSize: TYPE.display, fontWeight: '800' },
+  title: { color: C.accent, fontSize: TYPE.display, fontWeight: '800', letterSpacing: 1.5 },
   tagline: { color: C.dim, fontSize: TYPE.body },
-  panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  panel: { gap: SPACE.m, padding: SPACE.l },
   label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
   note: { color: C.dim, fontSize: TYPE.caption },
   botRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.s },

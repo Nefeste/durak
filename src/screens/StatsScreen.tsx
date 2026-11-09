@@ -8,6 +8,7 @@ import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { isPro, onRights } from '../money';
 import { Button } from '../ui/Button';
+import { Glass } from '../ui/Glass';
 import { Header } from '../ui/Header';
 import { C, CHART, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { LEVELS, oneLevel } from '../bot';
@@ -75,10 +76,10 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
             <Table st={st} now={now} />
           </View>
         ) : (
-          <View style={styles.card} testID="stats-locked">
+          <Glass style={styles.card} testID="stats-locked">
             <Text style={styles.text}>{T.stats.pro}</Text>
             <Button label={T.review.toStore} kind="ghost" onPress={onStore} testID="stats-store" />
-          </View>
+          </Glass>
         )}
         <Text style={styles.section} accessibilityRole="header">{T.stats.recent}</Text>
         {games.length === 0 ? <Text style={styles.text}>{T.stats.empty}</Text> : [...games].reverse().slice(0, 30).map(g => (
@@ -94,10 +95,10 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
 
 function Card({ title, children, testID }: { title: string; children: React.ReactNode; testID?: string }) {
   return (
-    <View style={styles.card} testID={testID}>
+    <Glass style={styles.card} testID={testID}>
       <Text style={styles.section} accessibilityRole="header">{title}</Text>
       {children}
-    </View>
+    </Glass>
   );
 }
 
@@ -265,9 +266,9 @@ function Table({ st, now }: { st: Stats; now: number }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.m },
+  root: { flex: 1, paddingHorizontal: SPACE.l, gap: SPACE.m },
   list: { gap: SPACE.m, paddingBottom: SPACE.xl },
-  card: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  card: { gap: SPACE.s, padding: SPACE.l },
   section: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   text: { color: C.text, fontSize: TYPE.body },

@@ -14,9 +14,10 @@ import { YOU } from './table';
 import { T } from '../i18n';
 import { isPro, isUnlocked, onRights, prepareRewarded, reviewAccess, rewardedReady, watchForReview } from '../money';
 import { Button } from '../ui/Button';
+import { Glass } from '../ui/Glass';
 import { Header } from '../ui/Header';
 import { Toggle } from '../ui/Toggle';
-import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
+import { C, SPACE, TYPE } from '../ui/theme';
 import { actionText, whyText, worstText } from './words';
 import { ReviewBoard } from './ReviewBoard';
 
@@ -24,7 +25,7 @@ import { ReviewBoard } from './ReviewBoard';
 function Panel({ d, i, n, main, done }: { d: Decision; i: number; n: number; main: boolean; done: boolean }) {
   const tone = d.grade === 'error' ? C.danger : d.grade === 'inaccurate' ? C.accent : C.dim;
   return (
-    <View style={styles.row} testID={`decision-${d.at}`}>
+    <Glass style={styles.row} testID={`decision-${d.at}`}>
       <View style={styles.rowHead}>
         <Text style={styles.bout} testID="review-step">{n > 1 ? T.review.step(d.bout, i, n) : T.review.bout(d.bout)}</Text>
         <Text style={[styles.grade, { color: tone }]} testID="review-grade">{T.review.grade[d.grade]}</Text>
@@ -38,7 +39,7 @@ function Panel({ d, i, n, main, done }: { d: Decision; i: number; n: number; mai
           <Text style={styles.small}>{d.exact ? T.review.exact(d.playedChance) : T.review.chance(d.bestChance, d.playedChance)}</Text>
         </>
       ) : null}
-    </View>
+    </Glass>
   );
 }
 
@@ -97,13 +98,13 @@ export function ReviewScreen({ review: given, record, at, lastToday, counting, o
               : access === 'full' ? <Text style={styles.text}>{only && all.length ? T.review.noMisses : T.review.none}</Text> : null}
             {access === 'full' && all.length > 1 ? <Toggle id="review-only" title={T.review.onlyMisses} value={only} onChange={setOnly} /> : null}
             {access !== 'full' ? (
-              <View style={styles.locked} testID="review-locked">
+              <Glass style={styles.locked} testID="review-locked">
                 <Text style={styles.head}>{T.review.lockedTitle}</Text>
                 <Text style={styles.text}>{T.review.lockedText}</Text>
                 {ready || rewardedReady() ? <Button label={T.review.watch} onPress={watch} testID="review-watch" /> : null}
                 {failed ? <Text style={styles.small}>{T.review.watchFailed}</Text> : null}
                 <Button label={T.review.toStore} kind="ghost" onPress={onStore} testID="review-store" />
-              </View>
+              </Glass>
             ) : null}
           </ScrollView>
           {access === 'full' && shown.length > 1 ? (
@@ -119,11 +120,11 @@ export function ReviewScreen({ review: given, record, at, lastToday, counting, o
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.m },
+  root: { flex: 1, paddingHorizontal: SPACE.l, gap: SPACE.m },
   scroll: { flex: 1 },
   list: { gap: SPACE.m, paddingBottom: SPACE.s },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
-  row: { gap: SPACE.xs, padding: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  row: { gap: SPACE.xs, padding: SPACE.m,  },
   rowHead: { flexDirection: 'row', justifyContent: 'space-between', gap: SPACE.s },
   bout: { color: C.dim, fontSize: TYPE.caption, flexShrink: 1 },
   grade: { fontSize: TYPE.caption, fontWeight: '700' },
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   text: { color: C.text, fontSize: TYPE.body },
   why: { color: C.text, fontSize: TYPE.body },
   small: { color: C.dim, fontSize: TYPE.caption },
-  locked: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  locked: { gap: SPACE.m, padding: SPACE.l,  },
   nav: { flexDirection: 'row', gap: SPACE.s },
   cell: { flex: 1 },
 });
