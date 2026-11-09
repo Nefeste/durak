@@ -80,8 +80,11 @@ const handCount = (p: Page) => p.locator('[data-testid^="hand-"]').count();
  *  не легла — «пас»/«бито», иначе «беру». Возвращает, сколько раз легла своя карта. */
 async function playOut(p: Page, label: string): Promise<{ ended: boolean; played: number }> {
   let played = 0;
+  const t0 = Date.now();
   for (let i = 0; i < 600; i++) {
-    if (await visible(p, 'result')) return { ended: true, played };
+    if (await visible(p, 'result')) { console.log(`  … ${label}: ${i} шагов, ${Math.round((Date.now() - t0) / 1000)} с`); return { ended: true, played }; }
+    // пауза перед «бито»: стол не трогаем, пока его разглядывают (касание своей карты её кончает)
+    if (await visible(p, 'held')) { await p.waitForTimeout(60); continue; }
     const before = await handCount(p);
     // сначала попробовать отбиться или походить картой — так проверяются касания карт
     const cards = p.locator('[data-testid^="hand-"]');
@@ -116,6 +119,19 @@ const page = await browser.newPage({ viewport: { width: 412, height: 915 } });
 const errors: string[] = [];
 page.on('pageerror', e => errors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+// пауза перед «бито» и «беру» (src/game/hold.ts): когда метка паузы появилась, что на столе и сколько она стояла
+await page.addInitScript(() => {
+  type Hold = { label: string; at: number; ms: number };
+  const w = globalThis as unknown as { __holds: Hold[] };
+  w.__holds = [];
+  let cur: Hold | null = null;
+  new MutationObserver(() => {
+    const el = document.querySelector('[data-testid="held"]');
+    if (el && !cur) { cur = { label: el.getAttribute('aria-label') ?? '', at: performance.now(), ms: -1 }; w.__holds.push(cur); }
+    if (!el && cur) { cur.ms = performance.now() - cur.at; cur = null; }
+  }).observe(document, { childList: true, subtree: true });
+});
+const holds = () => page.evaluate(() => (globalThis as unknown as { __holds: { label: string; ms: number }[] }).__holds);
 try {
   await page.goto(`${web.url}?fast=1`);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
@@ -397,6 +413,14 @@ try {
   await page.getByTestId('seen-close').click();
   const second = await playOut(page, 'переводной');
   ok(second.ended, 'партия втроём дошла до итога');
+  {
+    // отбой кончился картой (покрыта последняя, вдогонку — шестая): стол с ней виден, боты ждут паузу
+    const hs = (await holds()).filter(h => h.ms >= 0);
+    const covered = hs.filter(h => h.label.split(', ').some(pair => pair.includes(' ')));
+    ok(hs.length > 0, `пауза перед «бито» и «беру»: ${hs.length} раз за партии`, JSON.stringify(hs.slice(0, 5)));
+    ok(covered.length > 0, 'на столе паузы видна покрытая пара', JSON.stringify(hs.slice(0, 5)));
+    ok(hs.some(h => h.ms >= 300), 'пауза стоит своё время: боты не ходят поверх неё', JSON.stringify(hs.map(h => Math.round(h.ms))));
+  }
   await page.screenshot({ path: `${OUT}/04-perevodnoy.png` });
   await page.getByTestId('result-menu').click();
   await page.waitForTimeout(300);

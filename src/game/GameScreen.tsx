@@ -10,7 +10,7 @@ import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
 import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
-import type { Action, Card, GameRecord, Result, State, Variant } from '../engine';
+import type { Action, Card, GameRecord, Observation, Result, State, Variant } from '../engine';
 import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
 import { reviewGame } from './review';
 import type { Advice, Level, Review } from '../bot';
@@ -30,6 +30,8 @@ import { dropGame, saveGame } from '../state/save';
 import type { SavedGame } from '../state/save';
 import { botToAct, tapCard, YOU } from './table';
 import { autoPass, canUndo, seenGrid } from './flow';
+import { heldView, holdMs, tableLabel } from './hold';
+import { useHold } from './useHold';
 import { SeenCards } from './SeenCards';
 import { SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
@@ -78,6 +80,11 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const [showSeen, setShowSeen] = useState(false);
   const [deal, setDeal] = useState(0);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  // пауза перед «бито» и «беру» (src/game/hold.ts): отбой кончился картой — стол виден, пока все её не разглядят;
+  // боты ждут конца паузы, касание своей карты её кончает
+  const [held, setHeld] = useState<{ n: number; view: Observation } | null>(null);
+  const hold = useHold(`${deal}:${record.actions.length}`, held && held.n === record.actions.length ? held.view : null, fast ? 400 : holdMs(less));
+  const holding = hold.shown !== null;
   const font = useFont(Onest_700Bold, 15);
   const small = useFont(Onest_700Bold, 26);
   const lvl = restored?.level ?? level;
@@ -112,6 +119,8 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     if (reasonOf(state, seat, a) !== null) return;
     const next = apply(state, seat, a);
     const rec: GameRecord = { ...record, actions: [...record.actions, { seat, action: a, at: Date.now() }], result: next.result };
+    const h = heldView(observe(state, YOU), seat, a, next);
+    setHeld(h ? { n: rec.actions.length, view: h } : null);
     setState(next);
     setRecord(rec);
     if (next.phase === 'end') {
@@ -128,7 +137,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   // кусками во время паузы (src/game/think.ts): экран не замирает; пауза та же, пока ему её хватает
   useEffect(() => {
     const seat = botToAct(state, s => s !== YOU);
-    if (seat < 0 || paused) return;
+    if (seat < 0 || paused || holding) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const pause = fast ? 60 : botDelay(settings.botSpeed, rng.current.next()), from = Date.now();
@@ -136,7 +145,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     job.promise.then(a => { if (live) timer = setTimeout(() => act(seat, a), Math.max(0, pause - (Date.now() - from))); }, () => {});
     return () => { live = false; job.cancel(); if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, record, lvl, settings.botSpeed, paused]);
+  }, [state, record, lvl, settings.botSpeed, paused, holding]);
 
   // «Подсказка»: что сделал бы «Мастер» — кусками, пока игрок ждёт (docs/09-game-design.md)
   const [advising, setAdvising] = useState(false);
@@ -170,12 +179,14 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
   const allCovered = state.table.length > 0 && state.table.every(([, d]) => d !== null);
   const iDefend = state.defender === YOU && state.phase === 'bout' && state.table.length > 0;
   const view = useMemo(() => observe(state, YOU), [state]);
+  /** Что на столе сейчас: во время паузы — стол «последняя карта легла». */
+  const shown = hold.shown ?? view;
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
-  const origins = useOrigins(view);
-  useTableCues(view, deal, less);
-  const layout = useMemo(() => (size ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid }) : null),
+  const origins = useOrigins(shown);
+  useTableCues(shown, deal, less);
+  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, origins, size, settings.handOrder, settings.memoryAid, picked]);
+    [shown, origins, size, settings.handOrder, settings.memoryAid, picked]);
 
   const explain = (c: Card) => {
     const probe: Action = state.table.length === 0 ? { type: 'attack', cards: [c] }
@@ -185,6 +196,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     if (why) setNote(T.reason[why]);
   };
   const onCard = (c: Card) => {
+    hold.skip();
     setNote(null);
     if (picked?.card === c) { setPicked(null); return; }
     const r = tapCard(state, YOU, c);
@@ -193,11 +205,13 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     setPicked({ card: c, options: r.choose });
   };
   const onTableCard = (attack: Card) => {
+    hold.skip();
     if (!picked) return;
     const a = picked.options.find(o => o.type === 'beat' && o.on === attack);
     if (a) { setPicked(null); act(YOU, a); }
   };
   const onDrop = (c: Card, on: Card | null) => {
+    hold.skip();
     setNote(null);
     setPicked(null);
     const r = tapCard(state, YOU, c);
@@ -265,21 +279,21 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
       <View style={styles.area} onLayout={onLayout} testID="table">
         {layout && font && small ? (
           <TableCanvas key={deal} layout={layout} font={font} small={small} fourColor={settings.fourColor} less={less}
-            hand={state.hands[YOU]} table={state.table} enabled={state.phase !== 'end'}
+            hand={shown.hand} table={shown.table} enabled={state.phase !== 'end'}
             touch={{ onCard, onTableCard, onDrop }} />
         ) : null}
         {layout ? layout.opponents.map(p => (
           // вчетвером «Бот 1 · Средний» в строку не влезает — уровень уходит во вторую строку
           <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={oppW >= 150 ? `${T.game.bot(p.seat)} · ${name()}` : T.game.bot(p.seat)}
-            info={`${oppW >= 150 ? '' : `${name()} · `}${state.out.includes(p.seat) ? T.game.out : T.game.cards(state.hands[p.seat].length)}`}
+            info={`${oppW >= 150 ? '' : `${name()} · `}${shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])}`}
             role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : null}
             active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat)}
             left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - layout.ch * 0.55 * 0.5 - 66)} />
         )) : null}
-        {layout && state.talon.length > 0 ? (
-          <Text pointerEvents="none" style={[styles.talonText, { left: layout.talon.x - 40, top: layout.talon.y + layout.ch * 0.62 }]} testID="talon">{T.game.talon(state.talon.length)}</Text>
+        {layout && shown.talonSize > 0 ? (
+          <Text pointerEvents="none" style={[styles.talonText, { left: layout.talon.x - 40, top: layout.talon.y + layout.ch * 0.62 }]} testID="talon">{T.game.talon(shown.talonSize)}</Text>
         ) : null}
-        {layout && state.talon.length === 0 ? (
+        {layout && shown.talonSize === 0 ? (
           <Text pointerEvents="none" style={[styles.talonText, { left: layout.talon.x - 40, top: layout.talon.y - 10 }]}>{T.game.trumpIs(T.suits[Math.floor(state.trump / 9)])}</Text>
         ) : null}
         {layout ? (
@@ -308,9 +322,10 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
             { label: T.game.transferWhat.rules, kind: 'ghost', testID: 'transfer-rules', onPress: () => setRulesOpen(true) },
           ],
         } : null} />
+        {holding ? <View pointerEvents="none" style={styles.held} testID="held" accessible accessibilityLabel={tableLabel(hold.shown!.table)} /> : null}
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
-      {state.phase === 'end' && state.result ? (
+      {state.phase === 'end' && state.result && !holding ? (
         <ResultSheet bottom={insets.bottom} title={resultText(state.result)}
           lines={<Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>}
           main={<Button label={T.result.again} onPress={again} testID="again" />}
@@ -329,6 +344,8 @@ const styles = StyleSheet.create({
   top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
   variant: { color: C.dim, fontSize: TYPE.caption, flex: 1 },
   area: { flex: 1 },
+  /** метка паузы для сценария в браузере: невидима, ничего не ловит */
+  held: { position: 'absolute', width: 1, height: 1 },
   talonText: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
   hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },

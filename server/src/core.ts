@@ -9,6 +9,7 @@ import type { Action, Card, Result, State, Variant } from '../../src/engine';
 import { chooseAction, isLevel, levelOf, makeRng, TOP } from '../../src/bot';
 import type { Level, Rng } from '../../src/bot';
 import { autoPass } from '../../src/game/flow';
+import { heldView } from '../../src/game/hold';
 import { CODE_ALPHABET, isCode, isCommit, isKey, isSeed, nameProblem, ONLINE } from '../../src/state/protocol';
 import type {
   CodeInfo, GameView, ProofView, QuickMe, SeatView, TableKind, TableStatus, TableView,
@@ -50,6 +51,8 @@ interface Live {
   botFor: BotFor[];
   timers: (() => void)[];
   rng: Rng;
+  /** Действие номер `n - 1` кончило отбой картой: позиция до него и оно само — для `held` в виде места. */
+  held: { n: number; before: State; seat: number; action: Action } | null;
 }
 
 export interface CoreDeps {
@@ -439,7 +442,7 @@ export class Core {
     const state = newGame({ rules: RULES_V1, variant: t.variant, seats: t.seats, first }, deck);
     this.live.set(t.id, {
       no: g.no, state, actions: [], since: this.now(), banks, strikes: Array(t.seats).fill(0),
-      botFor: Array(t.seats).fill(null), timers: [], rng: makeRng(this.random(4).reduce((a, b) => a * 256 + b, 0)),
+      botFor: Array(t.seats).fill(null), timers: [], rng: makeRng(this.random(4).reduce((a, b) => a * 256 + b, 0)), held: null,
     });
     this.bump(t.id);
     this.after(t.id);
@@ -494,8 +497,10 @@ export class Core {
     for (const w of waitingOf(g.state)) {
       if (this.humanSeat(t, w) && g.botFor[w] === null) g.banks[w] = Math.max(0, g.banks[w] - Math.max(0, now - g.since - ONLINE.actionMs));
     }
+    const before = g.state;
     g.state = apply(g.state, seat, action);
     g.actions.push({ seat, action });
+    g.held = heldView(observe(before, seat), seat, action, g.state) ? { n: g.actions.length, before, seat, action } : null;
     g.since = now;
     this.db.query('UPDATE games SET actions = ?, banks = ? WHERE table_id = ? AND no = ?')
       .run(JSON.stringify(g.actions), JSON.stringify(g.banks), t.id, g.no);
@@ -597,7 +602,8 @@ export class Core {
       const level = rows[seat].bot ?? standInLevel();
       const action = chooseAction(observe(g.state, seat), level, g.rng);
       // «пас» бота — с той же паузой, что «бито» само: мгновенное «бито» выдало бы, что подкинуть нечем
-      const wait = action.type === 'pass' ? ONLINE.autoPassMs : ONLINE.botMs;
+      // отбой только что кончился картой — сначала пауза, пока все разглядят стол (src/game/hold.ts)
+      const wait = (action.type === 'pass' ? ONLINE.autoPassMs : ONLINE.botMs) + (g.held?.n === n ? ONLINE.holdMs : 0);
       fire(now + wait, () => this.tx(() => this.play(t, g, seat, action)));
       break;
     }
@@ -675,7 +681,7 @@ export class Core {
       for (const a of actions) state = apply(state, a.seat, a.action);
       this.live.set(r.table_id, {
         no: r.no, state, actions, since: this.now(), banks: JSON.parse(r.banks), strikes: Array(r.n).fill(0),
-        botFor: Array(r.n).fill(null), timers: [], rng: makeRng(this.random(4).reduce((a, b) => a * 256 + b, 0)),
+        botFor: Array(r.n).fill(null), timers: [], rng: makeRng(this.random(4).reduce((a, b) => a * 256 + b, 0)), held: null,
       });
       this.after(r.table_id);
     }
@@ -709,18 +715,20 @@ export class Core {
       const human = waiting.filter(w => rows[w].bot === null && g.botFor[w] === null);
       game = {
         no: g.no, commit: row.commit_, n: g.actions.length, view: obs, waiting,
+        held: g.held && g.held.n === g.actions.length ? heldView(observe(g.held.before, you), g.held.seat, g.held.action, g.state) : null,
         deadline: human.includes(you) ? g.since + ONLINE.actionMs + g.banks[you] : null,
         banks: [...g.banks], result: null, proof: null, nextCommit: null, rematch: Array(t.seats).fill(false),
       };
     } else if (last && last.result) {
       game = {
         no: last.no, commit: last.commit_, n: (JSON.parse(last.actions) as unknown[]).length, view: null, waiting: [], deadline: null,
+        held: this.lastHeld(last, t, you),
         banks: JSON.parse(last.banks), result: JSON.parse(last.result), proof: this.proofOf(last, t.variant), nextCommit: row.commit_,
         rematch: JSON.parse(row.rematch),
       };
     } else {
       game = {
-        no: row.no, commit: row.commit_, n: 0, view: null, waiting: [], deadline: null, banks: [], result: null, proof: null,
+        no: row.no, commit: row.commit_, n: 0, view: null, waiting: [], deadline: null, held: null, banks: [], result: null, proof: null,
         nextCommit: null, rematch: Array(t.seats).fill(false),
       };
     }
@@ -728,6 +736,21 @@ export class Core {
       id: t.id, kind: t.kind, code: t.code, status: t.status, variant: t.variant, rules: 'durak-rules-v1', host: rows.findIndex(r => r.player === t.host),
       bots: t.bots, seats, you, version: t.version, game,
     };
+  }
+
+  /** Законченная партия: стол её последнего отбоя для места `you` — переигрыванием записи (колода уже раскрыта). */
+  private lastHeld(g: GameRow, t: TableRow, you: number) {
+    const seeds = JSON.parse(g.seeds) as string[];
+    const actions = JSON.parse(g.actions) as { seat: number; action: Action }[];
+    if (g.first === null || actions.length === 0) return null;
+    let s = newGame({ rules: RULES_V1, variant: t.variant, seats: t.seats, first: g.first }, serverDeck(g.server_seed, seeds));
+    for (const a of actions.slice(0, -1)) s = apply(s, a.seat, a.action);
+    const last = actions[actions.length - 1];
+    const end = apply(s, last.seat, last.action);
+    // сдача посреди отбоя — последнего стола нет
+    if (end.phase !== 'end') return null;
+    // кончили «пасом» или «беру» — стол таким, каким его видели перед этим
+    return heldView(observe(s, you), last.seat, last.action, end) ?? observe(s, you);
   }
 
   private proofOf(g: GameRow, variant: Variant): ProofView {
