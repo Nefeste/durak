@@ -80,8 +80,9 @@ const handCount = (p: Page) => p.locator('[data-testid^="hand-"]').count();
  *  не легла — «пас»/«бито», иначе «беру». Возвращает, сколько раз легла своя карта. */
 async function playOut(p: Page, label: string): Promise<{ ended: boolean; played: number }> {
   let played = 0;
+  const t0 = Date.now();
   for (let i = 0; i < 600; i++) {
-    if (await visible(p, 'result')) return { ended: true, played };
+    if (await visible(p, 'result')) { console.log(`  … ${label}: ${i} шагов, ${Math.round((Date.now() - t0) / 1000)} с`); return { ended: true, played }; }
     // пауза перед «бито»: стол не трогаем, пока его разглядывают (касание своей карты её кончает)
     if (await visible(p, 'held')) { await p.waitForTimeout(60); continue; }
     const before = await handCount(p);
