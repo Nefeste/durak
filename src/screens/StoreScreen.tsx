@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { Button } from '../ui/Button';
+import { Glass } from '../ui/Glass';
 import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { T } from '../i18n';
@@ -72,7 +73,7 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
         const P = T.money.products[id];
         const owned = id === 'no_ads' ? rights.noAds || pro : pro;
         return (
-          <View key={id} style={styles.card} testID={`product-${id}`}>
+          <Glass key={id} style={styles.card} testID={`product-${id}`}>
             <Text style={styles.name} maxFontSizeMultiplier={1.3}>{P.title}</Text>
             <Text style={styles.note} maxFontSizeMultiplier={1.3}>{P.text}</Text>
             {owned ? (
@@ -82,7 +83,7 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
             ) : (
               <Button testID={`buy-${id}`} label={T.money.buy(priceOf(id))} disabled={why !== null || busy !== null} onPress={() => { void purchase(id); }} />
             )}
-          </View>
+          </Glass>
         );
       })}
       <Text style={styles.note} maxFontSizeMultiplier={1.3}>{T.money.free}</Text>
@@ -97,7 +98,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   pad: { paddingHorizontal: SPACE.l, gap: SPACE.l },
   banner: { backgroundColor: C.sheet, borderRadius: RADIUS.panel, padding: SPACE.l, gap: SPACE.m, borderWidth: 1, borderColor: C.glassLine },
-  card: { padding: SPACE.l, gap: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  card: { padding: SPACE.l, gap: SPACE.m,  },
   name: { color: C.accent, fontSize: TYPE.section, fontWeight: '800' },
   text: { color: C.text, fontSize: TYPE.body, lineHeight: 20 },
   note: { color: C.dim, fontSize: TYPE.caption, lineHeight: 18 },

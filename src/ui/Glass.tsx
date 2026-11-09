@@ -2,17 +2,17 @@
 // Стеклянная панель (13-art.md §5): полупрозрачная светлая заливка, кромка 1 px, отсвет на верхней половине и блик
 // по верхней кромке. Размытия нет: под стеклом неподвижный фон комнаты (src/ui/Backdrop.tsx).
 import React from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import type { StyleProp, ViewProps, ViewStyle } from 'react-native';
 import { StyleSheet, View } from 'react-native';
 import { C, RADIUS, SPACE } from './theme';
 
-export function Glass({ children, style, testID, radius = RADIUS.panel, selected }: {
-  children?: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string; radius?: number;
+export function Glass({ children, style, testID, radius = RADIUS.panel, selected, onLayout }: {
+  children?: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string; radius?: number; onLayout?: ViewProps['onLayout'];
   /** Выделенная панель (плашка ходящего): для чтения с экрана и сценария, вид задаёт стиль снаружи. */
   selected?: boolean;
 }) {
   return (
-    <View testID={testID} style={[styles.glass, { borderRadius: radius }, style]}
+    <View testID={testID} style={[styles.glass, { borderRadius: radius }, style]} onLayout={onLayout}
       accessibilityState={selected === undefined ? undefined : { selected }} aria-selected={selected}>
       <View pointerEvents="none" style={styles.sheen} />
       <View pointerEvents="none" style={[styles.shine, { left: radius, right: radius }]} />

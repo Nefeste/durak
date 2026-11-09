@@ -6,10 +6,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
+import { Glass } from '../ui/Glass';
 import { Header } from '../ui/Header';
 import { Chips } from '../ui/Chips';
 import { Toggle } from '../ui/Toggle';
-import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
+import { C, SPACE, TYPE } from '../ui/theme';
 import { setSettings, useSettings } from '../state/store';
 import { setPersonalAds } from '../money';
 import { APP_VERSION } from '../version';
@@ -33,7 +34,7 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
   return (
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]} testID="settings">
       <Header title={T.settings.title} back={T.settings.back} onBack={onBack} backTestID="settings-back" />
-      <View style={styles.panel}>
+      <Glass style={styles.panel}>
         <Row title={T.settings.lessMotion} note={T.settings.lessMotionNote}>
           <Chips id="motion" items={['system', 'on', 'off'] as const} value={motion}
             label={m => (m === 'system' ? T.settings.lessMotionSystem : m === 'on' ? T.settings.lessMotionOn : T.settings.lessMotionOff)}
@@ -52,7 +53,7 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
         <Toggle id="newbie" title={T.settings.newbie} note={T.settings.newbieNote} value={s.newbie}
           onChange={v => setSettings(v ? { newbie: true, transferTold: false } : { newbie: false })} />
         <Toggle id="personal-ads" title={T.settings.personalAds} note={T.settings.personalAdsNote} value={s.personalAds} onChange={v => { setSettings({ personalAds: v }); setPersonalAds(v); }} />
-      </View>
+      </Glass>
       <Button label={T.settings.report} kind="ghost" onPress={onReport} testID="report" />
       {/* скрытый вход в «Замер» (docs/06-testing.md): долгое нажатие на версию */}
       <Pressable onLongPress={onBench} delayLongPress={800} testID="version" accessibilityRole="text">
@@ -65,7 +66,7 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingHorizontal: SPACE.l, gap: SPACE.l },
-  panel: { gap: SPACE.l, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  panel: { gap: SPACE.l, padding: SPACE.l,  },
   row: { gap: SPACE.s },
   label: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   note: { color: C.dim, fontSize: TYPE.caption },

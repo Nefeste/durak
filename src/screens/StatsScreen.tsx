@@ -6,8 +6,9 @@ import { useInsets } from '../ui/insets';
 import { T } from '../i18n';
 import { isPro, onRights } from '../money';
 import { Button } from '../ui/Button';
+import { Glass } from '../ui/Glass';
 import { Header } from '../ui/Header';
-import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
+import { C, SPACE, TYPE } from '../ui/theme';
 import { LEVELS, oneLevel } from '../bot';
 import { lastToday, loadHistory } from '../state/history';
 import type { FinishedGame } from '../state/history';
@@ -42,16 +43,16 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
     <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="stats">
       <Header title={T.stats.title} back={T.stats.back} onBack={onBack} backTestID="stats-back" />
       <ScrollView contentContainerStyle={styles.list}>
-        <View style={styles.card}>
+        <Glass style={styles.card}>
           <Text style={styles.text} testID="stats-games">{T.stats.games(st.total.games)}</Text>
           <Text style={styles.text}>{T.stats.kept(st.total.kept)}</Text>
           <Text style={styles.text}>{T.stats.first(st.total.first)}</Text>
           {st.total.draws ? <Text style={styles.text}>{T.stats.draws(st.total.draws)}</Text> : null}
           <Text style={styles.text}>{T.stats.streak(st.streakToday)}</Text>
           <Text style={styles.text} testID="stats-puzzles">{T.stats.puzzles(solved)}</Text>
-        </View>
+        </Glass>
         {pro ? (
-          <View style={styles.card} testID="stats-pro">
+          <Glass style={styles.card} testID="stats-pro">
             <Text style={styles.head}>{T.stats.variant}</Text>
             {row(T.variant.podkidnoy, st.byVariant.podkidnoy)}
             {row(T.variant.perevodnoy, st.byVariant.perevodnoy)}
@@ -63,12 +64,12 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
             <Text style={styles.text} testID="stats-trumps">{T.stats.trumps(st.trumps.you, st.trumps.bot)}</Text>
             <Text style={styles.small}>{T.stats.trumpsNote}</Text>
             <Text style={styles.text} testID="stats-elo">{T.stats.elo(st.elo, st.eloGames)}</Text>
-          </View>
+          </Glass>
         ) : (
-          <View style={styles.card} testID="stats-locked">
+          <Glass style={styles.card} testID="stats-locked">
             <Text style={styles.text}>{T.stats.pro}</Text>
             <Button label={T.review.toStore} kind="ghost" onPress={onStore} testID="stats-store" />
-          </View>
+          </Glass>
         )}
         <Text style={styles.head}>{T.stats.recent}</Text>
         {games.length === 0 ? <Text style={styles.text}>{T.stats.empty}</Text> : [...games].reverse().slice(0, 30).map(g => (
@@ -85,7 +86,7 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: SPACE.l, gap: SPACE.m },
   list: { gap: SPACE.m, paddingBottom: SPACE.xl },
-  card: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  card: { gap: SPACE.s, padding: SPACE.l,  },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700', marginTop: SPACE.s },
   text: { color: C.text, fontSize: TYPE.body },
   small: { color: C.dim, fontSize: TYPE.caption },
