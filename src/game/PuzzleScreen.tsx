@@ -89,9 +89,9 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   // в задаче партия не сыграна на глазах игрока — взятое в открытую входит в условие, его видно всегда
   const origins = useOrigins(view);
   useTableCues(view, round, less, false);
-  const layout = useMemo(() => (size ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: true }) : null),
+  const layout = useMemo(() => (size ? layoutTable(view, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: true, straight: settings.straightHand }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, origins, size, settings.handOrder, picked]);
+    [view, origins, size, settings.handOrder, settings.straightHand, picked]);
   const mine = status === 'play' && actorOf(state) === you ? legalActions(state, you) : [];
   const take = mine.find(a => a.type === 'take');
   const pass = mine.find(a => a.type === 'pass');

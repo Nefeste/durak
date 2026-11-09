@@ -53,6 +53,8 @@ export interface Layout {
   handTop: number;
   /** Сукно: от вееров соперников до кнопок, во всю ширину. */
   felt: { x: number; y: number; w: number; h: number };
+  /** Середина кнопки порядка руки слева от руки (если `orderButton`). */
+  orderButton: { x: number; y: number } | null;
   /** Плашки соперников (src/game/SeatPlate.tsx): верх и высота места под них над веером. */
   plate: { top: number; height: number };
 }
@@ -69,6 +71,10 @@ export interface LayoutOptions {
   showOpenly?: boolean;
   /** Кто положил карты на стол и кто взял стол — откуда им лететь (`originsOf`). */
   origins?: Origins;
+  /** «Ровная рука»: карты руки по линейке; иначе — чуть вразброс (`jitterOf`). */
+  straight?: boolean;
+  /** Слева от руки — кнопка порядка руки (`ORDER_BUTTON`): рука на её ширину правее. */
+  orderButton?: boolean;
   /** Высота плашки соперника над веером (`plateHeight`); по умолчанию — `plateOf`: четыре строки обычным шрифтом. */
   plate?: number;
 }
@@ -149,6 +155,16 @@ export const CONTROLS_GAP = 8;
 export function plateOf(W: number, others: number, lines = 4, fontScale = 1): { w: number; h: number; narrow: boolean } {
   const w = Math.min(180, W / Math.max(1, others) - 6);
   return { w, h: plateHeight(lines, fontScale), narrow: w < 150 };
+}
+
+/** Цель касания кнопки порядка руки, dp: столько места рука оставляет слева. */
+export const ORDER_BUTTON = 48;
+
+/** Рука вразброс (docs/09-game-design.md, «Живой стол»): поворот ±1,5° и сдвиг ±2 dp — по номеру карты, поэтому одна и
+ *  та же карта лежит всегда одинаково и между кадрами не дрожит. */
+export function jitterOf(c: Card): { dx: number; dy: number; rot: number } {
+  const h = Math.imul(c + 1, 2654435761) >>> 0;
+  return { rot: ((h % 7) - 3) * 0.5, dx: ((h >>> 8) % 5) - 2, dy: ((h >>> 16) % 5) - 2 };
 }
 
 /** Небольшой постоянный поворот карты в сбросе — по номеру карты, без случайности. */
@@ -267,14 +283,17 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   // рука снизу веером; выбранная карта приподнята
   const hand = sortHand(o.hand, trumpSuit, opt.order);
   const hn = hand.length;
-  const span = W - 2 * m - cw;
+  // кнопка порядка руки — слева от руки: рука на её ширину правее
+  const left = opt.orderButton ? ORDER_BUTTON : 0;
+  const span = W - 2 * m - cw - left;
   const step = hn > 1 ? Math.min(cw * 0.72, span / (hn - 1)) : 0;
-  const x0 = W / 2 - (step * (hn - 1)) / 2;
+  const x0 = (W + left) / 2 - (step * (hn - 1)) / 2;
   hand.forEach((c, i) => {
     const t = hn > 1 ? i / (hn - 1) - 0.5 : 0;
+    const j = opt.straight ? { dx: 0, dy: 0, rot: 0 } : jitterOf(c);
     sprites.push({
-      key: `c${c}`, card: c, x: x0 + i * step, y: handY + t * t * ch * 0.25 - (opt.picked === c ? ch * 0.22 : 0),
-      rot: t * 10, scale: 1, z: z++, glow: false, from: talon,
+      key: `c${c}`, card: c, x: x0 + i * step + j.dx, y: handY + t * t * ch * 0.25 - (opt.picked === c ? ch * 0.22 : 0) + j.dy,
+      rot: t * 10 + j.rot, scale: 1, z: z++, glow: false, from: talon,
     });
   });
 
@@ -286,6 +305,7 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
     handTop: Math.round(handY - ch * 0.75),
     felt: feltRect,
     plate: { top: plateTop, height: plateH },
+    orderButton: opt.orderButton ? { x: Math.round(m / 2 + ORDER_BUTTON / 2), y: handY } : null,
   };
 }
 
