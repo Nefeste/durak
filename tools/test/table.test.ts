@@ -204,18 +204,18 @@ describe('сохранение партии', () => {
   const { record } = playGame(3, 3, 'perevodnoy');
   const mid: GameRecord = { ...record, actions: record.actions.slice(0, Math.floor(record.actions.length / 2)), result: null };
   test('восстановление — переигрывание той же записи', () => {
-    const r = restoreGame(JSON.parse(JSON.stringify({ record: mid, level: 'amateur', history: [] })));
+    const r = restoreGame(JSON.parse(JSON.stringify({ record: mid, levels: ['amateur', 'amateur'], history: [] })));
     expect(r).not.toBeNull();
     expect(r!.state).toEqual(replay(mid));
   });
   test('битая, чужая или законченная запись — нет партии, без исключения', () => {
     expect(restoreGame(null)).toBeNull();
     expect(restoreGame('мусор')).toBeNull();
-    expect(restoreGame({ record: { ...mid, v: 2 }, level: 'amateur', history: [] })).toBeNull();
-    expect(restoreGame({ record: { ...mid, rules: { ...RULES_V1, id: 'other' } }, level: 'amateur', history: [] })).toBeNull();
-    expect(restoreGame({ record: mid, level: 'grandmaster', history: [] })).toBeNull();
+    expect(restoreGame({ record: { ...mid, v: 2 }, levels: ['amateur', 'amateur'], history: [] })).toBeNull();
+    expect(restoreGame({ record: { ...mid, rules: { ...RULES_V1, id: 'other' } }, levels: ['amateur', 'amateur'], history: [] })).toBeNull();
+    expect(restoreGame({ record: mid, levels: ['amateur', 'grandmaster'], history: [] })).toBeNull();
     const bad = { ...mid, actions: [...mid.actions, { seat: 0, action: { type: 'take' }, at: 0 }, { seat: 0, action: { type: 'take' }, at: 0 }] };
-    expect(restoreGame({ record: bad, level: 'amateur', history: [] })).toBeNull();
-    expect(restoreGame({ record, level: 'amateur', history: [] })).toBeNull();
+    expect(restoreGame({ record: bad, levels: ['amateur', 'amateur'], history: [] })).toBeNull();
+    expect(restoreGame({ record, levels: ['amateur', 'amateur'], history: [] })).toBeNull();
   });
 });

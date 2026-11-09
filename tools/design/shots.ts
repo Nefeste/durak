@@ -1,6 +1,7 @@
 /**
  * Снимки экранов для аудита вида и листа стиля (docs/reports/2026-11-08-design-audit.md, docs/13-art.md):
- * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, окно «Что такое перевод» — 21, отчёт с раскрытой партией — 22, закрытый уровень — 23.
+ * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, окно «Что такое перевод» — 21, отчёт с раскрытой партией — 22, закрытый уровень — 23,
+ * разные уровни ботов — 24–26.
  *
  *   EXPO_OFFLINE=1 npm run export:web
  *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка]   # по умолчанию docs/design
@@ -161,6 +162,20 @@ try {
   // седьмой, закрытый шаг уровня: «Мастер · скоро», «Играть» недоступна
   for (let k = 0; k < 6 && await page.getByTestId('level-next').isEnabled().catch(() => false); k++) await page.getByTestId('level-next').click();
   await shot(page, '23-level-locked');
+  // «Разные уровни» (09.11.2026): два бота — у каждого своя строка; три бота; стол — уровень на плашке каждого
+  await page.getByTestId('level-prev').click().catch(() => {});
+  await page.getByTestId('bots-2').click().catch(() => {});
+  await page.getByTestId('levels-mixed').click().catch(() => {});
+  for (let k = 0; k < 6 && await page.getByTestId('level-1-prev').isEnabled().catch(() => false); k++) await page.getByTestId('level-1-prev').click();
+  await page.getByTestId('level-2-prev').click().catch(() => {});
+  await shot(page, '24-menu-levels');
+  await page.getByTestId('bots-3').click().catch(() => {});
+  for (let k = 0; k < 3; k++) await page.getByTestId('level-3-prev').click().catch(() => {});
+  await shot(page, '25-menu-levels-three');
+  await page.getByTestId('play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  await shot(page, '26-table-levels');
 } finally {
   await browser.close();
   web.stop();

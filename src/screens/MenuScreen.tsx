@@ -1,5 +1,6 @@
 // Главный экран: стол, число соперников и уровень — «Играть»; «Продолжить партию», если она
-// сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки».
+// сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки». С двумя-тремя ботами — «Разные уровни»: строка
+// «Бот N ‹ Любитель ›» у каждого бота (docs/09-game-design.md, «Боты за столом»).
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
@@ -10,18 +11,34 @@ import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
 import { Stepper } from '../ui/Stepper';
+import { Toggle } from '../ui/Toggle';
+import type { Choice } from '../state/settings';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { CardBack } from '../render/PlayingCard';
 
-export interface Choice { variant: Variant; bots: number; level: Level }
+export type { Choice } from '../state/settings';
 
 export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore, onPuzzle, onStats, onRules }: {
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
   onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void; onRules: () => void;
 }) {
   const insets = useInsets();
-  // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна
-  const [onLocked, setOnLocked] = useState(false);
+  // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна.
+  // На какой строке он показан: 0 — общий уровень, N — бот N; `null` — нигде
+  const [lockedAt, setLockedAt] = useState<number | null>(null);
+  const onLocked = lockedAt !== null;
+  const mixed = choice.mixed && choice.bots > 1;
+  /** Строка уровня: 0 — общая на всех ботов, N — бота N. */
+  const levelRow = (row: number) => {
+    const value = row === 0 ? choice.level : choice.levels[row - 1];
+    const set = (l: Level) => row === 0 ? onChange({ ...choice, level: l }) : onChange({ ...choice, levels: choice.levels.map((x, i) => (i === row - 1 ? l : x)) });
+    return (
+      <Stepper<string> id={row === 0 ? 'level' : `level-${row}`} items={LEVELS} value={lockedAt === row ? LOCKED_LEVEL : value} label={l => T.level[l as Level]}
+        prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp}
+        onChange={l => { if (l === LOCKED_LEVEL) { setLockedAt(row); return; } setLockedAt(null); set(l as Level); }}
+        locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel }} />
+    );
+  };
   return (
     // прокрутка: на невысоком экране или с крупным шрифтом нижний ряд не уходит под кнопки телефона (0.5.1)
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.xl, paddingBottom: insets.bottom + SPACE.l }]} testID="menu">
@@ -36,12 +53,19 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
         <Text style={styles.label}>{T.menu.variant}</Text>
         <Chips id="variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={choice.variant} label={v => T.variant[v]} onChange={variant => onChange({ ...choice, variant })} />
         <Text style={styles.label}>{T.menu.opponents}</Text>
-        <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => onChange({ ...choice, bots })} />
+        <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => { setLockedAt(null); onChange({ ...choice, bots }); }} />
         <Text style={styles.label}>{T.menu.level}</Text>
-        <Stepper<string> id="level" items={LEVELS} value={onLocked ? LOCKED_LEVEL : choice.level} label={l => T.level[l as Level]}
-          prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp}
-          onChange={l => { if (l === LOCKED_LEVEL) { setOnLocked(true); return; } setOnLocked(false); onChange({ ...choice, level: l as Level }); }}
-          locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel }} />
+        {/* «Разные уровни» — над строками: включили, и строки ботов появляются ниже, а переключатель остаётся под пальцем */}
+        {choice.bots > 1 ? (
+          <Toggle id="levels-mixed" title={T.menu.mixed} value={mixed}
+            onChange={on => { setLockedAt(null); onChange({ ...choice, mixed: on, levels: on ? choice.levels.map(() => choice.level) : choice.levels }); }} />
+        ) : null}
+        {mixed ? Array.from({ length: choice.bots }, (_, i) => (
+          <View key={i} style={styles.botRow} testID={`level-row-${i + 1}`}>
+            <Text style={styles.botName}>{T.game.bot(i + 1)}</Text>
+            <View style={styles.botStep}>{levelRow(i + 1)}</View>
+          </View>
+        )) : levelRow(0)}
         {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
       </View>
       <View style={styles.actions}>
@@ -76,6 +100,9 @@ const styles = StyleSheet.create({
   panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
   note: { color: C.dim, fontSize: TYPE.caption },
+  botRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
+  botName: { color: C.text, fontSize: TYPE.body, fontWeight: '700', minWidth: 52 },
+  botStep: { flex: 1 },
   actions: { gap: SPACE.m },
   row: { flexDirection: 'row', gap: SPACE.m },
   cell: { flex: 1 },

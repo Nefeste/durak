@@ -58,6 +58,7 @@ export const T = {
     lockedNote: 'Седьмой уровень — бот с нейросетью. Он откроется в новой версии игры, для всех и бесплатно.',
     levelDown: 'Уровень слабее',
     levelUp: 'Уровень сильнее',
+    mixed: 'Разные уровни',
   },
   settings: {
     title: 'Настройки',
@@ -451,6 +452,7 @@ export const T = {
     seats: 'По числу игроков',
     seatsRow: (n: number) => `${n} за столом`,
     level: 'По уровням',
+    mixed: 'Разные уровни',
     row: (name: string, games: number, kept: number) => `${name}: ${games} ${pluralRu(games, 'партия', 'партии', 'партий')}, с картами — ${kept}`,
     trumps: (you: number, bot: number) => `Козырей приходило за партию: вам — ${you.toFixed(1)}, боту — ${bot.toFixed(1)}`,
     trumpsNote: 'Колода честная: в долгую козыри приходят всем поровну.',

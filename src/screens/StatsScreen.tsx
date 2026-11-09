@@ -8,13 +8,16 @@ import { isPro, onRights } from '../money';
 import { Button } from '../ui/Button';
 import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
-import { LEVELS } from '../bot';
+import { LEVELS, oneLevel } from '../bot';
 import { lastToday, loadHistory } from '../state/history';
 import type { FinishedGame } from '../state/history';
 import { loadPuzzleLog, solvedCount } from '../state/puzzles';
 import { computeStats, ME } from '../state/stats';
 import type { Tally } from '../state/stats';
 import { ReviewScreen } from '../game/ReviewScreen';
+
+/** Уровни ботов партии строкой: один на всех — его имя, разные — имена по местам через запятую. */
+const levelsText = (g: FinishedGame) => { const one = oneLevel(g.levels); return one ? T.level[one] : g.levels.map(l => T.level[l]).join(', '); };
 
 const resultOf = (g: FinishedGame) => {
   const r = g.record.result!;
@@ -56,6 +59,7 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
             {([2, 3, 4] as const).filter(n => st.bySeats[n].games).map(n => row(T.stats.seatsRow(n), st.bySeats[n]))}
             <Text style={styles.head}>{T.stats.level}</Text>
             {LEVELS.filter(l => st.byLevel[l]).map(l => row(T.level[l], st.byLevel[l]!))}
+            {st.mixed.games ? row(T.stats.mixed, st.mixed) : null}
             <Text style={styles.text} testID="stats-trumps">{T.stats.trumps(st.trumps.you, st.trumps.bot)}</Text>
             <Text style={styles.small}>{T.stats.trumpsNote}</Text>
             <Text style={styles.text} testID="stats-elo">{T.stats.elo(st.elo, st.eloGames)}</Text>
@@ -69,7 +73,7 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
         <Text style={styles.head}>{T.stats.recent}</Text>
         {games.length === 0 ? <Text style={styles.text}>{T.stats.empty}</Text> : [...games].reverse().slice(0, 30).map(g => (
           <View key={g.at} style={styles.game}>
-            <Text style={styles.text}>{T.stats.recentRow(new Date(g.end).toLocaleDateString('ru-RU'), T.variant[g.record.variant], T.level[g.level], resultOf(g))}</Text>
+            <Text style={styles.text}>{T.stats.recentRow(new Date(g.end).toLocaleDateString('ru-RU'), T.variant[g.record.variant], levelsText(g), resultOf(g))}</Text>
             <Button label={T.stats.open} kind="ghost" onPress={() => setOpen(g)} testID={`stats-review-${g.at}`} />
           </View>
         ))}

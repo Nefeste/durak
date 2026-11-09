@@ -2,6 +2,7 @@
 // (docs/02-architecture.md, «Как ходят действия»). Без React — проверяется тестами.
 import { deckFrom, dealOf, firstOf, legalActions, newGame, nextFirst, RULES_V1 } from '../engine';
 import type { Action, Card, Result, State, Variant } from '../engine';
+import type { Level } from '../bot';
 
 export const YOU = 0;
 
@@ -30,6 +31,17 @@ export function botToAct(s: State, isBot: (seat: number) => boolean): number {
     if (isBot(seat) && legalActions(s, seat).length > 0) return seat;
   }
   return -1;
+}
+
+/** Уровень бота на месте `seat`: места ботов — 1 … `levels.length` (место 0 — вы), у каждого свой. */
+export function levelAt(levels: readonly Level[], seat: number): Level {
+  return levels[seat - 1] ?? levels[0];
+}
+
+/** Чей ход среди ботов стола и каким уровнем он думает; никто — `null`. */
+export function botTurn(s: State, levels: readonly Level[]): { seat: number; level: Level } | null {
+  const seat = botToAct(s, x => x !== YOU);
+  return seat < 0 ? null : { seat, level: levelAt(levels, seat) };
 }
 
 /** Новая партия против ботов: колода из 32 случайных байт (с ботами — без отпечатка, ADR 0004). */

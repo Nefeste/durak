@@ -1,9 +1,9 @@
-// Законченные партии с ботами (docs/04-data-model.md, «История»): запись партии, уровень, была ли подсказка
+// Законченные партии с ботами (docs/04-data-model.md, «История»): запись партии, уровни ботов, была ли подсказка
 // и разбор, когда он досчитан. Отсюда — статистика, рейтинг тренировок и разборы старых партий.
 // Хранится 200 последних; чистая часть — разбор записи (`normalizeHistory`).
 import { RULES_V1 } from '../engine';
 import type { GameRecord } from '../engine';
-import { levelOf } from '../bot';
+import { levelOf, levelsOf } from '../bot';
 import type { Level, Review } from '../bot';
 import { KEYS, loadJson, saveJson } from './storage';
 
@@ -11,7 +11,9 @@ export const KEEP_GAMES = 200;
 
 export interface FinishedGame {
   record: GameRecord;
-  level: Level;
+  /** Уровни ботов по местам 1 … seats − 1. В записях прошлых версий — один `level`: читается как этот уровень
+   *  у всех ботов (по умолчанию при чтении, не миграция). */
+  levels: Level[];
   /** Начало партии, мс: им же разбор помечается открытым рекламой (src/money/rights.ts). */
   at: number;
   /** Конец партии, мс. */
@@ -26,11 +28,14 @@ export function normalizeHistory(raw: unknown): FinishedGame[] {
   if (!Array.isArray(raw)) return [];
   const out: FinishedGame[] = [];
   for (const x of raw) {
-    const g = x as Partial<FinishedGame>;
-    const level = levelOf(g?.level);
-    if (!g || !g.record || g.record.v !== 1 || g.record.rules?.id !== RULES_V1.id || !level) continue;
-    if (typeof g.at !== 'number' || typeof g.end !== 'number' || !g.record.result) continue;
-    out.push({ record: g.record, level, at: g.at, end: g.end, hinted: g.hinted === true, review: g.review ?? null });
+    const g = x as Partial<FinishedGame> & { level?: unknown };
+    if (!g || !g.record || g.record.v !== 1 || g.record.rules?.id !== RULES_V1.id) continue;
+    if (typeof g.at !== 'number' || typeof g.end !== 'number' || !g.record.result || !Number.isInteger(g.record.seats)) continue;
+    const bots = g.record.seats - 1;
+    const one = levelOf(g.level);
+    const levels = levelsOf(g.levels, bots) ?? (one && bots >= 1 ? Array.from({ length: bots }, () => one) : null);
+    if (!levels) continue;
+    out.push({ record: g.record, levels, at: g.at, end: g.end, hinted: g.hinted === true, review: g.review ?? null });
   }
   return out.slice(-KEEP_GAMES);
 }

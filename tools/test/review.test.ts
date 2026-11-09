@@ -37,9 +37,9 @@ describe('уровни (#15)', () => {
     expect(levelOf('nobody')).toBeNull();
     const rec = botGame(3);
     const half = { ...rec, actions: rec.actions.slice(0, 6), result: null };
-    expect(restoreGame({ record: half, level: 'strong', history: [] })?.saved.level).toBe('master');
+    expect(restoreGame({ record: half, levels: ['strong'], history: [] })?.saved.levels).toEqual(['master']);
     const h = normalizeHistory([{ record: rec, level: 'strong', at: 1, end: 2, hinted: false, review: null }, { bad: true }]);
-    expect(h.map(g => g.level)).toEqual(['master']);
+    expect(h.map(g => g.levels)).toEqual([['master']]);
   });
 });
 
@@ -101,7 +101,7 @@ describe('разбор', () => {
 
 describe('статистика', () => {
   const games = [21, 22, 23, 24].map((seed, i): FinishedGame => ({
-    record: botGame(seed, 'average', 'novice'), level: 'novice', at: 100 + i, end: Date.UTC(2026, 10, 9, 10 + i), hinted: i === 3, review: null,
+    record: botGame(seed, 'average', 'novice'), levels: ['novice'], at: 100 + i, end: Date.UTC(2026, 10, 9, 10 + i), hinted: i === 3, review: null,
   }));
 
   test('итоги сходятся с записями', () => {
@@ -118,7 +118,7 @@ describe('статистика', () => {
 
   test('рейтинг растёт после побед над сильным уровнем', () => {
     const win = games.find(g => g.record.result!.fool === 1)!;
-    const st = computeStats([{ ...win, level: 'master', hinted: false }], 0);
+    const st = computeStats([{ ...win, levels: ['master'], hinted: false }], 0);
     expect(st.elo).toBeGreaterThan(START_ELO);
     expect(LEVEL_ELO.master).toBeGreaterThan(LEVEL_ELO.experienced);
   });
