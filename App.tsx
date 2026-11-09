@@ -23,7 +23,7 @@ import { net } from './src/state/onlineStore';
 import { inviteCode } from './src/state/invite';
 import { C } from './src/ui/theme';
 import { installCrashHandlers } from './src/state/crashlog';
-import { loadSettings } from './src/state/store';
+import { loadSettings, setSettings, useSettings } from './src/state/store';
 import { startMoney } from './src/money';
 import { loadGame } from './src/state/save';
 import type { SavedGame } from './src/state/save';
@@ -37,7 +37,9 @@ type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'on
 
 export default function App() {
   const [route, setRoute] = useState<Route>('menu');
-  const [choice, setChoice] = useState<Choice>({ variant: 'podkidnoy', bots: 1, level: 'average' });
+  // стол в меню запоминается в настройках; первый запуск — подкидной вдвоём против «Начинающего» (спецификация 1.0, §3)
+  const choice: Choice = useSettings().choice;
+  const setChoice = (c: Choice) => setSettings({ choice: c });
   const [saved, setSaved] = useState<SavedGame | null>(null);
   const [resume, setResume] = useState<SavedGame | null>(null);
   const [game, setGame] = useState(0);

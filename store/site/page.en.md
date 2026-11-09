@@ -21,9 +21,6 @@ shots:
   - file: screenshots/ru/04-perevodnoy.png
     caption: Perevodnoy for three
     alt: "Perevodnoy with two bots and the four-colour deck: each bot is labelled «bot» with its card count"
-  - file: screenshots/ru/05-seen.png
-    caption: Cards played
-    alt: "The table of cards played: what went to the discard and what an opponent picked up openly"
   - file: screenshots/ru/06-menu.png
     caption: Main screen
     alt: "Main screen: podkidnoy or perevodnoy, number of opponents, bot level, friends and quick match"
