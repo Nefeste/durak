@@ -54,7 +54,7 @@ describe('контраст', () => {
 // скругления и цвета только из src/ui/theme.ts. Рисунок карт (src/render) — своя геометрия, его здесь не проверяем.
 describe('токены вместо чисел на глаз', () => {
   const { readdirSync, readFileSync } = require('node:fs') as typeof import('node:fs');
-  const files = ['src/screens', 'src/game', 'src/ui'].flatMap(dir => readdirSync(dir).filter(f => f.endsWith('.tsx')).map(f => `${dir}/${f}`));
+  const files = ['src/screens', 'src/game', 'src/ui', 'src/ui/charts'].flatMap(dir => readdirSync(dir).filter(f => f.endsWith('.tsx')).map(f => `${dir}/${f}`));
   const bad = (re: RegExp) => files.flatMap(f => readFileSync(f, 'utf8').split('\n').map((l, i) => [f, i + 1, l] as const).filter(([, , l]) => re.test(l)).map(([f, i, l]) => `${f}:${i}: ${l.trim()}`));
   test('шкалы — как в листе стиля', async () => {
     const { TYPE, SPACE, RADIUS } = await import('../../src/ui/theme');
