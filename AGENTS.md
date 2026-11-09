@@ -71,6 +71,10 @@ bun tools/sim/arena.ts 1000 average amateur podkidnoy   # bot strength on mirror
 bun tools/sim/arena.ts table 100 master average 3 podkidnoy   # one level at a 3–4 seat table against another
 bun tools/sim/ladder.ts 1000 150 4  # the whole ladder: each level vs the one below, both variants, 4 processes
 bun tools/hermes/bots.ts [levels]   # ms per decision of each level and the endgame solver on Hermes 0.12
+bun tools/hermes/net.ts '256,128'   # ms per net evaluation and per decision of the net bot on Hermes 0.12
+bun tools/sim/arena.ts 1000 net:tools/gpu/nets/<date>/best.bin master podkidnoy   # the neural level (src/bot/net/) on the arena
+python tools/gpu/selftest.py        # GPU training kit (tools/gpu/README.md, docs/specs/2026-11-neural.md): Python features = TS bit for bit, speed
+python tools/gpu/train.py --hours 0.05 --threads 3 --games 60   # a short end-to-end run (self-play in Bun, training in PyTorch, arena, export)
 bun tools/test/make-deck-fixture.ts > tools/test/fixtures/deck-v1.json   # deck vectors (only on a new deck version)
 EXPO_OFFLINE=1 npm run export:web       # setup-skia-web puts canvaskit.wasm into public/ first
 NODE_PATH=/opt/node22/lib/node_modules bun tools/e2e/browser.ts   # the table in a browser, real taps
