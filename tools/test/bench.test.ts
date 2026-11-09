@@ -41,7 +41,7 @@ describe('сцены замера', () => {
     expect(mirrored(m).sprites.map(s => [r(s.x), r(s.rot)])).toEqual(l.sprites.map(s => [r(s.x), r(s.rot)]));
   });
 
-  test('позиции «Мастера»: восемь, у решающего есть действия', () => {
+  test('позиции «Опытного»: восемь, у решающего есть действия', () => {
     const ps = botPositions(8);
     expect(ps.length).toBe(8);
     for (const o of ps) {

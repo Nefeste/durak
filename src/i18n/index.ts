@@ -8,7 +8,7 @@ import { pluralRu } from './plural';
 
 const LEVEL_NAME: Record<Level, string> = {
   novice: 'Новичок', beginner: 'Начинающий', amateur: 'Любитель', average: 'Средний',
-  experienced: 'Опытный', master: 'Мастер',
+  experienced: 'Сильный', master: 'Опытный',
 };
 
 const REASON: Record<Reason, string> = {
@@ -54,7 +54,7 @@ export const T = {
     store: 'Магазин',
     puzzle: 'Задача дня',
     stats: 'Статистика',
-    lockedLevel: 'Нейросеть · скоро',
+    lockedLevel: 'Мастер · скоро',
     lockedNote: 'Седьмой уровень — бот с нейросетью. Он откроется в новой версии игры, для всех и бесплатно.',
     levelDown: 'Уровень слабее',
     levelUp: 'Уровень сильнее',
@@ -92,11 +92,11 @@ export const T = {
   bench: {
     title: 'Замер',
     back: 'Назад',
-    intro: 'Стол сам сыграет раздачу вчетвером, «беру» с 12 картами, 36 карт в полёте, а «Мастер» подумает на восьми позициях. Около минуты; телефон не трогайте.',
+    intro: 'Стол сам сыграет раздачу вчетвером, «беру» с 12 картами, 36 карт в полёте, а «Опытный» подумает на восьми позициях. Около минуты; телефон не трогайте.',
     run: 'Начать замер',
     running: (scene: string) => `Идёт: ${scene}…`,
     done: 'Готово. Числа — в журнал проверок спецификации 1.0.',
-    scenes: { deal: 'Раздача вчетвером', take: '«Беру» с 12 картами', flight: '36 карт в полёте', master: '«Мастер» думает' },
+    scenes: { deal: 'Раздача вчетвером', take: '«Беру» с 12 картами', flight: '36 карт в полёте', master: '«Опытный» думает' },
     head: (version: string, os: string, size: string, quick: boolean) => `Козырь ${version} · ${os} · стол ${size}${quick ? ' · быстрый' : ''}`,
     frames: (n: number, p50: string, p95: string, long: string, worst: number) => `кадров ${n}, медиана ${p50} мс, p95 ${p95}, дольше 25 мс — ${long} %, худший ${worst} мс`,
     bot: (n: number, p50: number, worst: number) => `решение: ${n} поз., медиана ${p50} мс, худшее ${worst} мс`,

@@ -16,7 +16,7 @@ describe('боты', () => {
     const r = arena(150, 'average', 'novice', 'perevodnoy', 6);
     expect(r.low).toBeGreaterThan(0.6);
   }, 60_000);
-  test('«Опытный» (расклады) обыгрывает «Среднего»', () => {
+  test('«Сильный» (расклады) обыгрывает «Среднего»', () => {
     const r = arena(40, 'experienced', 'average', 'podkidnoy', 9);
     expect(r.low).toBeGreaterThan(0.5);
   }, 120_000);

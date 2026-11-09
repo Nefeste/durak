@@ -116,7 +116,7 @@ export function* searchThink(o: Observation, p: SearchParams, rng: Rng): Thinkin
   return best(scored).action;
 }
 
-/** Совет игроку («Подсказка», docs/09-game-design.md): что сделал бы «Мастер» и его шанс выйти без
+/** Совет игроку («Подсказка», docs/09-game-design.md): что сделал бы «Опытный» и его шанс выйти без
  *  карт. В концовке вдвоём — точный расчёт (`exact`), иначе — доля раскладов, где действие ведёт к
  *  выходу. Работает по наблюдению игрока — бот за столом этих расчётов не видит. */
 export interface Advice { action: Action; chance: number | null; exact: boolean }
