@@ -228,7 +228,7 @@ def main():
         with open(os.path.join(args.out, 'progress.jsonl'), 'a', encoding='utf8') as f:
             f.write(json.dumps(r, ensure_ascii=False) + '\n')
 
-    last_arena = time.time() if state['arenas'] else 0.0
+    last_arena = time.time()      # первая арена — через час: у новой сети она ничего не скажет
     t_mark = time.time()
     run = launch(state['rounds'])
     try:
