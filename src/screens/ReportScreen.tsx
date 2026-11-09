@@ -53,7 +53,7 @@ export function ReportScreen({ onBack }: { onBack: () => void }) {
           <View style={styles.game}>
             <Pressable onPress={() => setOpen(v => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }} testID="report-game"
               style={({ pressed }) => [styles.gameRow, pressed && styles.pressed]}>
-              <Text style={styles.gameLine} numberOfLines={2}>{game.line}</Text>
+              <Text style={styles.gameLine}>{game.line}</Text>
               <Text style={styles.gameToggle}>{open ? T.report.gameClose : T.report.gameOpen}</Text>
             </Pressable>
             {open ? <Text style={styles.mono} selectable testID="report-game-json">{game.json}</Text> : null}

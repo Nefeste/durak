@@ -34,7 +34,7 @@ export function Stepper<V extends string>({ id, items, value, label, onChange, l
       {arrow(-1)}
       <Pressable testID={`${id}-value`} onPress={isLocked ? onLocked : undefined} disabled={!isLocked}
         accessibilityState={{ disabled: isLocked }} style={[styles.value, isLocked && styles.valueLocked]}>
-        <Text style={[styles.valueText, isLocked && styles.valueTextLocked]} numberOfLines={1}>{isLocked ? locked?.label : label(value)}</Text>
+        <Text style={[styles.valueText, isLocked && styles.valueTextLocked]} maxFontSizeMultiplier={1.3}>{isLocked ? locked?.label : label(value)}</Text>
         {/* где мы в ряду: точки шагов, текущая — золотом */}
         <View style={styles.dots}>
           {all.map((k, n) => <View key={k} style={[styles.dot, n === i && (isLocked ? styles.dotLocked : styles.dotOn)]} />)}
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
   off: { opacity: 0.4 },
   value: { flex: 1, minHeight: 48, borderRadius: RADIUS.small, borderWidth: 2, borderColor: C.accent, backgroundColor: C.glass, alignItems: 'center', justifyContent: 'center', gap: SPACE.xs, paddingVertical: SPACE.xs },
   valueLocked: { borderColor: C.glassLine, borderStyle: 'dashed', borderWidth: 1 },
-  valueText: { color: C.accent, fontSize: TYPE.button, fontWeight: '700' },
+  valueText: { color: C.accent, fontSize: TYPE.button, fontWeight: '700', textAlign: 'center' },
   valueTextLocked: { color: C.dim, fontWeight: '400' },
   dots: { flexDirection: 'row', gap: SPACE.xs },
   dot: { width: DOT, height: DOT, borderRadius: RADIUS.pill, backgroundColor: C.glassLine },

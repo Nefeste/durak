@@ -21,7 +21,8 @@ export function RulesScreen({ onBack, section }: { onBack: () => void; section?:
   const { width } = useWindowDimensions();
   const scroll = useRef<ScrollView>(null);
   const at = useRef<Partial<Record<RulesSection, number>>>({});
-  const jumped = useRef(false);
+  /** Игрок сам тронул прокрутку — больше не подводим к разделу. */
+  const touched = useRef(false);
   // открыт поверх партии — системное «Назад» возвращает к столу, а не в меню
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { onBack(); return true; });
@@ -31,14 +32,15 @@ export function RulesScreen({ onBack, section }: { onBack: () => void; section?:
   const pic = col - SPACE.l * 2;
   const onSection = (key: RulesSection) => (e: LayoutChangeEvent) => {
     at.current[key] = e.nativeEvent.layout.y;
-    if (key === section && !jumped.current) {
-      jumped.current = true;
+    // раздел съезжает, пока картинки выше меряют свои подписи (13-art.md, §3): подводим к нему заново, пока игрок не тронул
+    // прокрутку сам
+    if (key === section && !touched.current) {
       // после раскладки: иначе прокрутка в вебе упирается в ещё не выросшую высоту
       setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, (at.current[key] ?? 0) - SPACE.s), animated: false }), 0);
     }
   };
   return (
-    <ScrollView ref={scroll} style={styles.root} testID="rules"
+    <ScrollView ref={scroll} style={styles.root} testID="rules" onScrollBeginDrag={() => { touched.current = true; }}
       contentContainerStyle={[styles.content, { width: col + SPACE.l * 2, paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]}>
       <Header title={T.rules.title} back={T.rules.back} onBack={onBack} backTestID="rules-back" />
       <Text style={styles.intro}>{T.rules.intro}</Text>

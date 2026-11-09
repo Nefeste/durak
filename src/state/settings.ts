@@ -77,7 +77,7 @@ export function parseSettings(raw: string | null): Settings {
     vibration: flag(v.vibration, d.vibration),
     botSpeed: pick(v.botSpeed, ['normal', 'fast'] as const, d.botSpeed),
     handOrder: pick(v.handOrder, ['suit', 'rank'] as const, d.handOrder),
-    // до 0.9 настройки не было — по очереди, как теперь по умолчанию
+    // до очереди атакующих (после 0.9.0) настройки не было — по очереди, как теперь по умолчанию
     throwOrder: pick(v.throwOrder, ['queue', 'free'] as const, d.throwOrder),
     fourColor: flag(v.fourColor, d.fourColor),
     // до 0.5.1 настройка звалась `seenCards` и включала только таблицу
