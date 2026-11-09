@@ -78,7 +78,9 @@ describe('онлайн на телефоне', () => {
         if (why === null) progressed = true;
       }
       if (ta.view?.status === 'finished' && tb.view?.status === 'finished') break;
-      if (!progressed) await Bun.sleep(150);
+      // сервер даёт ключу 40 запросов за 2 с (`too-fast`, server/src/http.ts): опрос и ход за круг (2 запроса) — раз в
+      // 120 мс, меньше 20 в секунду на игрока; без паузы быстрая машина упиралась в предел, и тест падал через раз
+      await Bun.sleep(progressed ? 120 : 150);
     }
     for (const ot of [ta, tb]) {
       const r = await ot.net.poll(ot.id);
