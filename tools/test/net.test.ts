@@ -11,6 +11,7 @@ import { makeRng, unseen, thinkSync, chooseAction } from '../../src/bot';
 import { layout } from '../../src/bot/legal';
 import { encode, features, FEATURES_VERSION, INPUTS, NET_PARAMS, netFromBin, netThink, pack, RAW_SIZE, valueOf } from '../../src/bot/net';
 import { actorOf, shuffled } from '../sim/play';
+import { netSpec } from '../sim/players';
 
 const GPU = join(import.meta.dir, '../gpu/vectors');
 const tiny = netFromBin(new Uint8Array(readFileSync(join(GPU, 'tiny.bin'))));
@@ -90,4 +91,15 @@ describe('сеть', () => {
     }
     expect(checked).toBeGreaterThan(150);
   }, 120_000);
+});
+
+// Путь к сети на Windows сам содержит «:» (`D:\…`): разбор `net:<файл>[:<раскладов>][:now|bout]` — справа
+// (у владельца selftest.py падал: от `net:D:\…\tiny.bin:2:now` оставалось «D»).
+test('net:<файл> — путь с двоеточием и без, расклады и горизонт', () => {
+  expect(netSpec('net:D:\\gornitsa.games\\durak\\tools\\gpu\\vectors\\tiny.bin:2:now'))
+    .toEqual({ path: 'D:\\gornitsa.games\\durak\\tools\\gpu\\vectors\\tiny.bin', samples: 2, horizon: 'now' });
+  expect(netSpec('net:D:\\runs\\main\\arena.bin')).toEqual({ path: 'D:\\runs\\main\\arena.bin' });
+  expect(netSpec('net:tools/gpu/nets/x/best.bin:24:bout')).toEqual({ path: 'tools/gpu/nets/x/best.bin', samples: 24, horizon: 'bout' });
+  expect(netSpec('net:tools/x.bin:24')).toEqual({ path: 'tools/x.bin', samples: 24 });
+  expect(netSpec('net:tools/x.bin')).toEqual({ path: 'tools/x.bin' });
 });
