@@ -5,7 +5,7 @@ import type { Action, Card, Observation, Result, Variant } from '../engine';
 import type { Level } from '../bot';
 import { HOLD } from '../game/hold';
 
-export const PROTOCOL = '1.0.0';
+export const PROTOCOL = '1.1.0';
 /** Самая старая версия игры, с которой сервер говорит; старше — `426 upgrade`. */
 export const MIN_APP = '0.2.0';
 
@@ -141,7 +141,12 @@ export interface CodeInfo {
   commit: string;
   /** Вы уже за этим столом. */
   mine: boolean;
+  /** Кто где сидит — выбрать место (с 1.1.0 протокола): человек (`name`, `host` — создатель, `you` — вы), бот стола
+   *  (`bot` — уровень; на его место можно сесть до начала, бот уйдёт) или `null` — свободно. */
+  places?: (CodePlace | null)[];
 }
+
+export interface CodePlace { name: string; bot: Level | null; host: boolean; you: boolean }
 
 export interface QuickMe { rating: number; provisional: boolean; games: number }
 
@@ -173,6 +178,7 @@ export const ERRORS = {
   'bad-seats': 400,
   'bad-level': 400,
   'bad-action': 400,
+  'bad-seat': 400,
   illegal: 400,
   'no-key': 401,
   'no-profile': 401,
@@ -182,6 +188,7 @@ export const ERRORS = {
   'no-table': 404,
   'no-route': 404,
   full: 409,
+  'seat-taken': 409,
   'not-enough': 409,
   stale: 409,
   'commit-changed': 409,

@@ -1,6 +1,7 @@
 /**
  * Браузерный прогон онлайна (этап Г): сервер «Козыря» в этом же процессе, два браузера — два
- * телефона. Отметка «Мне есть 14 лет» и имя, стол на троих с ботом «Новичок», вход по коду, партия
+ * телефона. Отметка «Мне есть 14 лет» и имя, стол на четверых: боты «Новичок» и «Начинающий» (уровень каждому), вход по
+ * коду с выбором места — напротив хозяина, партия
  * настоящими касаниями до итога, «Колода проверена» у обоих, «Реванш» — новая партия; затем быстрая
  * игра: оба ищут подкидного, пара найдена, сдача — итог у соперника. Сначала — сервер отвечает 502 (как на
  * машине 08.11.2026): «Сервер недоступен, попробуйте позже», «Повторить» после починки проходит, «Назад» открыт. Ловит пустой экран, утечку
@@ -14,6 +15,7 @@ import { mkdirSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 import { createApp } from '../../server/src/app';
 import { serveWeb } from './serve';
+import { T } from '../../src/i18n';
 
 const PORT = 8796;
 let failures = 0;
@@ -126,22 +128,35 @@ async function main() {
   };
   await profile(a, 'Миша', 'friends-open');
   await a.getByTestId('friends').waitFor({ timeout: 10_000 });
-  await a.getByTestId('f-seats-3').click();
+  await a.getByTestId('f-seats-4').click();
   await a.getByTestId('f-bots-novice').click();
   await a.getByTestId('create').click();
   await a.getByTestId('lobby').waitFor({ timeout: 10_000 });
   const code = (await a.getByTestId('table-code').innerText()).trim();
   ok(/^[A-Z2-9]{6}$/.test(code), 'код стола — шесть знаков', code);
+  // уровень каждого бота: хозяин делает бота справа на ступень сильнее
+  ok(await a.getByTestId('bot-level-3-value').innerText().then(x => x.includes(T.level.novice)).catch(() => false), 'у каждого бота — своя строка уровня');
+  await a.getByTestId('bot-level-3-next').click();
+  await a.waitForTimeout(800);
+  const s3 = await a.getByTestId('lobby-seat-3').innerText().catch(() => '');
+  ok(s3.includes(T.level.beginner) && s3.includes('бот'), `бот справа — «${T.level.beginner}»`, s3);
+  ok((await a.getByTestId('lobby-seat-1').innerText()).includes(T.level.novice), `бот слева — по-прежнему «${T.level.novice}»`);
   await a.screenshot({ path: `${OUT}/online-01-lobby.png` });
 
   await profile(b, 'Саша', 'friends-open');
   await b.getByTestId('friends').waitFor({ timeout: 10_000 });
   await b.getByTestId('code').fill(code);
   await b.getByTestId('join').click();
+  // вход по ссылке: схема мест, создатель внизу; Саша садится напротив — на место бота, бот уходит
+  await b.getByTestId('pick-seat').waitFor({ timeout: 10_000 });
+  ok(/Миша/.test(await b.getByTestId('lobby-seat-0').innerText()) && /напротив/.test(await b.getByTestId('lobby-seat-2').innerText()),
+    'выбор места: видно, кто где сидит и где «напротив»', await b.getByTestId('seat-map').innerText());
+  await b.screenshot({ path: `${OUT}/online-01b-pick.png` });
+  await b.getByTestId('sit-2').click();
   await b.getByTestId('lobby').waitFor({ timeout: 10_000 });
   await a.waitForTimeout(2000);
-  ok(/Саша/.test(await a.getByTestId('lobby-seat-1').innerText()), 'у хозяина за столом видно второго', await a.getByTestId('lobby-seat-1').innerText());
-  ok(/бот/.test(await a.getByTestId('lobby-seat-2').innerText()), 'свободное место займёт бот с подписью «бот»');
+  ok(/Саша/.test(await a.getByTestId('lobby-seat-2').innerText()), 'у хозяина Саша — напротив', await a.getByTestId('lobby-seat-2').innerText());
+  ok(/бот/.test(await a.getByTestId('lobby-seat-1').innerText()) && /бот/.test(await a.getByTestId('lobby-seat-3').innerText()), 'остальные места займут боты с подписью «бот»');
   await a.getByTestId('start').click();
   await a.getByTestId('online-game').waitFor({ timeout: 10_000 });
   await b.getByTestId('online-game').waitFor({ timeout: 10_000 });
@@ -150,10 +165,14 @@ async function main() {
   const ha = await hand(a).evaluateAll(es => es.map(e => e.getAttribute('data-testid')));
   const hb = await hand(b).evaluateAll(es => es.map(e => e.getAttribute('data-testid')));
   ok(ha.every(x => !hb.includes(x)), 'в DOM каждого — только свои карты', `${ha} / ${hb}`);
-  ok(/бот/.test(await a.getByTestId('opp-2').innerText().catch(() => '')), 'бот за столом подписан');
+  // у Миши напротив — Саша, слева и справа — боты своих уровней
+  const opp = async (seat: number) => a.getByTestId(`opp-${seat}`).innerText().catch(() => '');
+  ok(/Саша/.test(await opp(2)), 'за столом Саша — напротив Миши', await opp(2));
+  ok((await opp(1)).includes(T.level.novice) && (await opp(3)).includes(T.level.beginner) && /бот/.test(await opp(3)),
+    'боты за столом — разных уровней, подписаны «бот»', `${await opp(1)} / ${await opp(3)}`);
   await a.screenshot({ path: `${OUT}/online-02-game.png` });
 
-  ok(await playOut([a, b], 'стол'), 'партия на троих дошла до итога');
+  ok(await playOut([a, b], 'стол'), 'партия вчетвером дошла до итога');
   {
     // отбой кончился картой — оба телефона видят стол с ней, прежде чем карты уйдут в сброс
     const holds = (p: Page) => p.evaluate(() => (globalThis as unknown as { __holds: { label: string; ms: number }[] }).__holds.filter(h => h.ms >= 0));

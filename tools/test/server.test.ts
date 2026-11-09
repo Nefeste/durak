@@ -6,7 +6,7 @@ import { apply, checkDeck, newGame, observe, RULES_V1, serverDeck } from '../../
 import type { Action, Observation, State } from '../../src/engine';
 import { chooseAction, legalFor, makeRng } from '../../src/bot';
 import { ONLINE, PROTOCOL } from '../../src/state/protocol';
-import type { ProofView, QuickView, TableView } from '../../src/state/protocol';
+import type { CodeInfo, ProofView, QuickView, TableView } from '../../src/state/protocol';
 import { createApp } from '../../server/src/app';
 import { FakeClock } from '../../server/src/clock';
 import { parseAction, simplest, waitingOf } from '../../server/src/core';
@@ -191,6 +191,87 @@ describe('сервер', () => {
       }
     }
     expect(checked).toBe(true);
+  });
+
+  test('выбор места и уровень каждого бота: напротив, на месте бота, пересесть; хозяин меняет уровни; боты разные', async () => {
+    const e = setup(31);
+    const a = await e.player('Миша'), b = await e.player('Саша'), c = await e.player('Оля');
+    const t = (await e.call('POST', '/v1/tables', a, { variant: 'podkidnoy', seats: 4, bots: 'average' })).body.table as TableView;
+    await joinByCode(e, a, t.code!);
+    // свободные места сразу за ботами стола, уровень виден
+    expect(t.seats.map(x => x?.bot ?? null)).toEqual([null, 'average', 'average', 'average']);
+    // кто где сидит — до входа
+    const info = (await e.call('GET', `/v1/tables/code/${t.code}`, b)).body as CodeInfo;
+    expect(info.places!.map(x => (x ? (x.bot ?? x.name) : null))).toEqual(['Миша', 'average', 'average', 'average']);
+    expect(info.places![0]!.host).toBe(true);
+    // Саша садится напротив хозяина — на место бота: бот уходит
+    const seedB = e.seed16();
+    const vb = (await e.call('POST', '/v1/tables/join', b, { code: t.code, seed: seedB, commit: info.commit, seat: 2 })).body.table as TableView;
+    expect(vb.you).toBe(2);
+    expect(vb.seats[2]!.name).toBe('Саша');
+    expect(vb.seats[2]!.bot).toBeNull();
+    noLeak(vb);
+    // занятое место и чужой номер места
+    expect((await e.call('POST', '/v1/tables/join', c, { code: t.code, seed: e.seed16(), commit: info.commit, seat: 2 })).body.error).toBe('seat-taken');
+    expect((await e.call('POST', '/v1/tables/join', c, { code: t.code, seed: e.seed16(), commit: info.commit, seat: 4 })).body.error).toBe('bad-seat');
+    expect((await e.call('POST', '/v1/tables/join', c, { code: t.code, seed: e.seed16(), commit: info.commit, seat: 'x' })).body.error).toBe('bad-seat');
+    // Оля без выбора (телефон до 0.8.0) — на первое место бота, потом пересаживается
+    const vc = (await e.call('POST', '/v1/tables/join', c, { code: t.code, seed: e.seed16(), commit: info.commit })).body.table as TableView;
+    expect(vc.you).toBe(1);
+    const moved = (await e.call('POST', '/v1/tables/join', c, { code: t.code, seed: e.seed16(), commit: info.commit, seat: 3 })).body.table as TableView;
+    expect(moved.you).toBe(3);
+    // прежнее место — снова за ботом стола
+    expect(moved.seats[1]!.bot).toBe('average');
+    // уровень бота на месте — только хозяин и только на место без человека
+    expect((await e.call('POST', `/v1/tables/${t.id}/bot`, b, { seat: 1, level: 'master' })).body.error).toBe('not-host');
+    expect((await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 2, level: 'master' })).body.error).toBe('seat-taken');
+    expect((await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 1, level: 'strong' })).body.error).toBe('bad-level');
+    // Оля пересела обратно на 1; бот на месте 3 — «Новичок» по выбору хозяина
+    await e.call('POST', '/v1/tables/join', c, { code: t.code, seed: e.seed16(), commit: info.commit, seat: 1 });
+    const set1 = await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 3, level: 'novice' });
+    expect(set1.status).toBe(200);
+    expect((set1.body.table as TableView).seats[3]!.bot).toBe('novice');
+    const st = await e.call('POST', `/v1/tables/${t.id}/start`, a);
+    expect(st.status).toBe(200);
+    const view = st.body.table as TableView;
+    expect(view.status).toBe('playing');
+    expect(view.seats.map(x => x!.bot)).toEqual([null, null, null, 'novice']);
+    expect(view.seats.map(x => x!.name)).toEqual(['Миша', 'Оля', 'Саша', '']);
+    // после начала уровни не меняются, места не меняются
+    expect((await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 3, level: 'master' })).body.error).toBe('not-waiting');
+    expect((await e.call('POST', '/v1/tables/join', c, { code: t.code, seed: e.seed16(), commit: info.commit, seat: 3 })).body.error).toBe('not-waiting');
+    // каждый — своё наблюдение (ADR 0008)
+    for (const [k, seat] of [[a, 0], [c, 1], [b, 2]] as const) {
+      const v = (await e.call('GET', `/v1/tables/${t.id}`, k)).body.table as TableView;
+      expect(v.you).toBe(seat);
+      noLeak(v);
+    }
+  });
+
+  test('боты разных уровней за одним столом: каждый ходит своим уровнем, зёрна мест — после пересадки', async () => {
+    const e = setup(41);
+    const a = await e.player('Аня');
+    const t = (await e.call('POST', '/v1/tables', a, { variant: 'perevodnoy', seats: 3, bots: 'average' })).body.table as TableView;
+    const me = await joinByCode(e, a, t.code!);
+    await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 1, level: 'novice' });
+    await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 2, level: 'master' });
+    // хозяин пересел на место 2 (бот «Мастер» ушёл), прежнее место 0 — за ботом стола
+    const moved = (await e.call('POST', '/v1/tables/join', a, { code: t.code, seed: me.seed, commit: me.commit, seat: 2 })).body.table as TableView;
+    expect(moved.you).toBe(2);
+    expect(moved.host).toBe(2);
+    expect(moved.seats.map(x => x?.bot ?? null)).toEqual(['average', 'novice', null]);
+    await e.call('POST', `/v1/tables/${t.id}/start`, a);
+    for (let i = 0; i < 400; i++) {
+      e.clock.advance(5000);
+      const v = (await e.call('GET', `/v1/tables/${t.id}`, a)).body.table as TableView;
+      if (v.status === 'finished') {
+        // своё зерно — на своём новом месте
+        expect(v.game!.proof!.seeds[2]).toBe(me.seed);
+        expect(v.seats.map(x => x!.bot)).toEqual(['average', 'novice', null]);
+        return;
+      }
+    }
+    throw new Error('партия не кончилась');
   });
 
   test('ошибки: занятый номер действия — stale, незаконное — причина, чужой ход, сменившийся отпечаток', async () => {

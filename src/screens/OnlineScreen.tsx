@@ -14,7 +14,8 @@ import { Chips } from '../ui/Chips';
 import { Checkbox } from '../ui/Toggle';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { isCode, nameProblem } from '../state/protocol';
-import type { QuickView } from '../state/protocol';
+import type { CodeInfo, QuickView } from '../state/protocol';
+import { SeatMap } from '../game/SeatMap';
 import { NetError } from '../state/net';
 import { isAdult, loadAdult, net, newSeed, setAdult } from '../state/onlineStore';
 import type { MySeed } from '../state/online';
@@ -25,13 +26,17 @@ const errText = (e: unknown) => T.online.errors[e instanceof NetError ? e.kind :
 /** Сервер не ответил или ответил ошибкой (502 и т. п.): это не вина игрока — «Повторить», меню открыто. */
 const serverDown = (e: unknown) => e instanceof NetError && (e.kind === 'offline' || e.kind === 'timeout' || e.kind === 'server');
 
-/** Сесть за стол по коду: отпечаток → зерно. */
-export async function sitByCode(code: string): Promise<Seated> {
-  const info = await net.codeInfo(code);
+/** Сесть за стол по коду: отпечаток → зерно; `seat` — выбранное место (без него — первое свободное). */
+export async function sitByCode(code: string, seat?: number, known?: CodeInfo): Promise<Seated> {
+  const info = known ?? await net.codeInfo(code);
   const seed = newSeed();
-  const t = await net.join(code, seed, info.commit);
+  const t = await net.join(code, seed, info.commit, seat);
   return { id: t.id, seed: { game: t.game?.no ?? 0, seed, commit: info.commit } };
 }
+
+/** Выбор места нужен: стол ждёт, вас за ним нет, а выбрать есть из чего (сервер с 1.1.0 протокола присылает места). */
+export const choosesSeat = (i: CodeInfo): boolean =>
+  !i.mine && i.status === 'waiting' && !!i.places && i.places.filter(p => !p || p.bot).length > 1;
 
 export function OnlineScreen({ mode, invite, onBack, onTable }: {
   mode: 'friends' | 'quick'; invite: string | null; onBack: () => void; onTable: (s: Seated) => void;
@@ -49,6 +54,8 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   const [seats, setSeats] = useState(2);
   const [bots, setBots] = useState<Level | 'none'>('average');
   const [code, setCode] = useState(invite ?? '');
+  /** Стол по коду, где выбирают место. */
+  const [picking, setPicking] = useState<{ code: string; info: CodeInfo } | null>(null);
   const [quick, setQuick] = useState<QuickView | null>(null);
   const searching = useRef(false);
 
@@ -92,7 +99,19 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   const join = () => run(async () => {
     const c = code.trim().toUpperCase();
     if (!isCode(c)) { setErr(T.online.errors['bad-code']); return; }
-    onTable(await sitByCode(c));
+    const info = await net.codeInfo(c);
+    if (choosesSeat(info)) { setPicking({ code: c, info }); return; }
+    onTable(await sitByCode(c, undefined, info));
+  });
+  const sit = (seat: number) => run(async () => {
+    if (!picking) return;
+    try {
+      onTable(await sitByCode(picking.code, seat, picking.info));
+    } catch (e) {
+      // место заняли или стол изменился — свежие места, выбрать снова
+      if (e instanceof NetError && (e.kind === 'seat-taken' || e.kind === 'commit-changed')) setPicking({ code: picking.code, info: await net.codeInfo(picking.code) });
+      throw e;
+    }
   });
 
   // быстрая игра: очередь, опрос раз в 1,5 с; найдена пара — сесть за стол по коду
@@ -173,6 +192,21 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
           ) : (
             <Button label={T.online.find} onPress={find} disabled={busy} testID="quick-find" />
           )}
+          {errorBlock}
+        </View>
+      </ScrollView>
+    );
+  }
+
+  if (picking) {
+    const i = picking.info;
+    return (
+      <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} testID="pick-seat">
+        <Header title={T.online.pickSeat} back={T.online.back} onBack={() => { setPicking(null); setErr(null); }} backTestID="pick-back" />
+        <View style={styles.panel}>
+          <Text style={styles.label}>{T.variant[i.variant]} · {i.host}</Text>
+          <Text style={styles.note}>{T.online.pickSeatNote}</Text>
+          <SeatMap places={i.places!} host={Math.max(0, i.places!.findIndex(p => p?.host))} onSit={busy ? undefined : sit} />
           {errorBlock}
         </View>
       </ScrollView>

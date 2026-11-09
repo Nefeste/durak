@@ -2,13 +2,14 @@
 // холст Skia, что с ботами, но по виду места с сервера (ADR 0008). Онлайн нет помощников: ни
 // подсказки, ни вышедших карт, ни отмены (ADR 0006). После партии — итог, проверка колоды и «Реванш».
 import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
-import { Share, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import { legalActions, stateFrom } from '../engine';
 import type { Action, Card, Result } from '../engine';
+import type { Level } from '../bot';
 import { layout as fill, unseen } from '../bot/legal';
 import { T } from '../i18n';
 import { gameEnded, leavingEnd } from '../money';
@@ -25,6 +26,8 @@ import type { OnlineTable } from '../state/online';
 import type { SeatView, TableView } from '../state/protocol';
 import { net, newSeed } from '../state/onlineStore';
 import { tapCard } from './table';
+import { SeatMap } from './SeatMap';
+import { placesOf } from './seats';
 import { holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
 
@@ -47,18 +50,28 @@ export function OnlineGameScreen({ table, onExit }: { table: OnlineTable; onExit
   const t = table.view;
   const pad = { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s };
   if (!t) return <View style={[styles.root, pad]} testID="online-loading"><Text style={styles.dim}>{T.online.waiting}</Text></View>;
-  if (t.status === 'waiting' || t.status === 'cancelled') return <Lobby t={t} onExit={onExit} pad={pad} />;
+  if (t.status === 'waiting' || t.status === 'cancelled') return <Lobby table={table} t={t} onExit={onExit} pad={pad} />;
   return <Play table={table} t={t} onExit={onExit} pad={pad} down={table.down} />;
 }
 
-function Lobby({ t, onExit, pad }: { t: TableView; onExit: () => void; pad: object }) {
+function Lobby({ table, t, onExit, pad }: { table: OnlineTable; t: TableView; onExit: () => void; pad: object }) {
   const host = t.you === t.host;
   const [err, setErr] = useState<string | null>(null);
-  const start = () => { setErr(null); net.start(t.id).catch(e => setErr(T.online.errors[(e as { kind?: string }).kind ?? 'other'] ?? T.online.errors.other)); };
+  const fail = (e: unknown) => setErr(T.online.errors[(e as { kind?: string }).kind ?? 'other'] ?? T.online.errors.other);
+  const start = () => { setErr(null); net.start(t.id).catch(fail); };
+  // пересесть до начала — с тем же зерном, что отдано за эту партию (сервер переносит его на новое место)
+  const mine = table.seedOf(t.game?.no ?? 0);
+  const move = t.kind === 'friend' && t.status === 'waiting' && t.code && mine
+    ? (seat: number) => { setErr(null); net.join(t.code!, mine.seed, mine.commit, seat).then(v => table.set(v), fail); }
+    : undefined;
+  const level = host && t.kind === 'friend' && t.status === 'waiting' && t.bots
+    ? (seat: number, l: Level) => { setErr(null); net.setBot(t.id, seat, l).then(v => table.set(v), fail); }
+    : undefined;
   const leave = () => { if (host && t.status === 'waiting') void net.cancel(t.id).catch(() => {}); onExit(); };
   const link = t.code ? inviteLink(t.code) : '';
   return (
-    <View style={[styles.root, pad, styles.lobby]} testID="lobby">
+    // прокрутка: вчетвером со строками уровней ботов лобби выше экрана телефона
+    <ScrollView style={styles.root} contentContainerStyle={[pad, styles.lobby]} testID="lobby">
       <Text style={styles.dim}>{T.variant[t.variant]}</Text>
       {t.kind === 'friend' && t.code ? (
         <View style={styles.panel}>
@@ -69,9 +82,7 @@ function Lobby({ t, onExit, pad }: { t: TableView; onExit: () => void; pad: obje
       ) : null}
       <View style={styles.panel}>
         <Text style={styles.dim}>{T.online.waiting}</Text>
-        {t.seats.map((s, i) => (
-          <Text key={i} style={styles.seat} testID={`lobby-seat-${i}`}>{i + 1}. {s ? seatName(s) : t.bots ? T.online.botSeat(T.level[t.bots]) : T.online.emptySeat}</Text>
-        ))}
+        <SeatMap places={placesOf(t)} host={Math.max(0, t.host)} onSit={move} sitLabel={T.online.moveSeat} onLevel={level} />
       </View>
       {host && t.kind === 'friend' ? (
         <>
@@ -81,7 +92,7 @@ function Lobby({ t, onExit, pad }: { t: TableView; onExit: () => void; pad: obje
       ) : null}
       {err ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
       <Button label={host && t.kind === 'friend' ? T.online.cancelTable : T.online.leave} kind="ghost" onPress={leave} testID="lobby-leave" />
-    </View>
+    </ScrollView>
   );
 }
 
@@ -259,7 +270,6 @@ const styles = StyleSheet.create({
   lobby: { gap: SPACE.l },
   panel: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   code: { color: C.accent, fontSize: TYPE.display, fontWeight: '800', letterSpacing: 6 },
-  seat: { color: C.text, fontSize: TYPE.button },
   dim: { color: C.dim, fontSize: TYPE.caption },
   err: { color: C.danger, fontSize: TYPE.body, textAlign: 'center' },
   ok: { color: C.ok, fontSize: TYPE.body, textAlign: 'center' },
