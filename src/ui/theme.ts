@@ -30,9 +30,27 @@ export const C = {
   shadow: 'rgba(0,0,0,0.35)',
   /** затемнение под окном (диалог, лист) */
   scrim: 'rgba(2,8,10,0.62)',
-  /** Сукно: светлее к середине. */
-  feltLight: '#174047',
+  /** Сукно: светлее под лампой (пятно света, 13-art.md §5). */
+  feltLight: '#1C4850',
+  /** Комната (Backdrop.tsx): верх неба, тёплое пятно лампы, холодный отсвет внизу. */
+  sky: '#0F262C',
+  lamp: '#F0C878',
+  cool: '#2A7F8A',
+  /** Борт стола — дерево: свет сверху, тень снизу. */
+  wood: '#5A3A22',
+  woodLight: '#7E5633',
+  woodDark: '#35210F',
+  /** Блик по верхней кромке стекла и золотой кнопки; отсвет на верхней половине стекла. */
+  shine: 'rgba(255,255,255,0.22)',
+  sheen: 'rgba(255,255,255,0.025)',
 } as const;
+
+/** Фон комнаты (13-art.md §5): небо сверху вниз и пятна света — лампа над столом и холодный отсвет снизу. */
+export const SKY = [C.sky, C.bg] as const;
+export const GLOWS = [
+  { id: 'lamp', color: C.lamp, opacity: 0.14, cx: '50%', cy: '16%', r: '58%' },
+  { id: 'cool', color: C.cool, opacity: 0.1, cx: '50%', cy: '104%', r: '62%' },
+] as const;
 
 /** Цвета мастей ♠ ♣ ♦ ♥ (docs/09-game-design.md, «Вид»): обычная колода или четырёхцветная. */
 export const suitColors = (fourColor: boolean): readonly string[] =>

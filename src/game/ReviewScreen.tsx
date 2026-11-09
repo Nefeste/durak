@@ -119,7 +119,7 @@ export function ReviewScreen({ review: given, record, at, lastToday, counting, o
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.m },
+  root: { flex: 1, paddingHorizontal: SPACE.l, gap: SPACE.m },
   scroll: { flex: 1 },
   list: { gap: SPACE.m, paddingBottom: SPACE.s },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },

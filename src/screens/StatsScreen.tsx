@@ -83,7 +83,7 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.l, gap: SPACE.m },
+  root: { flex: 1, paddingHorizontal: SPACE.l, gap: SPACE.m },
   list: { gap: SPACE.m, paddingBottom: SPACE.xl },
   card: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700', marginTop: SPACE.s },

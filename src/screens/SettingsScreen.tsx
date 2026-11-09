@@ -63,7 +63,7 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   content: { paddingHorizontal: SPACE.l, gap: SPACE.l },
   panel: { gap: SPACE.l, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   row: { gap: SPACE.s },

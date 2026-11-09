@@ -2,7 +2,7 @@
 // (В, Д, К, Т), масть — путь, нарисованный здесь же, у В, Д, К — «двуглавая» картинка буквой в рамке-картуше
 // с мастями (`courtArt`) вместо фигуры. Каждое лицо записывается один раз в SkPicture размера карты; холст
 // только ставит картинки на места (дёшево на кадр, docs/specs/2026-11-v1.md, «Бюджет»).
-import { PaintStyle, Skia } from '@shopify/react-native-skia';
+import { PaintStyle, Skia, TileMode } from '@shopify/react-native-skia';
 import type { SkCanvas, SkFont, SkPath, SkPicture } from '@shopify/react-native-skia';
 import { DECK_SIZE, rankOf, suitOf } from '../engine';
 import type { Card } from '../engine';
@@ -62,11 +62,37 @@ function widthOf(font: SkFont, text: string): number {
   return font.getGlyphWidths(font.getGlyphIDs(text)).reduce((a, b) => a + b, 0);
 }
 
-function fill(color: string) {
+function fill(color: string, alpha?: number) {
   const paint = Skia.Paint();
-  paint.setColor(Skia.Color(color));
+  const c = Skia.Color(color);
+  if (alpha !== undefined) c[3] = alpha;
+  paint.setColor(c);
   paint.setAntiAlias(true);
   return paint;
+}
+
+/** Сколько тень выходит за карту: граница записи картинки. */
+export const SHADOW_PAD = 8;
+
+/** Мягкая тень под картой (13-art.md §5): свет сверху — тень смещена вниз, светлее к краям. Стопка скруглённых
+ *  прямоугольников убывающей плотности вместо размытия: записывается один раз, на кадр ничего не считается. */
+function shadow(cv: SkCanvas, cw: number, ch: number, r: number) {
+  const dy = Math.max(2, cw * 0.035);
+  for (let i = 0; i < 4; i++) {
+    const grow = i * 1.6;
+    const p = fill(C.black, 0.11 - i * 0.022);
+    cv.drawRRect(Skia.RRectXY(Skia.XYWHRect(-cw / 2 - grow / 2, -ch / 2 - grow / 2 + dy, cw + grow, ch + grow), r + grow / 2, r + grow / 2), p);
+  }
+}
+
+/** Скос света на бумаге: едва светлее сверху. Статичный, в картинке. */
+function sheen(cv: SkCanvas, cw: number, ch: number, r: number) {
+  const p = Skia.Paint();
+  p.setAntiAlias(true);
+  const top = Skia.Color(C.text), bottom = Skia.Color(C.text);
+  top[3] = 0.16; bottom[3] = 0;
+  p.setShader(Skia.Shader.MakeLinearGradient({ x: 0, y: -ch / 2 }, { x: 0, y: ch * 0.1 }, [top, bottom], null, TileMode.Clamp));
+  cv.drawRRect(Skia.RRectXY(Skia.XYWHRect(-cw / 2, -ch / 2, cw, ch), r, r), p);
 }
 
 /** В, Д, К (ADR 0010, лист стиля 13-art.md): фигуры людей нет — вместо неё «двуглавая» картинка, как у настоящих
@@ -113,7 +139,7 @@ function courtArt(cv: SkCanvas, cw: number, ch: number, r: number, suit: number,
 export function makeFaces(cw: number, ch: number, font: SkFont, small: SkFont, fourColor: boolean): Faces {
   const r = Math.round(cw * 0.1);
   const colors = suitColors(fourColor);
-  const bounds = Skia.XYWHRect(-cw / 2 - 2, -ch / 2 - 2, cw + 4, ch + 4);
+  const bounds = Skia.XYWHRect(-cw / 2 - SHADOW_PAD, -ch / 2 - SHADOW_PAD, cw + SHADOW_PAD * 2, ch + SHADOW_PAD * 2);
   const rec = (draw: (cv: SkCanvas) => void): SkPicture => {
     const recorder = Skia.PictureRecorder();
     const cv = recorder.beginRecording(bounds);
@@ -124,7 +150,9 @@ export function makeFaces(cw: number, ch: number, font: SkFont, small: SkFont, f
   for (let c = 0; c < DECK_SIZE; c++) {
     const suit = suitOf(c), rank = rankOf(c), color = colors[suit];
     faces.push(rec(cv => {
+      shadow(cv, cw, ch, r);
       rrect(cv, cw, ch, r, C.face);
+      sheen(cv, cw, ch, r);
       rrect(cv, cw, ch, r, C.faceLine, 1);
       const label = T.ranks[rank];
       const ink = fill(color);
@@ -153,7 +181,9 @@ export function makeFaces(cw: number, ch: number, font: SkFont, small: SkFont, f
     }));
   }
   const back = rec(cv => {
+    shadow(cv, cw, ch, r);
     rrect(cv, cw, ch, r, C.back);
+    sheen(cv, cw, ch, r);
     rrect(cv, cw - cw * 0.14, ch - cw * 0.14, r * 0.7, C.backLine, 1.2);
     const line = fill(C.backLine);
     line.setAlphaf(0.45);

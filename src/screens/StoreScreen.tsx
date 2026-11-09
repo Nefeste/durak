@@ -94,7 +94,7 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   pad: { paddingHorizontal: SPACE.l, gap: SPACE.l },
   banner: { backgroundColor: C.sheet, borderRadius: RADIUS.panel, padding: SPACE.l, gap: SPACE.m, borderWidth: 1, borderColor: C.glassLine },
   card: { padding: SPACE.l, gap: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },

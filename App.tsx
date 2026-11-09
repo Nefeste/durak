@@ -22,6 +22,7 @@ import { OnlineTable } from './src/state/online';
 import { net } from './src/state/onlineStore';
 import { inviteCode } from './src/state/invite';
 import { C } from './src/ui/theme';
+import { Backdrop } from './src/ui/Backdrop';
 import { installCrashHandlers } from './src/state/crashlog';
 import { loadSettings, setSettings, useSettings } from './src/state/store';
 import { botLevels } from './src/state/settings';
@@ -93,6 +94,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="light" />
       <View style={styles.root}>
+        <Backdrop />
         {route === 'menu' ? (
           <MenuScreen choice={choice} onChange={setChoice} onPlay={() => play(null)}
             onResume={saved ? () => play(saved) : null} onSettings={() => setRoute('settings')}

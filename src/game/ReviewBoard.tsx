@@ -11,7 +11,7 @@ import { suitOf } from '../engine';
 import type { Card, Observation } from '../engine';
 import { T } from '../i18n';
 import { TableCanvas } from '../render/TableCanvas';
-import { layoutTable } from '../render/layout';
+import { layoutTable, plateOf } from '../render/layout';
 import type { Layout, Sprite } from '../render/layout';
 import { useSettings } from '../state/store';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
@@ -66,7 +66,8 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
   }
 
   const others = layout ? layout.opponents : [];
-  const oppW = size ? Math.min(150, size.width / Math.max(1, others.length) - 6) : 120;
+  const plate = plateOf(size?.width ?? 412, others.length);
+  const oppW = Math.min(150, plate.w);
   const chipText = (c: ReviewMarks['chips'][number]) =>
     T.review.chip(c.kind === 'best' ? T.review.markBest : T.review.markPlayed, c.action === 'take' ? T.game.take : c.done ? T.game.done : T.game.pass);
 
@@ -81,7 +82,7 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
           info={o.out.includes(p.seat) ? T.game.out : T.game.cards(o.handSizes[p.seat])}
           role={o.phase === 'end' ? null : o.attacker === p.seat ? T.game.attacking : o.defender === p.seat ? T.game.defending : null}
           active={o.phase !== 'end' && (o.attacker === p.seat || o.defender === p.seat)}
-          left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - layout.ch * 0.55 * 0.5 - 66)} />
+          left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - layout.ch * 0.55 * 0.5 - plate.h)} />
       )) : null}
       {layout ? (
         <Text pointerEvents="none" style={[styles.talon, { left: layout.talon.x - 40, top: o.talonSize > 0 ? layout.talon.y + layout.ch * 0.62 : layout.talon.y - 10 }]}>

@@ -58,7 +58,7 @@ export function RulesScreen({ onBack, section }: { onBack: () => void; section?:
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   content: { alignSelf: 'center', paddingHorizontal: SPACE.l, gap: SPACE.l },
   intro: { color: C.dim, fontSize: TYPE.body, lineHeight: 21 },
   panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
