@@ -18,6 +18,7 @@ import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { plateLines, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
+import { resultPlaces } from './outcome';
 import { CONTROLS_GAP, layoutTable, plateOf, plateHeight, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
@@ -258,6 +259,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
       </View>
       {t.status === 'finished' && g.result ? (
         <ResultSheet bottom={insets.bottom} title={result(g.result)}
+          places={resultPlaces(g.result, seat => ({ name: seat === t.you ? T.result.you : seatName(t.seats[seat]) }), t.you)}
           lines={table.check ? (
             <Text style={[sheetText.line, table.check.ok ? styles.ok : styles.err]} testID="deck-check">
               {table.check.ok ? T.online.deckOk(table.check.cards) : T.online.deckBad}
