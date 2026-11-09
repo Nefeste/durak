@@ -161,11 +161,13 @@ async function check(page: Page, phone: { width: number }, screen: string) {
 
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
 const hand = (p: Page) => p.locator('[data-testid^="hand-"]');
+/** Лист итога уже на странице, хоть ещё выезжает: дальше руки не касаться — касание попадёт в его «В меню». */
+const over = (p: Page) => p.getByTestId('result').count().then(n => n > 0).catch(() => false);
 
 async function playOne(p: Page): Promise<boolean> {
   const n = await hand(p).count();
   for (let k = 0; k < n; k++) {
-    if (await visible(p, 'held')) return false;
+    if (await visible(p, 'held') || await over(p)) return false;
     await hand(p).nth(k).click({ force: true, timeout: 800 }).catch(() => {});
     await p.waitForTimeout(30);
     if (await visible(p, 'transfer')) await p.getByTestId('transfer').click().catch(() => {});
@@ -178,7 +180,7 @@ async function playOne(p: Page): Promise<boolean> {
 }
 async function stepOnce(p: Page) {
   if (await visible(p, 'held')) { await p.waitForTimeout(60); return; }
-  if (!(await playOne(p))) {
+  if (!(await playOne(p)) && !(await over(p))) {
     if (await visible(p, 'pass')) await p.getByTestId('pass').click().catch(() => {});
     else if (await visible(p, 'take')) await p.getByTestId('take').click().catch(() => {});
   }
@@ -187,15 +189,15 @@ async function stepOnce(p: Page) {
 async function until(p: Page, re: RegExp, steps = 80): Promise<boolean> {
   for (let i = 0; i < steps; i++) {
     if (re.test(await p.getByTestId('hint').innerText().catch(() => ''))) return true;
-    if (await visible(p, 'result')) return false;
+    if (await over(p)) return false;
     await stepOnce(p);
   }
   return false;
 }
 async function toEnd(p: Page): Promise<boolean> {
   const t0 = Date.now();
-  for (let i = 0; i < 3000 && Date.now() - t0 < 600_000 && !(await visible(p, 'result')); i++) await stepOnce(p);
-  return visible(p, 'result');
+  for (let i = 0; i < 3000 && Date.now() - t0 < 600_000 && !(await over(p)); i++) await stepOnce(p);
+  return p.getByTestId('result').waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false);
 }
 /** Из партии в меню: «В меню» итога или верхней полосы — что есть (итог мог выйти, пока ждали). */
 async function leaveTable(p: Page) {
