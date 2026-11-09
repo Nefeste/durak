@@ -24,7 +24,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from common import bun_path, finish, start  # noqa: E402
-from features import INPUTS, encode, random_perm, read_shard  # noqa: E402
+from features import INPUTS, RAW_SIZE, encode, random_perm, read_shard  # noqa: E402
 
 
 def check_vectors(path, weights, label):
@@ -66,7 +66,7 @@ def check_device(quick):
     model = Net((256, 128)).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=1e-3)
     rng = np.random.default_rng(1)
-    raw = np.zeros((2048, 56), np.uint8)
+    raw = np.zeros((2048, RAW_SIZE), np.uint8)
     raw[:, :36] = rng.integers(0, 11, (2048, 36))
     raw[:, 36] = 2
     x = torch.from_numpy(encode(raw)).to(dev)

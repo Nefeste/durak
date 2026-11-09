@@ -31,6 +31,14 @@ from features import INPUTS, VERSION, encode, random_perm, read_shard  # noqa: E
 from model import Net, export_bin  # noqa: E402
 
 NAMES = {'experienced': '«Сильного»', 'master': '«Опытного»', 'average': '«Среднего»', 'amateur': '«Любителя»'}
+# пилот песочницы (30 минут на процессоре, 09.11.2026): третий соперник арены — растёт ли сеть дальше пилота
+PILOT = 'tools/gpu/nets/2026-11-09-cpu-pilot/best.bin'
+
+
+def name_of(rival):
+    if rival.startswith('net:'):
+        return '«пилота»' if PILOT in rival else rival
+    return NAMES.get(rival, rival)
 
 
 def parse():
@@ -56,7 +64,8 @@ def parse():
     ap.add_argument('--lr-end', type=float, default=3e-5)
     ap.add_argument('--arena-minutes', type=float, default=60.0)
     ap.add_argument('--arena-pairs', type=int, default=200, help='колод на соперника (партий — вдвое больше)')
-    ap.add_argument('--arena-vs', default='experienced,master', help='соперники арены (experienced — «Сильный», master — «Опытный»)')
+    ap.add_argument('--arena-vs', default='experienced,master,pilot',
+                    help='соперники арены: experienced — «Сильный», master — «Опытный», pilot — сеть-пилот, net:<файл.bin> — любая сеть')
     ap.add_argument('--arena-samples', type=int, default=24, help='раскладов на решение сети на арене (как в приложении)')
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--device', default='auto', help='auto, cuda или cpu')
@@ -117,6 +126,16 @@ def main():
         return dict(games=state['games'], samples=state['samples'], hours=round(state['seconds'] / 3600, 2), rounds=state['rounds'],
                     seed=args.seed, created=time.strftime('%Y-%m-%dT%H:%M:%S'), arena=state['arenas'][-1] if state['arenas'] else None)
 
+    rivals = []
+    for k in args.arena_vs.split(','):
+        if k == 'pilot':
+            if os.path.exists(os.path.join(REPO, PILOT)):
+                rivals.append(f'net:{PILOT}:{args.arena_samples}:bout')
+            else:
+                log(f'нет {PILOT} — арена без пилота (git pull)')
+        elif k:
+            rivals.append(k)
+    args.arena_vs = ','.join(rivals)
     total = args.hours * 3600
     shards = os.path.join(args.out, 'shards')
     os.makedirs(shards, exist_ok=True)
@@ -215,7 +234,7 @@ def main():
         parts = []
         for k in args.arena_vs.split(','):
             a = r[k]
-            parts.append(f'против {NAMES.get(k, k)} {a["share"]:.3f} ± {a["ci"]:.3f} (Эло {a["elo"]:+.0f}, {a["elo_lo"]:+.0f}…{a["elo_hi"]:+.0f})')
+            parts.append(f'против {name_of(k)} {a["share"]:.3f} ± {a["ci"]:.3f} (Эло {a["elo"]:+.0f}, {a["elo_lo"]:+.0f}…{a["elo_hi"]:+.0f})')
         log('== арена: ' + '; '.join(parts) + f'; {time.time() - t:.0f} с')
         key = 'master' if 'master' in r else args.arena_vs.split(',')[0]
         export_bin(model, os.path.join(args.out, 'snapshots', f'h{state["seconds"] / 3600:06.2f}'), passport())
@@ -224,7 +243,7 @@ def main():
             export_bin(model, os.path.join(args.out, 'best'), passport())
             if os.path.exists(last):
                 shutil.copyfile(last, os.path.join(args.out, 'best.pt'))
-            log(f'   лучший снимок обновлён: {r[key]["share"]:.3f} против {NAMES.get(key, key)}')
+            log(f'   лучший снимок обновлён: {r[key]["share"]:.3f} против {name_of(key)}')
         with open(os.path.join(args.out, 'progress.jsonl'), 'a', encoding='utf8') as f:
             f.write(json.dumps(r, ensure_ascii=False) + '\n')
 
