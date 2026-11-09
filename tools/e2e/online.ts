@@ -34,6 +34,7 @@ async function step(p: Page): Promise<boolean> {
   const before = await hand(p).count();
   const n = before;
   for (let k = 0; k < n; k++) {
+    if (await visible(p, 'held')) return false;
     await hand(p).nth(k).click({ timeout: 800, force: true }).catch(() => {});
     await p.waitForTimeout(40);
     if (await visible(p, 'transfer')) await p.getByTestId('transfer').click().catch(() => {});

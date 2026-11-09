@@ -91,6 +91,8 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
     const n = await cards.count();
     let moved = false;
     for (let k = 0; k < n && !moved; k++) {
+      // бот кончил отбой, пока мы перебирали карты, — не трогаем стол паузы (касание кончает её)
+      if (await visible(p, 'held')) break;
       await cards.nth(k).click({ timeout: 1000, force: true }).catch(() => {});
       await p.waitForTimeout(30);
       if (await visible(p, 'transfer')) await p.getByTestId('transfer').click().catch(() => {});
