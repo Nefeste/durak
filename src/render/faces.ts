@@ -72,15 +72,15 @@ function fill(color: string, alpha?: number) {
 }
 
 /** Сколько тень выходит за карту: граница записи картинки. */
-export const SHADOW_PAD = 8;
+export const SHADOW_PAD = 10;
 
 /** Мягкая тень под картой (13-art.md §5): свет сверху — тень смещена вниз, светлее к краям. Стопка скруглённых
  *  прямоугольников убывающей плотности вместо размытия: записывается один раз, на кадр ничего не считается. */
 function shadow(cv: SkCanvas, cw: number, ch: number, r: number) {
-  const dy = Math.max(2, cw * 0.035);
-  for (let i = 0; i < 4; i++) {
-    const grow = i * 1.6;
-    const p = fill(C.black, 0.11 - i * 0.022);
+  const dy = Math.max(3, cw * 0.05);
+  for (let i = 0; i < 5; i++) {
+    const grow = i * 2;
+    const p = fill(C.black, 0.15 - i * 0.027);
     cv.drawRRect(Skia.RRectXY(Skia.XYWHRect(-cw / 2 - grow / 2, -ch / 2 - grow / 2 + dy, cw + grow, ch + grow), r + grow / 2, r + grow / 2), p);
   }
 }

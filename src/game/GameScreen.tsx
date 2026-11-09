@@ -35,6 +35,7 @@ import { useHold } from './useHold';
 import { SeenCards } from './SeenCards';
 import { SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
+import { resultPlaces } from './outcome';
 import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
@@ -46,12 +47,22 @@ import { RULES_PICTURES } from './rulesPictures';
 import { newbieDone, newbieTip } from './newbie';
 
 const fast = typeof globalThis.location !== 'undefined' && /[?&]fast=1/.test(globalThis.location.search);
+/** Снимки «до — после» (tools/design/flow.ts): `?seed=N` — одна и та же колода и те же решения ботов в каждой сборке.
+ *  Только веб-сборка для проверок; на телефоне колода всегда из случайных байт (ADR 0004). */
+const seedParam = typeof globalThis.location !== 'undefined' ? Number(/[?&]seed=(\d+)/.exec(globalThis.location.search)?.[1]) : NaN;
+const fixedSeed = Number.isFinite(seedParam) ? seedParam : null;
+function seededBytes(seed: number): Uint8Array {
+  let x = ((seed ^ 0x9e3779b9) >>> 0) || 1;
+  const out = new Uint8Array(32);
+  for (let i = 0; i < out.length; i++) { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; out[i] = x & 255; }
+  return out;
+}
 /** Пауза перед «бито» само, когда подкинуть нечего (docs/09-game-design.md, «Темп»). */
 const AUTO_PASS = fast ? 80 : 1500;
 
 /** Новая запись партии: колода из 32 случайных байт телефона, первый ход — по своду (п. 3). */
-function newRecord(variant: Variant, seats: number, history: (Result | null)[]): GameRecord {
-  const deck = deckFrom(Crypto.getRandomBytes(32));
+function newRecord(variant: Variant, seats: number, history: (Result | null)[], deal = 0): GameRecord {
+  const deck = deckFrom(fixedSeed === null ? Crypto.getRandomBytes(32) : seededBytes(fixedSeed + deal * 7919));
   const { hands, trump } = dealOf(deck, seats);
   const after = nextFirst(history, seats);
   const lowest = firstOf(hands, trump);
@@ -74,7 +85,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const less = useLessMotion();
   const seats = bots + 1;
   const history = useRef<(Result | null)[]>(restored?.history ?? []);
-  const rng = useRef(makeRng(Crypto.getRandomBytes(4).reduce((a, b) => a * 256 + b, 0)));
+  const rng = useRef(makeRng(fixedSeed ?? Crypto.getRandomBytes(4).reduce((a, b) => a * 256 + b, 0)));
   const [record, setRecord] = useState<GameRecord>(() => restored?.record ?? newRecord(variant, seats, restored?.history ?? []));
   const [state, setState] = useState<State>(() => (restored ? replay(restored.record) : stateOf(record)));
   const [picked, setPicked] = useState<{ card: Card; options: Action[] } | null>(null);
@@ -244,7 +255,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     leaveEnd();
     setPicked(null);
     setNote(null);
-    const rec = newRecord(variant, seats, history.current);
+    const rec = newRecord(variant, seats, history.current, deal + 1);
     setRecord(rec);
     setState(stateOf(rec));
     setDeal(d => d + 1);
@@ -263,12 +274,10 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     : canPass ? (allCovered && autoPass(state, YOU) ? T.game.hintAutoDone : T.game.hintThrow) : T.game.hintWait;
 
   const name = (seat: number) => T.level[lvlAt(seat)];
-  const who = (seat: number) => (seat === YOU ? T.result.you : `${T.game.bot(seat)} · ${name(seat)}`);
   const resultText = (r: Result) => r.draw || r.fool === null ? T.result.draw
     : r.fool === YOU ? T.result.lose
     : seats === 2 ? T.result.win : r.order[0] === YOU ? T.result.first : T.result.win;
-  /** Втроём и вчетвером: кто вышел по порядку и кто остался с картами (specs/2026-11-art-premium.md §3). */
-  const orderText = (r: Result) => (seats > 2 && !r.draw && r.fool !== null ? T.result.order(r.order.map(who).join(', '), who(r.fool)) : null);
+
   const plate = plateOf(size?.width ?? 412, bots);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -349,7 +358,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
       {state.phase === 'end' && state.result && !holding ? (
-        <ResultSheet bottom={insets.bottom} title={resultText(state.result)} subtitle={orderText(state.result)}
+        <ResultSheet bottom={insets.bottom} title={resultText(state.result)} places={resultPlaces(state.result, seat => (seat === YOU ? { name: T.result.you } : { name: T.game.bot(seat), sub: name(seat) }), YOU)}
           lines={<Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>}
           main={<Button label={T.result.again} onPress={again} testID="again" />}
           rest={[

@@ -183,7 +183,9 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
 
   // стол: пары «атака — защита» в два ряда по три
   const tx = Math.round(talon.x + ch / 2 + m), tw = Math.round(discard.x - cw / 2 - m - tx);
-  const pairW = cw * 1.35, pairH = Math.min(ch * 1.3, (bottom - top) / 2);
+  // второй ряд пар ниже первого на 1,45 высоты карты: карта защиты первого ряда (сдвинута вниз на 0,22) не прячется под
+  // атакой второго (снимки «Круга 2», проход 1)
+  const pairW = cw * 1.35, pairH = Math.min(ch * 1.45, (bottom - top) / 2);
   const tableBox = { x: tx, y: Math.round(midY - pairH), w: tw, h: Math.round(pairH * 2) };
   const n = o.table.length;
   const perRow = n <= 3 ? Math.max(1, n) : 3;
