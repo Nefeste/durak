@@ -34,7 +34,6 @@ import { SeatMap } from './SeatMap';
 import { placesOf } from './seats';
 import { holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
-import { Dialog } from '../ui/dialog';
 
 export const inviteLink = (code: string) => `${net.base}/t/${code}`;
 
