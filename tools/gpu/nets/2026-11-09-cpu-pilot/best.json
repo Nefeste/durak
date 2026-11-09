@@ -1,0 +1,44 @@
+{
+ "sizes": [
+  474,
+  256,
+  128,
+  1
+ ],
+ "features": 1,
+ "sha256": "0afcd484adf5a4086f71db1664a412d265d1c62d642aa8920d83a2c7bf9d6e24",
+ "bytes": 618528,
+ "games": 50700,
+ "samples": 8358051,
+ "hours": 0.5,
+ "rounds": 169,
+ "seed": 1,
+ "created": "2026-11-09T20:26:20",
+ "arena": {
+  "net": "/tmp/claude-0/-home-user/a841f136-e454-57cd-be19-49cb125a63c1/scratchpad/run2/arena.bin",
+  "samples": 24,
+  "pairs": 100,
+  "experienced": {
+   "games": 200,
+   "loops": 0,
+   "share": 0.7825,
+   "ci": 0.05717588259047691,
+   "elo": 222.41003397113204,
+   "elo_lo": 168.68463582172015,
+   "elo_hi": 287.64512865896694
+  },
+  "master": {
+   "games": 200,
+   "loops": 0,
+   "share": 0.7375,
+   "ci": 0.06097990447680284,
+   "elo": 179.45308676329,
+   "elo_lo": 128.17335813033884,
+   "elo_hi": 239.17825210950633
+  },
+  "seconds": 295.695,
+  "games": 50700,
+  "hours": 0.5,
+  "rounds": 169
+ }
+}

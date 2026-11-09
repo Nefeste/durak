@@ -2,7 +2,7 @@
 // на один на зеркальных раздачах — каждая колода дважды, места меняются; поровну подкидной и переводной. Настоящие боты
 // приложения, настоящий движок. Части считаются параллельно (`--jobs`). Печатает одну строку JSON.
 //
-//   bun tools/gpu/arena.ts --net best.bin --vs experienced,master --pairs 200 [--jobs 8] [--samples 24] [--seed 1]
+//   bun tools/gpu/arena.ts --net best.bin --vs experienced,master --pairs 200 [--jobs 8] [--samples 24] [--seed 1] [--variant podkidnoy|perevodnoy]
 import { makeRng } from '../../src/bot';
 import type { Variant } from '../../src/engine';
 import { playOut, playerOf, shuffled, startOf, trainingRules } from './play';
@@ -27,7 +27,7 @@ async function part(rival: string, from: number, to: number) {
   for (let p = from; p < to; p++) {
     const deckRng = makeRng(seed * 1_000_003 + p);
     const deck = shuffled(deckRng);
-    const variant: Variant = p % 2 ? 'perevodnoy' : 'podkidnoy';
+    const variant: Variant = (A.variant as Variant | undefined) ?? (p % 2 ? 'perevodnoy' : 'podkidnoy');
     for (const mine of [0, 1]) {
       const players = mine === 0 ? [me, other] : [other, me];
       const end = playOut(startOf(deck, 2, variant, rules), players, makeRng(seed * 7 + p * 2 + mine));
