@@ -43,7 +43,8 @@ export async function misfits(page: Page, scale: number): Promise<Misfit[]> {
         if (lh !== 'normal') e.style.lineHeight = `${parseFloat(lh) * kk}px`;
       });
     }, [scale, FONT_CAPS] as [number, Record<string, number>]);
-    await page.waitForTimeout(400);
+    // подписи картинок «Правил» меряют себя через onLayout: на тяжёлом экране под нагрузкой 400 мс не хватало
+    await page.waitForTimeout(1000);
   }
   const out = await page.evaluate(() => {
     const texts = [...document.querySelectorAll<HTMLElement>('[dir="auto"]')].filter(e => e.tagName !== 'INPUT' && e.tagName !== 'TEXTAREA');
