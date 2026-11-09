@@ -306,7 +306,10 @@ try {
     await ph.waitForTimeout(380);
     const trace = await ph.evaluate(k => (globalThis as unknown as { __trace: Record<string, [number, number][]> }).__trace[k] ?? [], `c${id}`);
     const handY = card.y - felt.y + card.height / 2;
-    const back = trace.filter(([, y]) => y > drop.y + 60);
+    // карта летит от места, где её отпустили, к своему месту на столе (оно может быть ниже точки отпускания);
+    // возврат к руке — точки заметно ниже и того и другого
+    const rest = trace[trace.length - 1] ?? [drop.x, drop.y];
+    const back = trace.filter(([, y]) => y > Math.max(drop.y, rest[1]) + 60 || y > handY - 120);
     ok(trace.length > 0 && Math.hypot(trace[0][0] - drop.x, trace[0][1] - drop.y) < 30,
       `отпущенная карта на следующем кадре там, где её отпустили: (${trace[0]?.map(Math.round).join(', ')}) у (${Math.round(drop.x)}, ${Math.round(drop.y)})`, JSON.stringify(trace.slice(0, 4)));
     ok(back.length === 0, `карта не возвращается к руке (y ≈ ${Math.round(handY)}) и не летит оттуда второй раз`, JSON.stringify(back.slice(0, 4)));
