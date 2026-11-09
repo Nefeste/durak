@@ -10,7 +10,7 @@ export const YOU = 0;
 export function actionsWith(s: State, seat: number, c: Card): Action[] {
   return legalActions(s, seat).filter(a => {
     if (a.type === 'beat') return a.card === c;
-    if (a.type === 'take' || a.type === 'pass') return false;
+    if (a.type === 'take' || a.type === 'pass' || a.type === 'resign') return false;
     return a.cards.length === 1 && a.cards[0] === c;
   });
 }

@@ -98,7 +98,7 @@ describe('раскладка стола', () => {
             const { seat, action } = record.actions[i - 1];
             const prev = observe(states[i - 1], 0), next = observe(states[i], 0);
             origins = originsOf(prev, next, origins);
-            const played = action.type === 'beat' ? [action.card] : action.type === 'take' || action.type === 'pass' ? [] : action.cards;
+            const played = action.type === 'beat' ? [action.card] : action.type === 'take' || action.type === 'pass' || action.type === 'resign' ? [] : action.cards;
             const l = layoutTable(next, { ...opt, origins });
             const at = (k: number) => (k === 0 ? { x: SIZE.width / 2 } : l.opponents.find(p => p.seat === k) ?? { x: -1 });
             for (const c of played) {

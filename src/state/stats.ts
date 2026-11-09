@@ -2,7 +2,7 @@
 // итог в целом; подробно («Про») — места за столом, форма последних партий, против каждого уровня, рейтинг
 // тренировок по партиям, средние за партию с ходом, по столам, числу игроков, уровню стола и неделям.
 // Всё выводится из записи партии (переигрыванием, docs/04-data-model.md, «История») — нового в хранилище нет.
-import { apply, newGame, suitOf } from '../engine';
+import { apply, lostBy, newGame, suitOf } from '../engine';
 import type { Card, GameRecord, Variant } from '../engine';
 import { oneLevel } from '../bot';
 import type { Level } from '../bot';
@@ -157,7 +157,8 @@ export function replayed(r: GameRecord): Replayed {
   return {
     bouts, takes, transfers, trumps,
     trumpsLeft: s.hands.map(h => h.filter(isT).length),
-    exitBout: exitBout.map(b => (b < 0 ? bouts : b)),
+    // сдавшийся (п. 8) — позже всех, даже позже оставшегося с картами
+    exitBout: exitBout.map((b, seat) => (s.resigned.includes(seat) ? bouts + 1 : b < 0 ? bouts : b)),
   };
 }
 
@@ -166,8 +167,9 @@ export const trumpsDealt = (r: GameRecord): number[] => replayed(r).trumps;
 
 export function placeOf(r: GameRecord, seat = ME): Place {
   const res = r.result!;
+  // сдался — «остался с картами» (docs/08-rules.md, п. 8.5)
+  if (lostBy(res, seat)) return 'fool';
   if (res.draw) return 'draw';
-  if (res.fool === seat) return 'fool';
   return res.order[0] === seat ? 'first' : 'out';
 }
 

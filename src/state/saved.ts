@@ -18,7 +18,7 @@ export interface SavedGame {
 const isAction = (a: unknown): a is Action => {
   if (!a || typeof a !== 'object') return false;
   const t = (a as { type?: unknown }).type;
-  return ['attack', 'throwIn', 'give', 'transfer', 'beat', 'take', 'pass'].includes(t as string);
+  return ['attack', 'throwIn', 'give', 'transfer', 'beat', 'take', 'pass', 'resign'].includes(t as string);
 };
 
 /** Разобрать и проверить сохранение: та же версия свода, законные действия до конца записи.

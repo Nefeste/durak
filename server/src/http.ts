@@ -83,7 +83,7 @@ export class Http {
       r('POST', `/v1/tables/${id}/bot`, async (c, m) => { const me = this.me(c); return json(200, { table: core.setBot(me, m[1], await this.body(c)) }); }),
       r('POST', `/v1/tables/${id}/cancel`, (c, m) => json(200, core.cancel(this.me(c), m[1]))),
       r('POST', `/v1/tables/${id}/act`, async (c, m) => { const me = this.me(c); return json(200, core.act(me, m[1], await this.body(c))); }),
-      r('POST', `/v1/tables/${id}/resign`, (c, m) => json(200, core.resign(this.me(c), m[1]))),
+      r('POST', `/v1/tables/${id}/resign`, async (c, m) => { const me = this.me(c); return json(200, core.resign(me, m[1], await this.body(c).catch(() => ({})), knowsQueue(c))); }),
       r('POST', `/v1/tables/${id}/rematch`, async (c, m) => { const me = this.me(c); return json(200, { table: core.rematch(me, m[1], await this.body(c)) }); }),
       r('POST', `/v1/tables/${id}/say`, async (c, m) => {
         const me = this.me(c);

@@ -9,7 +9,7 @@ import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
-import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, rulesWith, throwerOf } from '../engine';
+import { apply, dealOf, deckFrom, firstOf, legalActions, lostBy, newGame, nextFirst, observe, reasonOf, replay, rulesWith, throwerOf } from '../engine';
 import type { Action, Card, GameRecord, Observation, Result, State, ThrowOrder, Variant } from '../engine';
 import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
 import { reviewGame } from './review';
@@ -29,7 +29,7 @@ import { getSettings, setSettings, useLessMotion, useSettings } from '../state/s
 import { dropGame, saveGame } from '../state/save';
 import type { SavedGame } from '../state/save';
 import { botTurn, levelAt, tapCard, YOU } from './table';
-import { autoPass, canUndo, seenGrid } from './flow';
+import { autoPass, canUndo, finishWithoutYou, seenGrid } from './flow';
 import { heldView, holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
 import { SeenCards } from './SeenCards';
@@ -113,7 +113,10 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   // «Правила» поверх стола; пока они открыты, боты ждут
   const [told, setTold] = useState(() => variant === 'perevodnoy' && !restored && !settings.transferTold);
   const [rulesOpen, setRulesOpen] = useState(false);
-  const paused = told || rulesOpen;
+  // «Сдаться» (docs/08-rules.md, п. 8; решение владельца #58): своё окно подтверждения, не Alert; пока оно открыто, боты ждут
+  const [resignAsk, setResignAsk] = useState(false);
+  const [menuAsk, setMenuAsk] = useState(false);
+  const paused = told || rulesOpen || resignAsk || menuAsk;
   const { width: winW, fontScale } = useWindowDimensions();
   // плашка бота: имя, уровень, число карт, роль — каждая строкой (docs/13-art.md, §3 «Надписи целиком»)
   // подсказки новичка гаснут после партии, которую начали с ними (включённые посреди партии — со следующей)
@@ -139,8 +142,16 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
 
   const act = (seat: number, a: Action) => {
     if (reasonOf(state, seat, a) !== null) return;
-    const next = apply(state, seat, a);
-    const rec: GameRecord = { ...record, actions: [...record.actions, { seat, action: a, at: Date.now() }], result: next.result };
+    let next = apply(state, seat, a);
+    const at = Date.now();
+    let actions = [...record.actions, { seat, action: a, at }];
+    // вы сдались, а ботов за столом двое и больше — они доигрывают сразу, без показа (docs/08-rules.md, п. 8.7)
+    if (a.type === 'resign' && next.phase !== 'end') {
+      const rest = finishWithoutYou(next, rng.current);
+      next = rest.state;
+      actions = [...actions, ...rest.actions.map(x => ({ ...x, at }))];
+    }
+    const rec: GameRecord = { ...record, actions, result: next.result };
     const h = heldView(observe(state, YOU), seat, a, next);
     setHeld(h ? { n: rec.actions.length, view: h } : null);
     setState(next);
@@ -258,7 +269,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     saveGame({ record: rec, levels: lvls, history: history.current });
   };
   /** Уход с экрана итога: оценка RuStore или реклама между партиями, если пора (src/money). */
-  const leaveEnd = () => { leavingEnd({ wonVsBot: !!state.result && !state.result.draw && state.result.fool !== YOU }); };
+  const leaveEnd = () => { leavingEnd({ wonVsBot: !!state.result && !state.result.draw && !lostBy(state.result, YOU) }); };
+
   const again = () => {
     leaveEnd();
     setPicked(null);
@@ -285,7 +297,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     : thrower >= 0 && thrower !== YOU && state.defender !== YOU ? T.game.hintQueue(T.game.bot(thrower)) : T.game.hintWait;
 
   const name = (seat: number) => T.level[lvlAt(seat)];
-  const resultText = (r: Result) => r.draw || r.fool === null ? T.result.draw
+  const resultText = (r: Result) => (r.resigned ?? []).includes(YOU) ? T.result.youResigned
+    : r.draw || r.fool === null ? T.result.draw
     : r.fool === YOU ? T.result.lose
     : seats === 2 ? T.result.win : r.order[0] === YOU ? T.result.first : T.result.win;
 
@@ -302,7 +315,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
       <View style={styles.top}>
-        <Button small label={T.game.menu} kind="ghost" onPress={onExit} testID="game-menu" />
+        {/* «В меню» — окно партии: выйти (партия сохранится) или «Сдаться» (п. 8, #58); после конца — сразу в меню */}
+        <Button small label={T.game.menu} kind="ghost" onPress={() => { if (state.phase === 'end') { onExit(); return; } hold.skip(); setMenuAsk(true); }} testID="game-menu" />
         {/* в полосе — только стол: уровень каждого бота — на его плашке («Переводной · Начинающий» с «Вышедшими» на 360 точках
             обрезался); название растёт с шрифтом телефона до ×1,15 — так на 360 точках рядом помещаются обе кнопки */}
         <Text style={styles.variant} maxFontSizeMultiplier={TITLE_SCALE} testID="game-title">{T.variant[variant]}</Text>
@@ -363,6 +377,17 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
             { label: T.game.transferWhat.ok, testID: 'transfer-ok' },
             { label: T.game.transferWhat.rules, kind: 'ghost', testID: 'transfer-rules', onPress: () => setRulesOpen(true) },
           ],
+        } : null} />
+        <Dialog onClose={() => setMenuAsk(false)} spec={menuAsk && state.phase !== 'end' ? {
+          title: T.game.menuAsk.title, text: T.game.menuAsk.text, cancel: T.game.resignAsk.cancel,
+          actions: [
+            { label: T.game.menu, testID: 'game-exit', onPress: () => { setMenuAsk(false); onExit(); } },
+            { label: T.game.resign, kind: 'ghost', testID: 'resign', onPress: () => { setMenuAsk(false); setResignAsk(true); } },
+          ],
+        } : null} />
+        <Dialog onClose={() => setResignAsk(false)} spec={resignAsk && state.phase !== 'end' ? {
+          title: T.game.resignAsk.title, text: seats > 2 ? T.game.resignAsk.textBots : T.game.resignAsk.text, cancel: T.game.resignAsk.cancel,
+          actions: [{ label: T.game.resignAsk.ok, testID: 'resign-ok', onPress: () => { setResignAsk(false); setPicked(null); act(YOU, { type: 'resign' }); } }],
         } : null} />
         {holding ? <View pointerEvents="none" style={styles.held} testID="held" accessible accessibilityLabel={tableLabel(hold.shown!.table)} /> : null}
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}

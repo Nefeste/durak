@@ -232,8 +232,11 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const plate = plateOf(size?.width ?? 412, t.seats.length - 1);
   const oppW = plate.w;
 
-  const result = (r: Result) => r.draw || r.fool === null ? T.result.draw
-    : r.fool === t.you ? T.result.lose : T.result.other(seatName(t.seats[r.fool]));
+  const gave = (seat: number | null, r: Result) => seat !== null && (r.resigned ?? []).includes(seat);
+  const result = (r: Result) => gave(t.you, r) ? T.result.youResigned
+    : r.draw || r.fool === null ? T.result.draw
+    : r.fool === t.you ? T.result.lose
+    : gave(r.fool, r) ? T.result.otherResigned(seatName(t.seats[r.fool])) : T.result.other(seatName(t.seats[r.fool]));
   const rematch = () => {
     if (!g.nextCommit) return;
     const seed = newSeed();
@@ -241,14 +244,19 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
     setAsked(true);
     void net.rematch(t.id, seed, g.nextCommit).then(v => table.set(v)).catch(() => setAsked(false));
   };
-  const resign = () => { void net.resign(t.id).catch(() => {}); if (t.kind === 'friend') onExit(); };
+  // «Выйти» из-за стола с друзьями — за вас доиграет бот; «Сдаться» — с подтверждением своим окном (п. 8, #58)
+  const leave = () => { void net.resign(t.id, true).catch(() => {}); onExit(); };
+  const [asking, setAsking] = useState(false);
+  const iResigned = !!view && (view.resigned ?? []).includes(t.you);
+  const doResign = () => { setAsking(false); void net.resign(t.id).catch(() => {}); };
 
   return (
     <View style={[styles.root, pad, { paddingHorizontal: SPACE.s }]} testID="online-game">
       <View style={styles.top}>
-        <Button small label={t.status === 'finished' ? T.game.menu : t.kind === 'quick' ? T.online.resign : T.online.leave} kind="ghost"
-          onPress={t.status === 'finished' ? onExit : resign} testID="online-exit" />
+        <Button small label={t.status === 'finished' || iResigned ? T.game.menu : t.kind === 'quick' ? T.online.resign : T.online.leave} kind="ghost"
+          onPress={t.status === 'finished' || iResigned ? onExit : t.kind === 'quick' ? () => setAsking(true) : leave} testID="online-exit" />
         <Text style={[styles.dim, styles.topTitle]} maxFontSizeMultiplier={TITLE_SCALE} testID="online-title">{T.variant[t.variant]}{left !== null ? ` · ${T.online.secs(left)}` : ''}</Text>
+        {t.kind === 'friend' && t.status === 'playing' && view && !iResigned ? <Button small label={T.game.resign} kind="ghost" onPress={() => setAsking(true)} testID="resign" /> : null}
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
         {down ? <Text style={[styles.err, styles.down]} pointerEvents="none" testID="online-down">{T.online.noNet}</Text> : null}
@@ -263,7 +271,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
             <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={s?.bot ? T.online.botName : seatName(s)}
               lines={[
                 ...(s?.bot ? [T.level[s.bot]] : s?.botFor ? [T.online.botPlays] : s && !s.online ? [T.online.offline] : []),
-                shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat]),
+                (shown.resigned ?? []).includes(p.seat) ? T.game.resigned : shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat]),
               ]}
               role={!view || view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : throwerSeen(view) === p.seat ? T.game.throwing : null}
               active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat || throwerSeen(view) === p.seat)}
@@ -287,6 +295,10 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
           </View>
         ) : null}
       </View>
+      <Dialog onClose={() => setAsking(false)} spec={asking && t.status === 'playing' && !iResigned ? {
+        title: T.game.resignAsk.title, text: t.seats.length > 2 ? T.game.resignAsk.textOnlineMany : T.game.resignAsk.textOnline, cancel: T.game.resignAsk.cancel,
+        actions: [{ label: T.game.resignAsk.ok, testID: 'resign-ok', onPress: doResign }],
+      } : null} />
       {t.status === 'finished' && g.result ? (
         <ResultSheet bottom={insets.bottom} title={result(g.result)}
           places={resultPlaces(g.result, seat => ({ name: seat === t.you ? T.result.you : seatName(t.seats[seat]) }), t.you)}

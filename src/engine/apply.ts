@@ -1,8 +1,8 @@
 // Применение действия: конец отбоя, добор, выход, конец партии (docs/08-rules.md, пп. 4–7).
 import type { Card } from './cards';
-import { active, cloneState, limitOf, nextActive } from './deal';
+import { active, cloneState, inPlay, limitOf, nextActive } from './deal';
 import { attackersOf, reasonOf } from './legal';
-import type { Action, State } from './types';
+import type { Action, Result, State } from './types';
 
 export class IllegalAction extends Error {
   constructor(readonly reason: string) {
@@ -64,6 +64,52 @@ export function applyInPlace(s: State, seat: number, a: Action): void {
     case 'pass':
       s.passed[seat] = true;
       break;
+    case 'resign':
+      resign(s, seat);
+      return;
+  }
+  settle(s);
+}
+
+const resultOf = (s: State, fool: number | null, order: number[]): Result =>
+  ({ fool, draw: fool === null, order, ...(s.resigned.length ? { resigned: [...s.resigned] } : {}) });
+
+/** Сдача (п. 8, правило приложения): карты — из игры рубашкой вверх, отбой — по п. 8.3, конец — по п. 8.4. */
+function resign(s: State, seat: number) {
+  s.buried.push(...s.hands[seat]);
+  s.hands[seat] = [];
+  s.openly[seat] = [];
+  s.passed[seat] = false;
+  s.resigned.push(seat);
+  const left: number[] = [];
+  for (let x = 0; x < s.seats; x++) if (inPlay(s, x)) left.push(x);
+  if (left.length < 2) {
+    s.discard.push(...s.table.flatMap(([a, d]) => (d === null ? [a] : [a, d])));
+    s.table = [];
+    s.phase = 'end';
+    s.result = { fool: seat, draw: false, order: [...s.out, ...left], resigned: [...s.resigned] };
+    return;
+  }
+  if (seat === s.defender) {
+    if (s.table.length > 0) { endBout(s, 'beaten'); return; }
+    s.defender = nextActive(s, s.attacker);
+    s.boutLimit = limitOf(s.rules, s.bout, s.hands[s.defender].length);
+    return;
+  }
+  if (seat === s.attacker) {
+    if (s.table.length === 0) {
+      const next = nextActive(s, seat);
+      s.starter = next;
+      s.attacker = next;
+      s.defender = nextActive(s, next);
+      s.boutLimit = limitOf(s.rules, s.bout, s.hands[s.defender].length);
+      return;
+    }
+    // посреди отбоя — ходящий следующий за ним атакующий (п. 8.3): первое право подкидывать у него
+    for (let k = 1; k < s.seats; k++) {
+      const x = (seat + k) % s.seats;
+      if (x !== s.defender && inPlay(s, x)) { s.attacker = x; break; }
+    }
   }
   settle(s);
 }
@@ -84,9 +130,9 @@ export function drawOrder(s: State): number[] {
   const order: number[] = [];
   for (let k = 0; k < s.seats; k++) {
     const seat = (s.starter + k) % s.seats;
-    if (seat !== s.defender && !s.out.includes(seat)) order.push(seat);
+    if (seat !== s.defender && inPlay(s, seat)) order.push(seat);
   }
-  if (!s.out.includes(s.defender)) order.push(s.defender);
+  if (inPlay(s, s.defender)) order.push(s.defender);
   return order;
 }
 
@@ -105,12 +151,12 @@ function endBout(s: State, how: 'beaten' | 'taken') {
   // п. 7.2: когда колода пуста, игрок без карт выходит
   if (s.talon.length === 0) for (const seat of order) if (s.hands[seat].length === 0 && !s.out.includes(seat)) s.out.push(seat);
   const left: number[] = [];
-  for (let seat = 0; seat < s.seats; seat++) if (!s.out.includes(seat)) left.push(seat);
+  for (let seat = 0; seat < s.seats; seat++) if (inPlay(s, seat)) left.push(seat);
   resetPasses(s);
   s.bout++;
   if (left.length <= 1) {
     s.phase = 'end';
-    s.result = { fool: left.length === 1 ? left[0] : null, draw: left.length === 0, order: [...s.out] };
+    s.result = resultOf(s, left.length === 1 ? left[0] : null, [...s.out]);
     return;
   }
   // п. 4.7 и 7.3: после «бито» ходит отбивавшийся (если вышел — следующий с картами),
