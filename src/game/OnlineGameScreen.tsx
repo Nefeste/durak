@@ -13,7 +13,10 @@ import type { Level } from '../bot';
 import { layout as fill, unseen } from '../bot/legal';
 import { T } from '../i18n';
 import { gameEnded, leavingEnd } from '../money';
+import { BottomBar } from '../ui/BottomBar';
 import { Button } from '../ui/Button';
+import { Dialog } from '../ui/dialog';
+import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
 import { plateLines, SeatPlate } from './SeatPlate';
@@ -52,13 +55,20 @@ export function OnlineGameScreen({ table, onExit }: { table: OnlineTable; onExit
   const t = table.view;
   const pad = { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s };
   if (!t) return <View style={[styles.root, pad]} testID="online-loading"><Text style={styles.dim}>{T.online.waiting}</Text></View>;
-  if (t.status === 'waiting' || t.status === 'cancelled') return <Lobby table={table} t={t} onExit={onExit} pad={pad} />;
+  if (t.status === 'waiting' || t.status === 'cancelled') return <Lobby table={table} t={t} onExit={onExit} />;
   return <Play table={table} t={t} onExit={onExit} pad={pad} down={table.down} />;
 }
 
-function Lobby({ table, t, onExit, pad }: { table: OnlineTable; t: TableView; onExit: () => void; pad: object }) {
+// Сбор стола (аудит 09.11.2026, находка 8; решение владельца 09.11.2026): шапка «Назад» + «Стол · Подкидной», как на
+// всех экранах; «Начать» — закреплённой полосой внизу над кнопками телефона, схема мест и строки уровней прокручиваются
+// над ней. «Назад» у хозяина — то же, что «Закрыть стол»: стол закрывается для всех, поэтому — с вопросом.
+function Lobby({ table, t, onExit }: { table: OnlineTable; t: TableView; onExit: () => void }) {
+  const insets = useInsets();
   const host = t.you === t.host;
   const [err, setErr] = useState<string | null>(null);
+  const [bar, setBar] = useState(0);
+  const [locked, setLocked] = useState(false);
+  const [asking, setAsking] = useState(false);
   const fail = (e: unknown) => setErr(T.online.errors[(e as { kind?: string }).kind ?? 'other'] ?? T.online.errors.other);
   const start = () => { setErr(null); net.start(t.id).catch(fail); };
   // пересесть до начала — с тем же зерном, что отдано за эту партию (сервер переносит его на новое место)
@@ -69,32 +79,44 @@ function Lobby({ table, t, onExit, pad }: { table: OnlineTable; t: TableView; on
   const level = host && t.kind === 'friend' && t.status === 'waiting' && t.bots
     ? (seat: number, l: Level) => { setErr(null); net.setBot(t.id, seat, l).then(v => table.set(v), fail); }
     : undefined;
-  const leave = () => { if (host && t.status === 'waiting') void net.cancel(t.id).catch(() => {}); onExit(); };
+  const closes = host && t.status === 'waiting';
+  const leaveNow = () => { if (closes) void net.cancel(t.id).catch(() => {}); onExit(); };
+  const leave = () => { if (closes && t.kind === 'friend') setAsking(true); else leaveNow(); };
+  const starts = host && t.kind === 'friend';
   const link = t.code ? inviteLink(t.code) : '';
   return (
-    // прокрутка: вчетвером со строками уровней ботов лобби выше экрана телефона
-    <ScrollView style={styles.root} contentContainerStyle={[pad, styles.lobby]} testID="lobby">
-      <Text style={styles.dim} testID="lobby-rules">{t.seats.length > 2 ? `${T.variant[t.variant]} · ${T.online.orderOf(t.order ?? 'free')}` : T.variant[t.variant]}</Text>
-      {t.kind === 'friend' && t.code ? (
+    <View style={styles.lobbyRoot}>
+      {/* прокрутка: вчетвером со строками уровней ботов сбор стола выше экрана телефона */}
+      <ScrollView style={styles.lobbyRoot} contentContainerStyle={[styles.lobby, { paddingTop: insets.top + SPACE.l, paddingBottom: (starts ? bar : insets.bottom) + SPACE.l }]} testID="lobby">
+        <Header title={T.online.lobbyTitle(T.variant[t.variant])} back={T.online.back} onBack={leave} backTestID="lobby-back" />
+        {/* «Подкидывать» стола (ADR 0013): втроём и вчетвером */}
+        {t.seats.length > 2 ? <Text style={styles.dim} testID="lobby-rules">{T.online.orderOf(t.order ?? 'free')}</Text> : null}
+        {t.kind === 'friend' && t.code ? (
+          <View style={styles.panel}>
+            <Text style={styles.dim}>{T.online.code}</Text>
+            <Text style={styles.code} testID="table-code" selectable>{t.code}</Text>
+            <Button label={T.online.share} kind="ghost" onPress={() => void Share.share({ message: T.online.shareText(link) }).catch(() => {})} testID="share" />
+          </View>
+        ) : null}
         <View style={styles.panel}>
-          <Text style={styles.dim}>{T.online.code}</Text>
-          <Text style={styles.code} testID="table-code" selectable>{t.code}</Text>
-          <Button label={T.online.share} kind="ghost" onPress={() => void Share.share({ message: T.online.shareText(link) }).catch(() => {})} testID="share" />
+          <Text style={styles.dim}>{T.online.waiting}</Text>
+          <SeatMap places={placesOf(t)} host={Math.max(0, t.host)} onSit={move} sitLabel={T.online.moveSeat} onLevel={level} onLocked={setLocked} />
         </View>
+        {starts && t.bots ? <Text style={styles.dim}>{T.online.startHint}</Text> : null}
+        {err && !starts ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
+        <Button label={starts ? T.online.cancelTable : T.online.leave} kind="ghost" onPress={leave} testID="lobby-leave" />
+      </ScrollView>
+      {starts ? (
+        <BottomBar bottom={insets.bottom} onHeight={setBar} testID="start-bar">
+          {err ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
+          <Button label={T.online.start} onPress={start} disabled={locked} testID="start" />
+        </BottomBar>
       ) : null}
-      <View style={styles.panel}>
-        <Text style={styles.dim}>{T.online.waiting}</Text>
-        <SeatMap places={placesOf(t)} host={Math.max(0, t.host)} onSit={move} sitLabel={T.online.moveSeat} onLevel={level} />
-      </View>
-      {host && t.kind === 'friend' ? (
-        <>
-          {t.bots ? <Text style={styles.dim}>{T.online.startHint}</Text> : null}
-          <Button label={T.online.start} onPress={start} testID="start" />
-        </>
-      ) : null}
-      {err ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
-      <Button label={host && t.kind === 'friend' ? T.online.cancelTable : T.online.leave} kind="ghost" onPress={leave} testID="lobby-leave" />
-    </ScrollView>
+      <Dialog onClose={() => setAsking(false)} spec={asking ? {
+        title: T.online.cancelAsk, text: T.online.cancelAskText, cancel: T.online.cancelKeep,
+        actions: [{ label: T.online.cancelTable, testID: 'lobby-close', onPress: leaveNow }],
+      } : null} />
+    </View>
   );
 }
 
@@ -288,7 +310,8 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
 
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: SPACE.l, gap: SPACE.s },
-  lobby: { gap: SPACE.l },
+  lobbyRoot: { flex: 1 },
+  lobby: { gap: SPACE.l, paddingHorizontal: SPACE.l },
   panel: { gap: SPACE.s, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
   code: { color: C.accent, fontSize: TYPE.display, fontWeight: '800', letterSpacing: 6 },
   dim: { color: C.dim, fontSize: TYPE.caption },

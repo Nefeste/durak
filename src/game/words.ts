@@ -33,7 +33,10 @@ export function whyText(d: Decision, done = false): string {
   }
 }
 
+/** Первая буква строчной, остальное как есть: «В♠» в середине строки остаётся валетом, а не «в♠». */
+const lower1 = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
 /** Главная ошибка одной строкой — для экрана итога. */
 export function worstText(d: Decision): string {
-  return T.result.worst(d.bout, d.why.kind === 'better' ? `${actionText(d.played)}; ${T.review.best(actionText(d.best)).toLowerCase()}` : whyText(d));
+  return T.result.worst(d.bout, d.why.kind === 'better' ? `${actionText(d.played)}; ${lower1(T.review.best(lower1(actionText(d.best))))}` : whyText(d));
 }

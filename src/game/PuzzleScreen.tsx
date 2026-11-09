@@ -136,13 +136,13 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
           </View>
         ) : null}
       </View>
-      <View style={styles.row}>
+      <View style={[styles.row, styles.inset]}>
         {status === 'wrong' ? <View style={styles.cell}><Button label={T.puzzle.again} onPress={again} testID="puzzle-again" /></View> : null}
         {status === 'play' || status === 'wrong' ? <View style={styles.cell}><Button label={T.puzzle.answer} kind="ghost" onPress={showAnswer} testID="puzzle-answer" /></View> : null}
         {status === 'solved' || status === 'shown' ? <View style={styles.cell}><Button label={T.puzzle.share} onPress={share} testID="puzzle-share" /></View> : null}
         <View style={styles.cell}><Button label={T.puzzle.archive} kind="ghost" onPress={onArchive} testID="puzzle-archive" /></View>
       </View>
-      {shared ? <Text style={styles.shared} testID="puzzle-share-text">{shared}</Text> : null}
+      {shared ? <Text style={[styles.shared, styles.margin]} testID="puzzle-share-text">{shared}</Text> : null}
     </View>
   );
 }
@@ -169,8 +169,11 @@ export function PuzzleScreen({ onBack }: { onBack: () => void }) {
   useEffect(() => { if (archive) void loadPuzzleLog().then(setLog); }, [archive]);
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="puzzle">
-      <Header title={archive ? T.puzzle.archive : T.puzzle.title} back={T.puzzle.back} onBack={archive ? () => setArchive(false) : onBack} backTestID="puzzle-back"
-        right={!archive && day !== today ? <Button small label={T.puzzle.today} kind="ghost" onPress={() => setDay(today)} testID="puzzle-today" /> : null} />
+      {/* шапка, строки и кнопки — с полями экрана 16, как на других экранах; стол — шире, на поля 8, как в партии (аудит 09.11.2026, находка 5) */}
+      <View style={styles.inset}>
+        <Header title={archive ? T.puzzle.archive : T.puzzle.title} back={T.puzzle.back} onBack={archive ? () => setArchive(false) : onBack} backTestID="puzzle-back"
+          right={!archive && day !== today ? <Button small label={T.puzzle.today} kind="ghost" onPress={() => setDay(today)} testID="puzzle-today" /> : null} />
+      </View>
       {archive ? <Archive today={today} log={log} onOpen={n => { setDay(n); setArchive(false); }} />
         : <Board key={day} day={day} onArchive={() => setArchive(true)} />}
     </View>
@@ -189,5 +192,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: SPACE.s },
   cell: { flex: 1 },
   shared: { color: C.dim, fontSize: TYPE.caption, textAlign: 'center', padding: SPACE.s, borderRadius: RADIUS.panel, borderWidth: 1, borderColor: C.glassLine },
-  list: { gap: SPACE.s, paddingBottom: SPACE.xl },
+  list: { gap: SPACE.s, paddingBottom: SPACE.xl, paddingHorizontal: SPACE.s },
+  inset: { paddingHorizontal: SPACE.s },
+  margin: { marginHorizontal: SPACE.s },
 });
