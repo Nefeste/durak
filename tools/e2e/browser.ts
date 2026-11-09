@@ -336,7 +336,9 @@ try {
         }
       }).observe(document, { childList: true, subtree: true, characterData: true });
     });
-    await ph.goto(`${web.url}?seed=11`); // без ?fast: бот думает как на телефоне — видно «думает…»
+    // без ?fast: бот думает как на телефоне — видно «думает…». seed=12: по масти и по старшинству рука разная
+    // (при seed=11 оба порядка совпадали: 12,14,24,26,1,4 — и проверку кнопки порядка нечем было пройти)
+    await ph.goto(`${web.url}?seed=12`);
     await ph.getByTestId('menu').waitFor({ timeout: 20000 });
     await ph.getByTestId('play').click();
     await ph.getByTestId('game').waitFor({ timeout: 10000 });
