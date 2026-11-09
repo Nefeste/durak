@@ -29,7 +29,7 @@ export function pos(p: Pos): State {
     rules, variant: p.variant ?? 'podkidnoy', seats, hands, talon, trump,
     table: [], discard: [], openly: hands.map(() => []),
     starter: attacker, attacker, defender, passed: hands.map(() => false),
-    boutLimit: limitOf(rules, bout, hands[defender].length), bout, out: [], phase: 'bout', result: null,
+    boutLimit: limitOf(rules, bout, hands[defender].length), bout, out: [], resigned: [], buried: [], phase: 'bout', result: null,
   };
 }
 

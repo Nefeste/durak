@@ -194,6 +194,20 @@ async function main() {
   await b.getByTestId('rematch').click();
   await a.waitForTimeout(2500);
   ok(await hand(a).count() === 6, 'реванш: новая партия, снова шесть карт', await hand(a).count());
+  // «Сдаться» вчетвером (docs/08-rules.md, п. 8; #58): Саша сдаётся — остальные доигрывают без него
+  await b.getByTestId('resign').click();
+  ok(await visible(b, 'resign-ok'), 'Саша: «Сдаться» спрашивает своим окном');
+  await b.screenshot({ path: `${OUT}/online-03b-resign-ask.png` });
+  await b.getByTestId('resign-ok').click();
+  await a.waitForTimeout(2500);
+  ok(/сдался/.test(await a.getByTestId('opp-2').innerText().catch(() => '')), 'у Миши на плашке Саши — «сдался»', await a.getByTestId('opp-2').innerText().catch(() => ''));
+  ok(!(await visible(a, 'result')) && await hand(a).count() > 0, 'партия идёт без сдавшегося');
+  ok(await hand(b).count() === 0 && !(await visible(b, 'resign')), 'у Саши карт нет, «Сдаться» больше нет');
+  await a.screenshot({ path: `${OUT}/online-03c-resigned.png` });
+  ok(await playOut([a], 'без сдавшегося'), 'партия втроём без сдавшегося дошла до итога');
+  await a.waitForTimeout(800);
+  ok(/Колода проверена/.test(await a.getByTestId('deck-check').innerText().catch(() => '')), 'Миша: «Колода проверена» и со сдачей в записи');
+  ok(/с картами/.test(await a.getByTestId('result-places').getAttribute('aria-label').catch(() => '') ?? ''), 'в ряду мест есть «с картами»');
   await a.getByTestId('online-exit').click();
   await b.getByTestId('online-exit').click();
   await a.getByTestId('menu').waitFor({ timeout: 10_000 });

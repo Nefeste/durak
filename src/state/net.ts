@@ -104,7 +104,8 @@ export class Net {
   /** Действие с номером: повтор того же — безопасен (сервер ответит тем же). */
   act = (id: string, game: number, n: number, action: Action) =>
     this.request<{ n: number }>('POST', `/v1/tables/${id}/act`, { game, n, action }, undefined, true);
-  resign = (id: string) => this.request<{ ok: true }>('POST', `/v1/tables/${id}/resign`, {}, undefined, true);
+  /** Сдаться (docs/08-rules.md, п. 8); `leave` — только выйти из-за стола с друзьями: за вас доиграет бот, как раньше. */
+  resign = (id: string, leave = false) => this.request<{ ok: true }>('POST', `/v1/tables/${id}/resign`, leave ? { leave: true } : {}, undefined, true);
   rematch = (id: string, seed: string, commit: string) =>
     this.request<{ table: TableView }>('POST', `/v1/tables/${id}/rematch`, { seed, commit }, undefined, true).then(r => r.table);
   /** Фраза не повторяется сама: дубль хуже потери. */

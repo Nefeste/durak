@@ -46,6 +46,18 @@ export const orderOf = (r: RuleSet): ThrowOrder => r.order ?? 'free';
 export const knownRules = (r: RuleSet | undefined | null): boolean =>
   !!r && (r.id === 'durak-rules-v1' || (r.id === 'durak-rules-v2' && (r.order === 'queue' || r.order === 'free')));
 
+/** Проиграл ли место: остался с картами или сдался (п. 7.4, 8.5). */
+export const lostBy = (r: Result, seat: number): boolean => r.fool === seat || (r.resigned ?? []).includes(seat);
+
+/** Места итога по порядку (п. 8.5): вышедшие, дурак, сдавшиеся — кто сдался раньше, тот ниже. */
+export function placesOf(r: Result): number[] {
+  const resigned = r.resigned ?? [];
+  const out = [...r.order];
+  if (!r.draw && r.fool !== null && !resigned.includes(r.fool)) out.push(r.fool);
+  for (let i = resigned.length - 1; i >= 0; i--) out.push(resigned[i]);
+  return out;
+}
+
 export const isThrowOrder = (v: unknown): v is ThrowOrder => v === 'queue' || v === 'free';
 
 export interface Setup {
@@ -65,6 +77,8 @@ export interface Result {
   draw: boolean;
   /** Порядок выхода (п. 7.6). */
   order: number[];
+  /** Сдавшиеся по порядку сдачи (п. 8, правило приложения); нет поля — никто не сдавался. Сдавшийся проиграл. */
+  resigned?: number[];
 }
 
 export interface State {
@@ -94,6 +108,10 @@ export interface State {
   bout: number;
   /** Вышедшие по порядку выхода (п. 7.2). */
   out: number[];
+  /** Сдавшиеся по порядку сдачи (п. 8). */
+  resigned: number[];
+  /** Карты сдавшихся — из игры рубашкой вверх; их не видит никто (п. 8.2, ADR 0008), в наблюдении их нет. */
+  buried: Card[];
   phase: Phase;
   result: Result | null;
 }
@@ -106,7 +124,9 @@ export type Action =
   | { type: 'transfer'; cards: Card[] }
   | { type: 'beat'; card: Card; on: Card }
   | { type: 'take' }
-  | { type: 'pass' };
+  | { type: 'pass' }
+  /** Сдаться (п. 8, правило приложения): в любой момент, и не в свой ход. В `legalActions` его нет — боты не сдаются. */
+  | { type: 'resign' };
 
 /** Почему действие нельзя (для строки подсказки, docs/08-rules.md, п. 4.8). */
 export type Reason =

@@ -51,6 +51,7 @@ export function markOf(d: Decision, o: Observation): ReviewMarks {
   const mark = (a: Action, kind: MarkKind) => {
     switch (a.type) {
       case 'beat': add(out.hand, a.card, kind); add(out.table, a.on, kind); break;
+      case 'resign': break;
       case 'take': case 'pass': out.chips.push({ kind, action: a.type, done: a.type === 'pass' && done }); break;
       default: for (const c of a.cards) add(out.hand, c, kind);
     }

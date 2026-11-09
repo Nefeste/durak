@@ -39,7 +39,7 @@ export function stateOf(p: Puzzle): State {
     rules: RULES_V1, variant: p.variant, seats: 2, hands: p.hands.map(h => [...h]), talon: [], trump: p.trump,
     table: p.table.map(([a, d]) => [a, d] as [Card, Card | null]), discard: [...p.discard], openly: p.openly.map(o => [...o]),
     starter: p.starter, attacker: p.attacker, defender: p.defender, passed: [...p.passed], boutLimit: p.boutLimit,
-    bout: p.bout, out: [], phase: p.phase, result: null,
+    bout: p.bout, out: [], resigned: [], buried: [], phase: p.phase, result: null,
   };
 }
 

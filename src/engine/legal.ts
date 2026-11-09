@@ -1,7 +1,7 @@
 // Законные действия места и причина запрета для любого другого (docs/08-rules.md, пп. 4, 6).
 import { beats, rankOf, suitOf } from './cards';
 import type { Card } from './cards';
-import { active, nextActive } from './deal';
+import { active, inPlay, nextActive } from './deal';
 import { orderOf } from './types';
 import type { Action, Reason, State } from './types';
 
@@ -56,6 +56,8 @@ function mayThrow(s: State, seat: number): boolean {
 /** Почему действие нельзя; `null` — можно. */
 export function reasonOf(s: State, seat: number, a: Action): Reason | null {
   if (s.phase === 'end') return 'gameOver';
+  // сдаться — в любой момент, пока место в партии, даже без карт и не в свой ход (п. 8.1)
+  if (a.type === 'resign') return inPlay(s, seat) ? null : 'notYourMove';
   if (!active(s, seat)) return 'notYourMove';
   const isDef = seat === s.defender;
   switch (a.type) {

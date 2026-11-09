@@ -34,7 +34,7 @@ interface TableRow {
   /** «Подкидывать» (ADR 0013); столы до неё — `free`. */
   throw_order: ThrowOrder;
 }
-interface SeatRow { seat: number; player: number | null; bot: Level | null }
+interface SeatRow { seat: number; player: number | null; bot: Level | null; knows?: number }
 
 /** Строка стола из базы: уровень ботов — через levelOf (столы до 0.5.0 могли держать `strong`, #15). */
 const fixTable = <T extends TableRow | null>(t: T): T => (t && t.bots !== null ? { ...t, bots: levelOf(t.bots) ?? TOP } : t);
@@ -240,7 +240,7 @@ export class Core {
 
   private seats(tableId: string): SeatRow[] {
     // уровень из базы — через levelOf: столы до 0.5.0 могли держать `strong`, теперь это «Мастер» (#15)
-    return (this.db.query('SELECT seat, player, bot FROM table_seats WHERE table_id = ? ORDER BY seat').all(tableId) as SeatRow[])
+    return (this.db.query('SELECT seat, player, bot, knows FROM table_seats WHERE table_id = ? ORDER BY seat').all(tableId) as SeatRow[])
       .map(r => (r.bot === null ? r : { ...r, bot: levelOf(r.bot) ?? TOP }));
   }
 
@@ -352,9 +352,12 @@ export class Core {
       const seeds = JSON.parse(g.seeds) as (string | null)[];
       const take = (to: number) => {
         // место бота: бот уходит — на этом месте будет человек
-        this.db.query('UPDATE table_seats SET player = ?, bot = NULL WHERE table_id = ? AND seat = ?').run(p.id, t.id, to);
+        this.db.query('UPDATE table_seats SET player = ?, bot = NULL, knows = ? WHERE table_id = ? AND seat = ?').run(p.id, knows ? 1 : 0, t.id, to);
       };
-      if (mine && (want === null || want === mine.seat)) seat = mine.seat;
+      if (mine && (want === null || want === mine.seat)) {
+        seat = mine.seat;
+        this.db.query('UPDATE table_seats SET knows = ? WHERE table_id = ? AND seat = ?').run(knows ? 1 : 0, t.id, seat);
+      }
       else {
         if (t.status !== 'waiting' || t.kind === 'quick') throw new ApiError(t.status !== 'waiting' ? 'not-waiting' : mine ? 'bad-seat' : 'full');
         let to: SeatRow | undefined;
@@ -535,22 +538,35 @@ export class Core {
     this.bump(t.id);
   }
 
-  private resignSeat(t: TableRow, seat: number): void {
+  /** Быстрая игра кончена без действия в записи: часы трижды, удалённый профиль, сдача со старой версии игры.
+   *  `gave` — игрок сдался сам: итог помечает его сдавшимся (старые версии поле не читают). */
+  private resignSeat(t: TableRow, seat: number, gave = false): void {
     const g = this.live.get(t.id);
     if (!g) return;
     const order = g.state.out.filter(s => s !== seat);
     for (let s = 0; s < t.seats; s++) if (s !== seat && !order.includes(s)) order.push(s);
-    this.finish(t, g, { fool: seat, draw: false, order });
+    this.finish(t, g, { fool: seat, draw: false, order, ...(gave ? { resigned: [seat] } : {}) });
   }
 
-  /** Сдаться: в быстрой игре — поражение; за столом с друзьями дальше за вас играет бот. */
-  resign(p: Player, id: unknown): { ok: true } {
+  /**
+   * Сдаться (docs/08-rules.md, п. 8): действие движка `resign` — вдвоём партия кончается, втроём и вчетвером остальные
+   * доигрывают. `leave` — только выйти из-за стола с друзьями: за вас доиграет бот, как раньше. Телефон без
+   * `x-durak-rules` (`knows`) или стол, где сидит такой телефон, — как раньше: в быстрой игре — поражение без действия в
+   * записи, за столом с друзьями — за вас доигрывает бот (сдачи старая версия не знает, её проверка колоды разошлась бы).
+   */
+  resign(p: Player, id: unknown, body: { leave?: unknown } = {}, knows = false): { ok: true } {
     const t = this.tableRow(id);
     const seat = this.seatOfPlayer(t, p);
     const g = this.live.get(t.id);
     if (t.status !== 'playing' || !g) throw new ApiError('not-playing');
+    const all = this.seats(t.id).every(s => s.player === null || s.knows === 1);
     this.tx(() => {
-      if (t.kind === 'quick') this.resignSeat(t, seat);
+      if (knows && all && body.leave !== true) {
+        if (!g.state.resigned.includes(seat) && !g.state.out.includes(seat)) {
+          g.botFor[seat] = null;
+          this.play(t, g, seat, { type: 'resign' });
+        }
+      } else if (t.kind === 'quick') this.resignSeat(t, seat, true);
       else {
         g.botFor[seat] = 'clock';
         this.bump(t.id);
@@ -818,8 +834,10 @@ export class Core {
       const bots = b === null ? 'average' : null;
       this.db.query(`INSERT INTO tables (id, code, kind, host, variant, seats, bots, status, created, throw_order) VALUES (?, ?, 'quick', ?, ?, 2, ?, 'waiting', ?, ?)`)
         .run(id, code, a.id, variant, bots, this.now(), order);
-      this.db.query('INSERT INTO table_seats (table_id, seat, player) VALUES (?, 0, ?)').run(id, a.id);
-      this.db.query('INSERT INTO table_seats (table_id, seat, player, bot) VALUES (?, 1, ?, ?)').run(id, b, b === null ? 'average' : null);
+      // `order` «по очереди» — оба телефона прислали `x-durak-rules`: значит, оба знают и сдачу
+      const knows = order === 'queue' ? 1 : 0;
+      this.db.query('INSERT INTO table_seats (table_id, seat, player, knows) VALUES (?, 0, ?, ?)').run(id, a.id, knows);
+      this.db.query('INSERT INTO table_seats (table_id, seat, player, bot, knows) VALUES (?, 1, ?, ?, ?)').run(id, b, b === null ? 'average' : null, knows);
       this.newGameRow(id, 0, 2);
       this.bump(id);
       out = { id, code };

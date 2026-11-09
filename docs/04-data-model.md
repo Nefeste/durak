@@ -39,7 +39,8 @@ type Action =
   | { type: 'attack' | 'transfer'; cards: number[] }   // одна или несколько одного достоинства
   | { type: 'throwIn' | 'give'; cards: [number] }       // подкинуть и вдогонку — по одной
   | { type: 'beat'; card: number; on: number }
-  | { type: 'take' | 'pass' };
+  | { type: 'take' | 'pass' }
+  | { type: 'resign' };                                  // сдаться — правило приложения, 08-rules.md п. 8
 ```
 
 ### Запись партии
@@ -55,7 +56,7 @@ type GameRecord = {
   deck: number[];             // 36 чисел — порядок колоды
   source: { kind: 'phone' } | { kind: 'server'; commit: string; seed: string; seeds: string[] };
   actions: { seat: number; action: Action; at: number }[]; // at — мс от начала партии, для разбора и темпа
-  result: null | { fool: number | null; draw: boolean; order: number[] };
+  result: null | { fool: number | null; draw: boolean; order: number[]; resigned?: number[] };
 };
 ```
 
@@ -64,6 +65,11 @@ type GameRecord = {
 нет). Записи, сохранения, история и задачи дня прошлых версий — все `durak-rules-v1` и переигрываются «кто успел», как
 их и играли: ни миграции, ни нового ключа (`knownRules`, `orderOf` в `src/engine/types.ts`). Настройка игрока —
 `durak.settings`, `throwOrder` (`'queue'` по умолчанию; в строке прошлых версий её нет — по умолчанию).
+
+Сдача ([`08-rules.md`](08-rules.md), п. 8): в позиции — `resigned` (по порядку) и `buried` (их карты рубашкой вверх,
+в наблюдении их нет, `allCards` их считает); в наблюдении — `resigned`, только когда кто-то сдался (иначе поля нет, и
+наблюдение то же, что у версий до сдачи); в итоге — `resigned`. Места итога — `placesOf`, проиграл ли место — `lostBy`
+(`src/engine/types.ts`). С ботами действия ботов, доигравших без вас, тоже в записи.
 
 Восстановление — переигрывание `actions` по `deck`. Запись с ботами хранит колоду с самого начала — это и есть
 правда партии; ботам её не передают (ADR [0005](adr/0005-bot-observation.md)).

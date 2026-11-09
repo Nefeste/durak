@@ -11,7 +11,7 @@ export const HOLD = { ms: 1200, lessMs: 800 } as const;
 
 export const holdMs = (less: boolean): number => (less ? HOLD.lessMs : HOLD.ms);
 
-const cardsOf = (a: Action): Card[] => (a.type === 'beat' ? [a.card] : a.type === 'take' || a.type === 'pass' ? [] : a.cards);
+const cardsOf = (a: Action): Card[] => (a.type === 'beat' ? [a.card] : a.type === 'take' || a.type === 'pass' || a.type === 'resign' ? [] : a.cards);
 
 /**
  * Действие `a` места `seat` перевело наблюдение `before` в `after`. Если оно кончило отбой картой — наблюдение того же
