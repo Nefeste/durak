@@ -4,9 +4,13 @@ import type { Card } from './cards';
 
 export type Variant = 'podkidnoy' | 'perevodnoy';
 
-/** Свод правил: версия пишется в каждую партию (ADR 0003). Числа — docs/08-rules.md. */
+/** Подкидывать (п. 4.3, ADR 0013): по очереди — первое право у ходящего, за ним по часовой стрелке; кто успел — без очереди. */
+export type ThrowOrder = 'queue' | 'free';
+
+/** Свод правил с настройками стола: версия пишется в каждую партию (ADR 0003, 0013). Числа — docs/08-rules.md. */
 export interface RuleSet {
-  id: 'durak-rules-v1';
+  /** `durak-rules-v1` — партии до 09.11.2026, очереди нет; `durak-rules-v2` — с настройкой `order`. */
+  id: 'durak-rules-v1' | 'durak-rules-v2';
   /** п. 4.4: предел карт атаки в отбое. */
   maxAttack: number;
   /** п. 4.4: предел в первом отбое партии. */
@@ -15,8 +19,11 @@ export interface RuleSet {
   firstBoutTransfer: boolean;
   /** п. 5: добор до стольких карт. */
   handSize: number;
+  /** п. 4.3: очередь атакующих. Нет поля (записи `durak-rules-v1`) — «кто успел»: так их и играли. */
+  order?: ThrowOrder;
 }
 
+/** Свод до 09.11.2026: без очереди. Им переигрываются старые записи; задачи дня — вдвоём, там очередь не важна. */
 export const RULES_V1: RuleSet = {
   id: 'durak-rules-v1',
   maxAttack: 6,
@@ -24,6 +31,22 @@ export const RULES_V1: RuleSet = {
   firstBoutTransfer: false,
   handSize: 6,
 };
+
+/** Свод сейчас: по умолчанию — по очереди (решение владельца #57). */
+export const RULES: RuleSet = { ...RULES_V1, id: 'durak-rules-v2', order: 'queue' };
+
+/** Свод с выбранной настройкой «Подкидывать»: «кто успел» — это ровно свод `durak-rules-v1` (так старые версии игры
+ *  за таким столом онлайн видят тот же свод, что у себя). */
+export const rulesWith = (order: ThrowOrder): RuleSet => (order === 'free' ? RULES_V1 : RULES);
+
+/** Как подкидывают за этим столом: у записей без поля — «кто успел». */
+export const orderOf = (r: RuleSet): ThrowOrder => r.order ?? 'free';
+
+/** Знает ли игра этот свод: `durak-rules-v1` или `durak-rules-v2` с настройкой «Подкидывать». */
+export const knownRules = (r: RuleSet | undefined | null): boolean =>
+  !!r && (r.id === 'durak-rules-v1' || (r.id === 'durak-rules-v2' && (r.order === 'queue' || r.order === 'free')));
+
+export const isThrowOrder = (v: unknown): v is ThrowOrder => v === 'queue' || v === 'free';
 
 export interface Setup {
   rules: RuleSet;
@@ -104,4 +127,5 @@ export type Reason =
   | 'transferRank'
   | 'transferTooMany'
   | 'nothingToTake'
-  | 'alreadyPassed';
+  | 'alreadyPassed'
+  | 'waitTurn';

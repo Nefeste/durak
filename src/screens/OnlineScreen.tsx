@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useInsets } from '../ui/insets';
-import type { Variant } from '../engine';
+import type { ThrowOrder, Variant } from '../engine';
 import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
@@ -14,6 +14,7 @@ import { Header } from '../ui/Header';
 import { Chips } from '../ui/Chips';
 import { Checkbox } from '../ui/Toggle';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
+import { getSettings } from '../state/store';
 import { isCode, nameProblem } from '../state/protocol';
 import type { CodeInfo, QuickView } from '../state/protocol';
 import { SeatMap } from '../game/SeatMap';
@@ -53,6 +54,8 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   const [busy, setBusy] = useState(false);
   const [variant, setVariant] = useState<Variant>('podkidnoy');
   const [seats, setSeats] = useState(2);
+  // «Подкидывать» (ADR 0013): как в настройках, создатель меняет для этого стола
+  const [order, setOrder] = useState<ThrowOrder>(() => getSettings().throwOrder);
   const [bots, setBots] = useState<Level | 'none'>('average');
   const [code, setCode] = useState(invite ?? '');
   /** Стол по коду, где выбирают место. */
@@ -94,7 +97,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   });
 
   const create = () => run(async () => {
-    const t = await net.createTable(variant, seats, bots === 'none' ? null : bots, newSeed());
+    const t = await net.createTable(variant, seats, bots === 'none' ? null : bots, newSeed(), order);
     onTable(await sitByCode(t.code!));
   });
   const join = () => run(async () => {
@@ -206,6 +209,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         <Header title={T.online.pickSeat} back={T.online.back} onBack={() => { setPicking(null); setErr(null); }} backTestID="pick-back" />
         <Glass style={styles.panel}>
           <Text style={styles.label}>{T.variant[i.variant]} · {i.host}</Text>
+          {i.seats > 2 ? <Text style={styles.note} testID="pick-rules">{T.online.orderOf(i.order ?? 'free')}</Text> : null}
           <Text style={styles.note}>{T.online.pickSeatNote}</Text>
           <SeatMap places={i.places!} host={Math.max(0, i.places!.findIndex(p => p?.host))} onSit={busy ? undefined : sit} />
           {errorBlock}
@@ -222,6 +226,13 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         <Chips id="f-variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={variant} label={v => T.variant[v]} onChange={setVariant} />
         <Text style={styles.label}>{T.online.seats}</Text>
         <Chips id="f-seats" items={[2, 3, 4]} value={seats} label={T.online.seatsN} onChange={setSeats} />
+        {/* вдвоём атакующий один — очередь ничего не меняет, выбирать нечего */}
+        {seats > 2 ? (
+          <>
+            <Text style={styles.label}>{T.settings.throwOrder}</Text>
+            <Chips id="f-throw" items={['queue', 'free'] as ThrowOrder[]} value={order} label={v => (v === 'queue' ? T.settings.throwQueue : T.settings.throwFree)} onChange={setOrder} />
+          </>
+        ) : null}
         <Text style={styles.label}>{T.online.bots}</Text>
         <Chips id="f-bots" items={['none', ...LEVELS] as (Level | 'none')[]} value={bots} label={l => (l === 'none' ? T.online.noBots : T.level[l])} onChange={setBots} />
         <Button label={T.online.create} onPress={create} disabled={busy} testID="create" />

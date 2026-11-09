@@ -10,7 +10,8 @@ import type { Clock } from './clock';
 import type { Core, Player } from './core';
 import { ApiError } from './errors';
 
-interface Waiting { p: Player; variant: Variant; since: number; seen: number; rating: number }
+/** `knows` — телефон знает очередь атакующих (заголовок `x-durak-rules`); иначе стол — «кто успел» (ADR 0013). */
+interface Waiting { p: Player; variant: Variant; since: number; seen: number; rating: number; knows: boolean }
 interface Found { at: number; table: string }
 
 /** Не опрашивал очередь столько — выпал из неё. */
@@ -26,14 +27,14 @@ export class QuickQueue {
 
   constructor(private readonly core: Core, private readonly clock: Clock) {}
 
-  join(p: Player, body: { variant?: unknown }): QuickView {
+  join(p: Player, body: { variant?: unknown }, knows = true): QuickView {
     if (body.variant !== 'podkidnoy' && body.variant !== 'perevodnoy') throw new ApiError('bad-variant');
     const f = this.found.get(p.id);
     if (f && this.core.tableStatus(f.table) !== 'waiting') this.found.delete(p.id);
     if (!this.found.has(p.id)) {
       const now = this.clock.now(), w = this.waiting.get(p.id);
       const since = w && w.variant === body.variant ? w.since : now;
-      this.waiting.set(p.id, { p, variant: body.variant, since, seen: now, rating: this.core.glickoOf(p.id, body.variant).rating });
+      this.waiting.set(p.id, { p, variant: body.variant, since, seen: now, rating: this.core.glickoOf(p.id, body.variant).rating, knows });
       this.tick();
     }
     return this.poll(p);
@@ -65,7 +66,7 @@ export class QuickQueue {
     const w = this.waiting.get(p.id);
     if (!w) throw new ApiError('not-waiting');
     this.waiting.delete(p.id);
-    const { id } = this.core.createQuick(p, null, w.variant);
+    const { id } = this.core.createQuick(p, null, w.variant, w.knows ? 'queue' : 'free');
     this.found.set(p.id, { at: this.clock.now(), table: id });
     return { status: 'matched', table: id };
   }
@@ -95,7 +96,7 @@ export class QuickQueue {
       used.add(best.p.id);
       this.waiting.delete(a.p.id);
       this.waiting.delete(best.p.id);
-      const { id } = this.core.createQuick(a.p, best.p.id, a.variant);
+      const { id } = this.core.createQuick(a.p, best.p.id, a.variant, a.knows && best.knows ? 'queue' : 'free');
       this.found.set(a.p.id, { at: now, table: id });
       this.found.set(best.p.id, { at: now, table: id });
     }

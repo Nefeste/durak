@@ -14,7 +14,7 @@
 
 ```ts
 type State = {
-  rules: RuleSet;             // свод: id 'durak-rules-v1', пределы атаки, firstBoutTransfer
+  rules: RuleSet;             // свод: id 'durak-rules-v2' (или v1), пределы атаки, firstBoutTransfer, order
   variant: 'podkidnoy' | 'perevodnoy'; seats: number;   // 2..4
   hands: number[][];          // руки по местам
   talon: number[];            // колода сверху вниз; последний — козырь
@@ -47,7 +47,7 @@ type Action =
 ```ts
 type GameRecord = {
   v: 1;                       // номер формата записи
-  rules: 'durak-rules-v1';
+  rules: RuleSet;             // { id: 'durak-rules-v2', …, order: 'queue' } или ровно RULES_V1 («кто успел»)
   variant: 'podkidnoy' | 'perevodnoy';
   seats: { kind: 'you' | 'bot' | 'human'; level?: Level; name?: string }[];
   first: number;              // кто ходит первым
@@ -58,6 +58,12 @@ type GameRecord = {
   result: null | { fool: number | null; draw: boolean; order: number[] };
 };
 ```
+
+Настройка стола «Подкидывать» (ADR [0013](adr/0013-throw-order.md)) — в `rules`: «по очереди» — `RULES` (`id:
+'durak-rules-v2', order: 'queue'`), «кто успел» — ровно прежний `RULES_V1` (`id: 'durak-rules-v1'`, поля `order`
+нет). Записи, сохранения, история и задачи дня прошлых версий — все `durak-rules-v1` и переигрываются «кто успел», как
+их и играли: ни миграции, ни нового ключа (`knownRules`, `orderOf` в `src/engine/types.ts`). Настройка игрока —
+`durak.settings`, `throwOrder` (`'queue'` по умолчанию; в строке прошлых версий её нет — по умолчанию).
 
 Восстановление — переигрывание `actions` по `deck`. Запись с ботами хранит колоду с самого начала — это и есть
 правда партии; ботам её не передают (ADR [0005](adr/0005-bot-observation.md)).
@@ -119,7 +125,7 @@ SQLite (WAL), как в «Нардах»; миграции — `server/src/schem
 |---|---|
 | `players` | профиль: хеш ключа устройства, ник, тег, когда создан и когда был на связи |
 | `ratings` | Glicko-2 по вариантам (`player`, `variant`, рейтинг, отклонение, волатильность, число партий) |
-| `tables` | стол: код, вид (`friend`/`quick`), создатель, вариант, мест, уровень ботов на свободные места, состояние, номер текущей партии, `version` |
+| `tables` | стол: код, вид (`friend`/`quick`), создатель, вариант, мест, уровень ботов на свободные места, состояние, номер текущей партии, `version`, `throw_order` — «Подкидывать» (миграция 2; столы до неё — `free`) |
 | `table_seats` | место: игрок или бот (уровень). До начала у стола с ботами место без человека — за ботом своего уровня (хозяин меняет); сел человек — `bot` стирается, пересел — прежнему месту снова уровень ботов стола |
 | `games` | партия: зерно сервера и его отпечаток, зёрна мест, первый ход, действия (JSON по порядку), запас часов мест, кто нажал «Реванш», итог, начало и конец |
 | `reports` | отчёты «Сообщить об ошибке», 180 дней |

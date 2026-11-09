@@ -2,6 +2,7 @@
 // ключ устройства в `Authorization`, версия игры в `X-Durak-Version`, пределы частоты, ошибки кодами.
 import { MIN_APP, PROTOCOL, compareVersions, isChat, isVersion, ERRORS } from '../../src/state/protocol';
 import type { ErrorCode } from '../../src/state/protocol';
+import { RULES } from '../../src/engine';
 import { keyHash } from './core';
 import type { Core, Player } from './core';
 import { ApiError } from './errors';
@@ -17,7 +18,7 @@ export interface HttpOptions {
 const CORS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'authorization, content-type, x-durak-version',
+  'access-control-allow-headers': 'authorization, content-type, x-durak-version, x-durak-rules',
   'access-control-max-age': '86400',
 };
 
@@ -38,6 +39,8 @@ export class Http {
 
   constructor(private readonly core: Core, quick: QuickQueue, live: Live, private readonly opts: HttpOptions = {}) {
     this.limits = new Limits(() => core.now());
+    /** Телефон знает очередь атакующих (ADR 0013): шлёт `x-durak-rules: durak-rules-v2`. */
+    const knowsQueue = (c: Ctx) => c.req.headers.get('x-durak-rules') === RULES.id;
     const r = (method: string, path: string, run: Route['run']): Route => ({ method, re: new RegExp(`^${path}$`), run });
     const id = '(t_[a-z0-9]{12})';
     this.routes = [
@@ -74,7 +77,7 @@ export class Http {
       r('POST', '/v1/tables/join', async c => {
         const me = this.me(c);
         const b = await this.body(c);
-        return json(200, { table: core.join(me, { ...b, code: typeof b.code === 'string' ? b.code.toUpperCase() : b.code }) });
+        return json(200, { table: core.join(me, { ...b, code: typeof b.code === 'string' ? b.code.toUpperCase() : b.code }, knowsQueue(c)) });
       }),
       r('POST', `/v1/tables/${id}/start`, (c, m) => json(200, { table: core.startBy(this.me(c), m[1]) })),
       r('POST', `/v1/tables/${id}/bot`, async (c, m) => { const me = this.me(c); return json(200, { table: core.setBot(me, m[1], await this.body(c)) }); }),
@@ -106,7 +109,7 @@ export class Http {
       r('POST', '/v1/quick', async c => {
         const me = this.me(c);
         this.limits.take(`quick:${me.id}`, 30, 60_000);
-        return json(200, quick.join(me, await this.body(c)));
+        return json(200, quick.join(me, await this.body(c), knowsQueue(c)));
       }),
       r('GET', '/v1/quick', c => json(200, quick.poll(this.me(c)))),
       r('POST', '/v1/quick/cancel', c => json(200, quick.cancel(this.me(c)))),

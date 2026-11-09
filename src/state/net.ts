@@ -2,7 +2,8 @@
 // `offline`/`timeout`, «онлайн с 14 лет»; маршруты, заголовок `X-Durak-Version` и типы — свои
 // (docs/03-server-api.md). Модуль без React Native: хранилище подставляет вызывающий, поэтому его
 // гоняет тест против настоящего сервера под Bun.
-import type { Action, Variant } from '../engine';
+import { RULES } from '../engine';
+import type { Action, ThrowOrder, Variant } from '../engine';
 import type { Level } from '../bot';
 import type { ChatKey, CodeInfo, ErrorCode, ProofView, QuickView, TableView } from './protocol';
 import { APP_VERSION } from '../version';
@@ -88,8 +89,9 @@ export class Net {
   }
 
   ping = () => this.request<{ ok: true; v: string; now: number }>('GET', '/v1/ping', undefined, '');
-  createTable = (variant: Variant, seats: number, bots: Level | null, rid: string) =>
-    this.request<{ table: TableView }>('POST', '/v1/tables', { rid, variant, seats, bots }, undefined, true).then(r => r.table);
+  /** `order` — «Подкидывать» стола (ADR 0013). */
+  createTable = (variant: Variant, seats: number, bots: Level | null, rid: string, order: ThrowOrder = 'queue') =>
+    this.request<{ table: TableView }>('POST', '/v1/tables', { rid, variant, seats, bots, order }, undefined, true).then(r => r.table);
   codeInfo = (code: string) => this.request<CodeInfo>('GET', `/v1/tables/code/${code}`, undefined, undefined, true);
   /** `seat` — выбранное место; без него сервер сажает на первое свободное. Уже сидящий так пересаживается до начала. */
   join = (code: string, seed: string, commit: string, seat?: number) =>
@@ -129,7 +131,8 @@ export class Net {
 
   private async once<R>(method: 'GET' | 'POST', path: string, body?: unknown, key?: string): Promise<R> {
     const k = key === '' ? '' : key ?? (await this.getDevice())?.key ?? '';
-    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-durak-version': this.version };
+    // `x-durak-rules` — телефон знает очередь атакующих: сервер пускает его за стол «по очереди» (ADR 0013)
+    const headers: Record<string, string> = { 'content-type': 'application/json', 'x-durak-version': this.version, 'x-durak-rules': RULES.id };
     if (k) headers.authorization = `Bearer ${k}`;
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), netTiming.timeout);

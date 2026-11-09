@@ -1,6 +1,6 @@
 // Вход сборки для Hermes (tools/hermes/bots.ts): сколько думает каждый уровень на позициях из
 // партий ботов и сколько стоит точная концовка. Печатает таблицу; числа — в docs/10-bot.md.
-import { apply, newGame, observe, RULES_V1 } from '../../src/engine';
+import { apply, newGame, observe, RULES } from '../../src/engine';
 import { chooseAction, LEVELS, makeRng, solveActions, isEndgame } from '../../src/bot';
 import type { Level } from '../../src/bot';
 import { actorOf } from '../../src/bot/sim';
@@ -16,7 +16,7 @@ const rng = makeRng(42);
 const positions: { o: ReturnType<typeof observe> }[] = [];
 const ends: ReturnType<typeof observe>[] = [];
 for (let g = 0; g < 6; g++) {
-  let s = newGame({ rules: RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2, first: 0 }, deckOf(rng));
+  let s = newGame({ rules: RULES, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2, first: 0 }, deckOf(rng));
   let n = 0, endTaken = false;
   while (s.phase !== 'end') {
     const who = actorOf(s);

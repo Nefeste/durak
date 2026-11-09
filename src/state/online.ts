@@ -64,7 +64,7 @@ export class OnlineTable {
     if (g?.proof && g.result) {
       const mine = this.seeds.get(g.no);
       this.check = mine
-        ? verifyGame(g.proof, { seat: t.you, seed: mine.seed, commit: mine.commit, variant: t.variant, seats: t.seats.length }, this.seen.get(g.no) ?? [])
+        ? verifyGame(g.proof, { seat: t.you, seed: mine.seed, commit: mine.commit, variant: t.variant, seats: t.seats.length, order: t.order ?? 'free' }, this.seen.get(g.no) ?? [])
         : null;
     } else this.check = null;
     this.emit();

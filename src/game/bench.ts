@@ -3,7 +3,7 @@
 // вчетвером (все 36 карт на столе), «беру» с 12 картами (стол уходит в вашу руку) и все 36 карт в полёте разом
 // (стол зеркально, туда и обратно). Позиции для «Опытного» — из партий «Среднего» против себя, как в
 // tools/hermes/bots.ts. Без React и часов — проверяется тестом (tools/test/bench.test.ts).
-import { apply, newGame, observe, RULES_V1 } from '../engine';
+import { apply, newGame, observe, RULES } from '../engine';
 import type { Card, Observation } from '../engine';
 import { chooseAction, isEndgame, makeRng } from '../bot';
 import { actorOf } from '../bot/sim';
@@ -18,7 +18,7 @@ function deckOf(rng: { int(n: number): number }): Card[] {
 
 /** Раздача вчетвером глазами места 0: 6 своих карт лицом, 18 рубашкой у соперников, 12 в колоде. */
 export function dealScene(seed = 7): Observation {
-  return observe(newGame({ rules: RULES_V1, variant: 'podkidnoy', seats: 4, first: 1 }, deckOf(makeRng(seed))), 0);
+  return observe(newGame({ rules: RULES, variant: 'podkidnoy', seats: 4, first: 1 }, deckOf(makeRng(seed))), 0);
 }
 
 /**
@@ -26,7 +26,7 @@ export function dealScene(seed = 7): Observation {
  * Карты стола взяты из колоды, чтобы рука и колода остались честными по числу.
  */
 export function takeScene(seed = 11): { before: Observation; after: Observation } {
-  const o = observe(newGame({ rules: RULES_V1, variant: 'podkidnoy', seats: 2, first: 1 }, deckOf(makeRng(seed))), 0);
+  const o = observe(newGame({ rules: RULES, variant: 'podkidnoy', seats: 2, first: 1 }, deckOf(makeRng(seed))), 0);
   // карты стола — из тех, которых место не видит: колода без козыря
   const shown = new Set([...o.hand, o.trump]);
   const free = Array.from({ length: 36 }, (_, c) => c).filter(c => !shown.has(c)).slice(0, 12);
@@ -50,7 +50,7 @@ export function botPositions(n: number, games = 6): Observation[] {
   const rng = makeRng(42);
   const out: Observation[] = [];
   for (let g = 0; g < games && out.length < n; g++) {
-    let s = newGame({ rules: RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2, first: 0 }, deckOf(rng));
+    let s = newGame({ rules: RULES, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2, first: 0 }, deckOf(rng));
     let k = 0;
     while (s.phase !== 'end') {
       const who = actorOf(s);

@@ -7,7 +7,7 @@ import type { LayoutChangeEvent } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
-import { legalActions, stateFrom } from '../engine';
+import { legalActions, stateFrom, throwerSeen } from '../engine';
 import type { Action, Card, Result } from '../engine';
 import type { Level } from '../bot';
 import { layout as fill, unseen } from '../bot/legal';
@@ -73,7 +73,7 @@ function Lobby({ table, t, onExit, pad }: { table: OnlineTable; t: TableView; on
   return (
     // прокрутка: вчетвером со строками уровней ботов лобби выше экрана телефона
     <ScrollView style={styles.root} contentContainerStyle={[pad, styles.lobby]} testID="lobby">
-      <Text style={styles.dim}>{T.variant[t.variant]}</Text>
+      <Text style={styles.dim} testID="lobby-rules">{t.seats.length > 2 ? `${T.variant[t.variant]} · ${T.online.orderOf(t.order ?? 'free')}` : T.variant[t.variant]}</Text>
       {t.kind === 'friend' && t.code ? (
         <View style={styles.panel}>
           <Text style={styles.dim}>{T.online.code}</Text>
@@ -230,8 +230,8 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
             <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={seatName(s)}
               info={s?.botFor ? T.online.playingFor(s.name) : s && !s.online ? T.online.offline
                 : shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])}
-              role={!view || view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : null}
-              active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat)}
+              role={!view || view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : view && throwerSeen(view) === p.seat ? T.game.throwing : null}
+              active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat || throwerSeen(view) === p.seat)}
               left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - lay.ch * 0.55 * 0.5 - plate.h)} />
           );
         }) : null}
