@@ -1,3 +1,4 @@
+# по образцу nardy: tools/gpu/train.py @ 1d2bdff (studio ADR 0002): то же устройство, свои правила и сеть
 """Обучение сети седьмого уровня «Мастер» на видеокарте (tools/gpu/README.md, docs/specs/2026-11-neural.md).
 
     python tools/gpu/train.py --hours 24                    # сутки; Ctrl+C — остановить, та же команда — продолжить

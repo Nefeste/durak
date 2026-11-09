@@ -1,3 +1,4 @@
+# по образцу nardy: tools/gpu/selftest.py @ 1d2bdff (studio ADR 0002): то же устройство, свои правила и сеть
 """Проверка набора перед обучением (tools/gpu/README.md, шаг 3) — около 5 минут.
 
     python tools/gpu/selftest.py [--quick]

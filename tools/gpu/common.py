@@ -1,3 +1,4 @@
+# по образцу nardy: tools/gpu/train.py @ 1d2bdff — запуск и снимки
 """Общее для обучения: где Bun и репозиторий, запуск частей самоигры и арены (tools/gpu/README.md)."""
 import json
 import os

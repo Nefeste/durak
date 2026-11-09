@@ -1,3 +1,4 @@
+# по образцу nardy: tools/gpu/collect.py @ 1d2bdff (studio ADR 0002): то же устройство, свои правила и сеть
 """Сложить итог обучения в папку для git (tools/gpu/README.md, шаг 7).
 
     python tools/gpu/collect.py                               # самый свежий прогон из tools/gpu/runs/

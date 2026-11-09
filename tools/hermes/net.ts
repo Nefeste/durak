@@ -1,3 +1,4 @@
+// по образцу tools/hermes/bots.ts: сборка в ES5 и Hermes 0.12
 // Скорость сети на Hermes — движке JavaScript телефона (docs/specs/2026-11-neural.md, «Телефон»). Как bots.ts: сборка
 // в ES5 и Hermes 0.12 из npm без JIT — порядок чисел телефона, не точное число.
 //
