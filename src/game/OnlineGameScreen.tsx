@@ -34,6 +34,8 @@ import { SeatMap } from './SeatMap';
 import { placesOf } from './seats';
 import { holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
+import { noteOf } from './note';
+import type { Note } from './note';
 
 export const inviteLink = (code: string) => `${net.base}/t/${code}`;
 
@@ -128,11 +130,12 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const small = useFont(Onest_700Bold, 26);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [pick, setPick] = useState<{ card: Card; options: Action[]; at: string } | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [noted, setNoted] = useState<Note<string> | null>(null);
   const [now, setNow] = useState(0);
   const [askedNo, setAskedNo] = useState(-1);
   const g = t.game!;
   const at = `${g.no}:${g.n}`;
+  const note = noteOf(noted, at);
   // деньги (src/money): партия по сети — в счётчики рекламы, когда кончилась; реклама — только при
   // уходе с итога в меню, никогда во время партии и не между партиями за одним столом
   const started = useRef<{ no: number; at: number } | null>(null);
@@ -169,13 +172,15 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
 
   const send = (a: Action) => {
     setPicked(null);
-    setNote(null);
-    void table.act(a).then(why => { if (why && why in T.reason) setNote(T.reason[why as keyof typeof T.reason]); });
+    setNoted(null);
+    // «так нельзя: …» — к ходу, на который ответил сервер: пришёл новый ход — строки нет (src/game/note.ts)
+    const sent = at;
+    void table.act(a).then(why => { if (why && why in T.reason) setNoted({ text: T.reason[why as keyof typeof T.reason], at: sent }); });
   };
   const onCard = (c: Card) => {
     hold.skip();
     if (!state) return;
-    setNote(null);
+    setNoted(null);
     if (picked?.card === c) { setPicked(null); return; }
     const r = tapCard(state, t.you, c);
     if (!r) { setPicked(null); return; }
@@ -187,14 +192,17 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
     const a = picked?.options.find(o => o.type === 'beat' && o.on === attack);
     if (a) send(a);
   };
-  const onDrop = (c: Card, on: Card | null) => {
+  /** Карта брошена на стол; `true` — ход отправлен: карта ждёт ответа сервера там, где её отпустили. */
+  const onDrop = (c: Card, on: Card | null): boolean => {
     hold.skip();
-    if (!state) return;
+    if (!state) return false;
     const r = tapCard(state, t.you, c);
-    if (!r) return;
-    if ('now' in r) { send(r.now); return; }
+    if (!r) return false;
+    if ('now' in r) { send(r.now); return true; }
     const a = (on !== null && r.choose.find(o => o.type === 'beat' && o.on === on)) || r.choose.find(o => o.type === 'transfer');
-    if (a) send(a); else setPicked({ card: c, options: r.choose });
+    if (a) { send(a); return true; }
+    setPicked({ card: c, options: r.choose });
+    return false;
   };
 
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
@@ -271,10 +279,10 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
           );
         }) : null}
         {lay && shown && shown.talonSize > 0 ? (
-          <Text pointerEvents="none" style={[styles.talon, { left: lay.talon.x - 40, top: lay.talon.y + lay.ch * 0.62 }]} testID="talon">{T.game.talon(shown.talonSize)}</Text>
+          <Text pointerEvents="none" style={[styles.talon, { left: lay.talonLabel.x, top: lay.talonLabel.y - 9 }]} testID="talon">{T.game.talon(shown.talonSize)}</Text>
         ) : null}
         {lay && shown && shown.talonSize === 0 ? (
-          <Text pointerEvents="none" style={[styles.talon, { left: lay.talon.x - 40, top: lay.talon.y - 10 }]}>{T.game.trumpIs(T.suits[Math.floor(shown.trump / 9)])}</Text>
+          <Text pointerEvents="none" style={[styles.talon, { left: lay.table.x + SPACE.s, top: lay.talon.y - 9 }]}>{T.game.trumpIs(T.suits[Math.floor(shown.trump / 9)])}</Text>
         ) : null}
         {lay && view ? (
           <View pointerEvents="box-none" style={[styles.controls, { bottom: (size?.height ?? 0) - lay.handTop + CONTROLS_GAP }]}>
@@ -323,7 +331,7 @@ const styles = StyleSheet.create({
   area: { flex: 1 },
   /** метка паузы для сценария в браузере: невидима, ничего не ловит */
   held: { position: 'absolute', width: 1, height: 1 },
-  talon: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
+  talon: { position: 'absolute', width: 96, color: C.dim, fontSize: TYPE.caption },
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
   hint: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
   buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: SPACE.m, minHeight: 48 },

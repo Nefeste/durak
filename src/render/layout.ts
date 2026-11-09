@@ -39,10 +39,16 @@ export interface Layout {
   sprites: Sprite[];
   /** Места соперников: имена и значки над веером рисует экран. */
   opponents: Seat[];
+  /** Середина стопки колоды (левый верхний угол сукна) — отсюда летит добор. */
   talon: { x: number; y: number };
+  /** Левый край и середина по высоте капсулы «колода N» — справа от козыря. */
+  talonLabel: { x: number; y: number };
+  /** Середина сброса (правый верхний угол сукна) — сюда уходит «бито». */
   discard: { x: number; y: number };
-  /** Прямоугольник стола — сюда бросают карту перетаскиванием. */
+  /** Сукно внутри борта — сюда бросают карту перетаскиванием. */
   table: { x: number; y: number; w: number; h: number };
+  /** Где лежат пары «атака — защита»: середина сукна под колодой и сбросом. */
+  pairs: { x: number; y: number; w: number; h: number };
   /** Верх руки: экран ставит подсказку и кнопки над ним. */
   handTop: number;
   /** Сукно: от вееров соперников до кнопок, во всю ширину. */
@@ -147,6 +153,12 @@ export function plateOf(W: number, others: number, lines = 4, fontScale = 1): { 
 
 /** Небольшой постоянный поворот карты в сбросе — по номеру карты, без случайности. */
 const tilt = (c: Card) => ((c * 37) % 21) - 10;
+const COS10 = Math.cos(Math.PI / 18), SIN10 = Math.sin(Math.PI / 18);
+
+/** Ширина деревянного борта стола, dp (рисует src/render/felt.ts). */
+export const RIM = 14;
+/** Колода и сброс в углах сукна — чуть меньше карт стола. */
+export const CORNER = 0.8;
 
 export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   const { width: W, height: H } = opt;
@@ -186,38 +198,54 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   // середина стола — между веерами соперников и строкой подсказки с кнопками над рукой
   const handY = Math.round(H - ch * 0.62);
   const top = oppY + (ch * oppScale) / 2 + m;
-  const bottom = handY - ch / 2 - CONTROLS;
-  const midY = Math.round((top + bottom) / 2);
-  // колода слева: открытый козырь поперёк под стопкой рубашек
+  const feltRect = {
+    x: Math.round(m / 2), y: Math.round(top - m / 2), w: Math.round(W - m),
+    // сукно кончается над строкой подсказки (она стоит на handTop − CONTROLS + 8): капсула подсказки не ложится на борт
+    h: Math.round(handY - ch * 0.75 - CONTROLS + 4 - (top - m / 2)),
+  };
+  const inner = { x: feltRect.x + RIM, y: feltRect.y + RIM, r: feltRect.x + feltRect.w - RIM, b: feltRect.y + feltRect.h - RIM };
+  const gap = Math.max(8, Math.round(m * 0.5));
 
-  const talon = { x: Math.round(m + ch / 2), y: midY };
+  // колода — в левом верхнем углу сукна: стопка рубашек, под ней поперёк открытый козырь (виден его индекс);
+  // сброс — в правом верхнем, стопкой вразброс; оба чуть меньше карт стола (игра владельца 09.11.2026: середина — для пар)
+  const cs = CORNER;
+  const talon = { x: Math.round(inner.x + gap + cw * cs * 0.6), y: Math.round(inner.y + gap + (ch * cs) / 2) };
   if (o.talonSize > 0) {
-    sprites.push({ key: `c${o.trump}`, card: o.trump, x: talon.x + cw * 0.35, y: talon.y, rot: 90, scale: 1, z: z++, glow: false, from: talon });
+    sprites.push({ key: `c${o.trump}`, card: o.trump, x: talon.x + cw * cs * 0.35, y: talon.y, rot: 90, scale: cs, z: z++, glow: false, from: talon });
     const backs = o.talonSize - 1;
     for (let i = 0; i < backs; i++) {
-      sprites.push({ key: `t-${i}`, card: null, x: talon.x - cw * 0.1 - Math.min(i, 6) * 0.6, y: talon.y - Math.min(i, 6) * 0.6, rot: 0, scale: 1, z: z++, glow: false, from: talon });
+      sprites.push({ key: `t-${i}`, card: null, x: talon.x - cw * cs * 0.1 - Math.min(i, 6) * 0.6, y: talon.y - Math.min(i, 6) * 0.6, rot: 0, scale: cs, z: z++, glow: false, from: talon });
     }
   }
+  // капсула «колода N» — справа от козыря, на высоте стопки
+  const talonLabel = { x: Math.round(talon.x + cw * cs * 1.05 + 8), y: talon.y };
 
-  // сброс справа: рубашками, вразброс; повёрнутые карты не выходят за борт (tilt до 10°, запас 0,15 ширины карты)
-  const discard = { x: Math.round(W - m - cw * 0.65), y: midY };
+  // сброс: рубашками, вразброс; повёрнутые карты (tilt до 10°) не выходят за угол сукна
+  const tiltW = ((cw / 2) * COS10 + (ch / 2) * SIN10) * cs, tiltH = ((ch / 2) * COS10 + (cw / 2) * SIN10) * cs;
+  const discard = { x: Math.round(inner.r - gap - tiltW), y: Math.round(inner.y + gap + tiltH) };
   for (const c of o.discard) {
-    sprites.push({ key: `c${c}`, card: null, x: discard.x, y: discard.y, rot: tilt(c), scale: 1, z: z++, glow: false, from: discard });
+    sprites.push({ key: `c${c}`, card: null, x: discard.x, y: discard.y, rot: tilt(c), scale: cs, z: z++, glow: false, from: discard });
   }
 
-  // стол: пары «атака — защита» в два ряда по три
-  const tx = Math.round(talon.x + ch / 2 + m), tw = Math.round(discard.x - cw / 2 - m - tx);
-  // второй ряд пар ниже первого на 1,45 высоты карты: карта защиты первого ряда (сдвинута вниз на 0,22) не прячется под
-  // атакой второго (снимки «Круга 2», проход 1)
-  const pairW = cw * 1.35, pairH = Math.min(ch * 1.45, (bottom - top) / 2);
-  const tableBox = { x: tx, y: Math.round(midY - pairH), w: tw, h: Math.round(pairH * 2) };
+  // стол: пары «атака — защита» в два ряда по три — под углами колоды и сброса, во всю ширину сукна
+  const band = inner.y + gap + Math.max(ch * cs, tiltH * 2) + gap;
+  const area = { x: inner.x + gap, y: band, w: inner.r - inner.x - gap * 2, h: inner.b - gap - band };
+  // рамка пары вокруг карты атаки: защита сдвинута на 0,2 ширины и 0,22 высоты, повороты −3° и 6° — пара занимает
+  // 1,31 ширины и 1,28 высоты карты, её середина на 0,12 правее и ниже карты атаки
   const n = o.table.length;
   const perRow = n <= 3 ? Math.max(1, n) : 3;
   const rows = Math.ceil(n / perRow) || 1;
+  // ряды — на 1,334 высоты карты: карта защиты первого ряда не прячется под атакой второго (снимки «Круга 2», проход 1);
+  // столбцы — на 1,4 ширины. Не помещаются (узкий экран, четверо, два ряда) — карты стола чуть меньше, а не внахлёст
+  const PAIR_W = 1.34, PAIR_H = 1.3, COL = 1.4, ROW = 1.334;
+  const ps = Math.min(1, area.h / (ch * (PAIR_H + (rows - 1) * ROW)), area.w / (cw * (PAIR_W + (perRow - 1) * COL)));
+  const tcw = cw * ps, tch = ch * ps;
+  const colStep = Math.min(tcw * COL, area.w / perRow), rowStep = tch * ROW;
+  const midX = area.x + area.w / 2, midY = Math.round(area.y + area.h / 2);
   const mine = { x: W / 2, y: handY };
   const seatPoint = (seat: number) => (seat === o.seat ? mine : opponents.find(p => p.seat === seat) ?? mine);
   const origin = (c: Card, fallback: number) => seatPoint(opt.origins?.byCard.get(c) ?? fallback);
-  const middle = { x: tx + tw / 2, y: midY };
+  const middle = { x: midX, y: midY };
   for (let i = 0; i < fanEnd; i++) {
     const sp = sprites[i];
     if (!sp.key.startsWith('h')) continue;
@@ -227,11 +255,12 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   o.table.forEach(([a, d], i) => {
     const row = Math.floor(i / perRow), col = i % perRow;
     const inRow = Math.min(perRow, n - row * perRow);
-    const x = tx + tw / 2 + (col - (inRow - 1) / 2) * Math.min(pairW, tw / perRow) - cw * 0.08;
-    const y = midY + (row - (rows - 1) / 2) * pairH * 0.92 - ch * 0.08;
-    sprites.push({ key: `c${a}`, card: a, x, y, rot: -3, scale: 1, z: z++, glow: opt.targets.includes(a), from: origin(a, o.attacker) });
+    // середина рамки пары → карта атаки
+    const x = midX + (col - (inRow - 1) / 2) * colStep - tcw * 0.12;
+    const y = midY + (row - (rows - 1) / 2) * rowStep - tch * 0.12;
+    sprites.push({ key: `c${a}`, card: a, x, y, rot: -3, scale: ps, z: z++, glow: opt.targets.includes(a), from: origin(a, o.attacker) });
     if (d !== null) {
-      sprites.push({ key: `c${d}`, card: d, x: x + cw * 0.2, y: y + ch * 0.22, rot: 6, scale: 1, z: z++, glow: false, from: origin(d, o.defender) });
+      sprites.push({ key: `c${d}`, card: d, x: x + tcw * 0.2, y: y + tch * 0.22, rot: 6, scale: ps, z: z++, glow: false, from: origin(d, o.defender) });
     }
   });
 
@@ -250,10 +279,12 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   });
 
   return {
-    cw, ch, sprites, opponents, talon, discard, table: tableBox,
+    cw, ch, sprites, opponents, talon, talonLabel, discard,
+    // бросить карту можно на всё сукно
+    table: { x: inner.x, y: inner.y, w: inner.r - inner.x, h: inner.b - inner.y },
+    pairs: area,
     handTop: Math.round(handY - ch * 0.75),
-    // сукно кончается над строкой подсказки (она стоит на handTop − CONTROLS + 8): капсула подсказки не ложится на борт
-    felt: { x: Math.round(m / 2), y: Math.round(top - m / 2), w: Math.round(W - m), h: Math.round(handY - ch * 0.75 - CONTROLS + 4 - (top - m / 2)) },
+    felt: feltRect,
     plate: { top: plateTop, height: plateH },
   };
 }

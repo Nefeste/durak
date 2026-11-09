@@ -45,6 +45,8 @@ import { CardPicture } from '../render/CardPicture';
 import { RulesScreen } from '../screens/RulesScreen';
 import { RULES_PICTURES } from './rulesPictures';
 import { newbieDone, newbieTip } from './newbie';
+import { noteOf } from './note';
+import type { Note } from './note';
 
 const fast = typeof globalThis.location !== 'undefined' && /[?&]fast=1/.test(globalThis.location.search);
 /** Снимки «до — после» (tools/design/flow.ts): `?seed=N` — одна и та же колода и те же решения ботов в каждой сборке.
@@ -89,7 +91,10 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const [record, setRecord] = useState<GameRecord>(() => restored?.record ?? newRecord(variant, seats, restored?.history ?? []));
   const [state, setState] = useState<State>(() => (restored ? replay(restored.record) : stateOf(record)));
   const [picked, setPicked] = useState<{ card: Card; options: Action[] } | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  // строка «Подсказки» и «так нельзя» — к позиции, где её спросили: следующее действие её гасит (src/game/note.ts)
+  const [noted, setNoted] = useState<Note<GameRecord> | null>(null);
+  const note = noteOf(noted, record);
+  const setNote = (text: string | null, at: GameRecord = record) => setNoted(text === null ? null : { text, at });
   const [showSeen, setShowSeen] = useState(false);
   const [deal, setDeal] = useState(0);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
@@ -187,7 +192,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     setNote(T.game.thinking);
     const job = thinkSliced(adviseThink(observe(state, YOU), makeRng(record.actions.length + 1)), THINK_MS[TOP]);
     adviseJob.current = job;
-    job.promise.then(a => { setAdvising(false); setNote(T.game.advice(adviceText(a.action, state), a.chance, a.exact)); }, () => setAdvising(false));
+    const at = record;
+    job.promise.then(a => { setAdvising(false); setNote(T.game.advice(adviceText(a.action, state), a.chance, a.exact), at); }, () => setAdvising(false));
   };
 
   // учили в этой партии три отбоя — дальше игрок сам
@@ -239,16 +245,18 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     const a = picked.options.find(o => o.type === 'beat' && o.on === attack);
     if (a) { setPicked(null); act(YOU, a); }
   };
-  const onDrop = (c: Card, on: Card | null) => {
+  /** Карта брошена на стол; `true` — ход сделан (карта идёт на стол от пальца). */
+  const onDrop = (c: Card, on: Card | null): boolean => {
     hold.skip();
     setNote(null);
     setPicked(null);
     const r = tapCard(state, YOU, c);
-    if (!r) { explain(c); return; }
-    if ('now' in r) { act(YOU, r.now); return; }
+    if (!r) { explain(c); return false; }
+    if ('now' in r) { act(YOU, r.now); return true; }
     const a = (on !== null && r.choose.find(o => o.type === 'beat' && o.on === on)) || r.choose.find(o => o.type === 'transfer');
-    if (a) act(YOU, a);
-    else setPicked({ card: c, options: r.choose });
+    if (a) { act(YOU, a); return true; }
+    setPicked({ card: c, options: r.choose });
+    return false;
   };
   const transfer = picked?.options.find(o => o.type === 'transfer');
 
@@ -328,12 +336,12 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
             left={p.x - plate.w / 2} width={plate.w} top={layout.plate.top} height={layout.plate.height} />
         )) : null}
         {layout && shown.talonSize > 0 ? (
-          <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talon.x - 44, top: layout.talon.y + layout.ch * 0.6 }]}>
+          <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talonLabel.x, top: layout.talonLabel.y - 13 }]}>
             <Text pointerEvents="none" style={styles.talonText} testID="talon">{T.game.talon(shown.talonSize)}</Text>
           </Glass>
         ) : null}
         {layout && shown.talonSize === 0 ? (
-          <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talon.x - 44, top: layout.talon.y - 14 }]}>
+          <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.table.x + SPACE.s, top: layout.talon.y - 13 }]}>
             <Text pointerEvents="none" style={styles.talonText}>{T.game.trumpIs(T.suits[Math.floor(state.trump / 9)])}</Text>
           </Glass>
         ) : null}
@@ -405,7 +413,7 @@ const styles = StyleSheet.create({
   area: { flex: 1 },
   /** метка паузы для сценария в браузере: невидима, ничего не ловит */
   held: { position: 'absolute', width: 1, height: 1 },
-  talonPill: { position: 'absolute', width: 88, paddingVertical: SPACE.xs },
+  talonPill: { position: 'absolute', minWidth: 88, paddingHorizontal: SPACE.s, paddingVertical: SPACE.xs },
   talonText: { textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
   hintRow: { alignItems: 'center', minHeight: 28 },

@@ -26,7 +26,7 @@
 **Отчёты:** лестница этапа В — [`docs/reports/2026-11-08-arena-stage-v.md`](docs/reports/2026-11-08-arena-stage-v.md),
 шесть уровней — [`docs/reports/2026-11-08-arena-stage-d.md`](docs/reports/2026-11-08-arena-stage-d.md); протокол — [`docs/03-server-api.md`](docs/03-server-api.md).
 
-**Что дальше:** Ж; нейросеть седьмого уровня — если успеет к 1.0. Звук стола — записи CC0 (Kenney, OpenGameArt) — в `main`, слушает владелец.
+**Что дальше:** Ж; нейросеть седьмого уровня — если успеет к 1.0: устройство и код обучения готовы ([`docs/specs/2026-11-neural.md`](docs/specs/2026-11-neural.md)), **ждёт владельца** — запуск обучения на его видеокарте на сутки или неделю ([`tools/gpu/README.md`](tools/gpu/README.md)). Звук стола — записи CC0 (Kenney, OpenGameArt) — в `main`, слушает владелец.
 
 **Ждёт владельца:**
 
