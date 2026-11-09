@@ -8,6 +8,7 @@ import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
+import { breakable } from './SeatPlate';
 import { Stepper } from '../ui/Stepper';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { placeRows, whereOf } from './seats';
@@ -32,8 +33,8 @@ export function SeatMap({ places, host, onSit, sitLabel, onLevel }: {
     const note = p?.host ? T.online.hostSeat : wordOf(seat);
     return (
       <View key={seat} style={[styles.tile, p?.you && styles.mine]} testID={`lobby-seat-${seat}`}>
-        <Text style={styles.note} numberOfLines={1}>{seat + 1} · {note}</Text>
-        <Text style={[styles.name, !p && styles.free]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.note, styles.center]}>{seat + 1} · {note}</Text>
+        <Text style={[styles.name, styles.center, !p && styles.free]}>{p && !p.bot ? breakable(title) : title}</Text>
         {onSit && (!p || p.bot) ? <Button small kind="ghost" label={sitLabel ?? T.online.sit} onPress={() => onSit(seat)} testID={`sit-${seat}`} /> : null}
       </View>
     );
@@ -70,4 +71,6 @@ const styles = StyleSheet.create({
   note: { color: C.dim, fontSize: TYPE.caption },
   label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
   level: { gap: SPACE.xs },
+  // надписи места целиком (13-art.md, §3): длинное имя переносится, место становится выше
+  center: { textAlign: 'center' },
 });

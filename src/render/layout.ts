@@ -47,6 +47,8 @@ export interface Layout {
   handTop: number;
   /** Сукно: от вееров соперников до кнопок, во всю ширину. */
   felt: { x: number; y: number; w: number; h: number };
+  /** Плашки соперников (src/game/SeatPlate.tsx): верх и высота места под них над веером. */
+  plate: { top: number; height: number };
 }
 
 export interface LayoutOptions {
@@ -61,6 +63,22 @@ export interface LayoutOptions {
   showOpenly?: boolean;
   /** Кто положил карты на стол и кто взял стол — откуда им лететь (`originsOf`). */
   origins?: Origins;
+  /** Высота плашки соперника над веером (`plateHeight`); по умолчанию — три строки обычным шрифтом. */
+  plate?: number;
+}
+
+/** Плашка соперника (docs/13-art.md, §3 «Надписи целиком»): имя — строка 20 точек, остальные строки — по 17, поля 4
+ *  и кромка. Каждая надпись — своей строкой, без многоточия; крупный шрифт телефона плашка растит до ×1,3. */
+export const PLATE = { name: 20, line: 17, pad: 5, maxScale: 1.3 } as const;
+
+/** Название стола в верхней полосе растёт с шрифтом телефона не больше, чем в ×1,15: так на 360 точках рядом с ним
+ *  помещаются «В меню» и «Вышедшие» (13-art.md, §3). */
+export const TITLE_SCALE = 1.15;
+
+/** Высота плашки из `lines` строк (имя и строки под ним) при шрифте телефона `fontScale`. */
+export function plateHeight(lines: number, fontScale = 1): number {
+  const k = Math.min(PLATE.maxScale, Math.max(1, fontScale));
+  return Math.ceil((PLATE.name + PLATE.line * Math.max(0, lines - 1)) * k + PLATE.pad * 2);
 }
 
 /** Откуда летят новые карты: место, положившее карту на стол, и место, взявшее стол. */
@@ -114,6 +132,9 @@ export function sortHand(hand: Card[], trumpSuit: number, order: HandOrder): Car
 
 /** Высота строки подсказки и ряда кнопок над рукой. */
 export const CONTROLS = 100;
+/** Зазор от низа ряда кнопок до верха руки. Подсказка и кнопки стоят на нём и растут вверх, на сукно, а не вниз, на
+ *  карты руки: длинная подсказка в две строки или крупный шрифт не закрывают руку (13-art.md, §3 «Надписи целиком»). */
+export const CONTROLS_GAP = 16;
 
 /** Небольшой постоянный поворот карты в сбросе — по номеру карты, без случайности. */
 const tilt = (c: Card) => ((c * 37) % 21) - 10;
@@ -129,8 +150,10 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
 
   // соперники: по часовой стрелке от вас — слева направо по верху
   const others = Array.from({ length: o.seats - 1 }, (_, i) => (o.seat + 1 + i) % o.seats);
-  // место под имя и число карт над веером соперника
-  const oppY = Math.round(ch * 0.55 * 0.5 + 58 + m);
+  // место под плашку (имя, уровень, число карт, роль) над веером соперника: плашка кончается у верха веера
+  const plateH = opt.plate ?? 66;
+  const plateTop = Math.max(0, m - 8);
+  const oppY = Math.round(ch * 0.55 * 0.5 + plateTop + plateH);
   const opponents: Seat[] = others.map((seat, i) => ({ seat, x: Math.round((W * (2 * i + 1)) / (2 * others.length)), y: oppY }));
   const oppScale = 0.55;
   for (const p of opponents) {
@@ -219,6 +242,7 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
     cw, ch, sprites, opponents, talon, discard, table: tableBox,
     handTop: Math.round(handY - ch * 0.75),
     felt: { x: Math.round(m / 2), y: Math.round(top - m / 2), w: Math.round(W - m), h: Math.round(bottom - top + m) },
+    plate: { top: plateTop, height: plateH },
   };
 }
 

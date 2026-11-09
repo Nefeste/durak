@@ -2,7 +2,7 @@
 // мест на полоске сукна, на каждом — карта, пара «атака — защита», колода с козырем, сброс или веер. Лица — те же,
 // что за столом (faces.ts, ADR 0010), один холст Skia на картинку, без движения и касаний. Подписи мест — текстом
 // под холстом, ровно под своим местом.
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Canvas, Group, LinearGradient, Picture, RoundedRect, useFont, vec } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
@@ -36,6 +36,11 @@ export function CardPicture({ spec, width, testID }: { spec: PictureSpec; width:
   const faces = useMemo(() => (font && small ? makeFaces(cw, ch, font, small, settings.fourColor) : null), [cw, ch, font, small, settings.fourColor]);
   // для чтения с экрана: карты картинки по порядку
   const said = placed.cards.filter(p => p.card !== null).map(p => nameOf(p.card as Card)).join(' ');
+  // подписи стоят под своими местами и переносятся сколько нужно (13-art.md, §3 «Надписи целиком»): высота ряда — по
+  // самой высокой подписи, а не две строки заранее (крупным шрифтом «старшей той же масти» уходила в третью и обрезалась)
+  const [hs, setHs] = useState<number[]>([]);
+  const labelH = hs.some(Boolean) ? Math.ceil(Math.max(...hs.filter(Boolean))) : TYPE.caption * 2 + SPACE.s;
+  const onLabel = (i: number, h: number) => setHs(prev => (prev[i] === h ? prev : Object.assign([...prev], { [i]: h })));
   return (
     <View style={styles.wrap} testID={testID} accessible accessibilityLabel={said}>
       <View style={{ width, height }}>
@@ -49,11 +54,11 @@ export function CardPicture({ spec, width, testID }: { spec: PictureSpec; width:
         ) : null}
       </View>
       {spec.labels ? (
-        <View style={{ width, height: TYPE.caption * 2 + SPACE.s }}>
+        <View style={{ width, height: labelH }}>
           {spec.labels.map((l, i) => {
             // подпись не шире места до соседней: под тремя парами три подписи не налезают друг на друга
             const m = placed.mids, w = Math.min(cw * 2.4, i > 0 ? m[i] - m[i - 1] - SPACE.xs : Infinity, i < m.length - 1 ? m[i + 1] - m[i] - SPACE.xs : Infinity);
-            return <Text key={i} style={[styles.label, { left: m[i] - w / 2, width: w }]} numberOfLines={2}>{l}</Text>;
+            return <Text key={i} style={[styles.label, { left: Math.max(0, Math.min(width - w, m[i] - w / 2)), width: w }]} onLayout={e => onLabel(i, e.nativeEvent.layout.height)}>{l}</Text>;
           })}
         </View>
       ) : null}

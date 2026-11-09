@@ -168,7 +168,7 @@ async function main() {
   // у Миши напротив — Саша, слева и справа — боты своих уровней
   const opp = async (seat: number) => a.getByTestId(`opp-${seat}`).innerText().catch(() => '');
   ok(/Саша/.test(await opp(2)), 'за столом Саша — напротив Миши', await opp(2));
-  ok((await opp(1)).includes(T.level.novice) && (await opp(3)).includes(T.level.beginner) && /бот/.test(await opp(3)),
+  ok((await opp(1)).includes(T.level.novice) && (await opp(3)).includes(T.level.beginner) && /бот/i.test(await opp(3)),
     'боты за столом — разных уровней, подписаны «бот»', `${await opp(1)} / ${await opp(3)}`);
   await a.screenshot({ path: `${OUT}/online-02-game.png` });
 

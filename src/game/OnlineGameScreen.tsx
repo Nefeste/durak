@@ -2,7 +2,7 @@
 // холст Skia, что с ботами, но по виду места с сервера (ADR 0008). Онлайн нет помощников: ни
 // подсказки, ни вышедших карт, ни отмены (ADR 0006). После партии — итог, проверка колоды и «Реванш».
 import React, { useEffect, useMemo, useReducer, useState, useRef } from 'react';
-import { ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
@@ -16,9 +16,9 @@ import { gameEnded, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
-import { SeatPlate } from './SeatPlate';
+import { plateLines, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
-import { CONTROLS, layoutTable } from '../render/layout';
+import { CONTROLS_GAP, layoutTable, plateHeight, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { useLessMotion, useSettings } from '../state/store';
@@ -98,6 +98,7 @@ function Lobby({ table, t, onExit, pad }: { table: OnlineTable; t: TableView; on
 
 function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableView; onExit: () => void; pad: object; down: boolean }) {
   const insets = useInsets();
+  const { fontScale } = useWindowDimensions();
   const settings = useSettings();
   const less = useLessMotion();
   const font = useFont(Onest_700Bold, 15);
@@ -176,9 +177,11 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   const origins = useOrigins(shown);
   useTableCues(shown, g.no, less);
-  const lay = useMemo(() => (size && shown ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets }) : null),
+  // плашка: имя, уровень бота или «играет бот» / «нет связи», число карт, роль — каждая строкой (docs/13-art.md, §3)
+  const plateH = plateHeight(plateLines(2), fontScale);
+  const lay = useMemo(() => (size && shown ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, plate: plateH }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shown, origins, size, settings.handOrder, picked]);
+    [shown, origins, size, settings.handOrder, picked, plateH]);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
@@ -213,7 +216,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
       <View style={styles.top}>
         <Button small label={t.status === 'finished' ? T.game.menu : t.kind === 'quick' ? T.online.resign : T.online.leave} kind="ghost"
           onPress={t.status === 'finished' ? onExit : resign} testID="online-exit" />
-        <Text style={[styles.dim, styles.topTitle]} numberOfLines={1}>{T.variant[t.variant]}{left !== null ? ` · ${T.online.secs(left)}` : ''}</Text>
+        <Text style={[styles.dim, styles.topTitle]} maxFontSizeMultiplier={TITLE_SCALE} testID="online-title">{T.variant[t.variant]}{left !== null ? ` · ${T.online.secs(left)}` : ''}</Text>
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
         {down ? <Text style={[styles.err, styles.down]} pointerEvents="none" testID="online-down">{T.online.noNet}</Text> : null}
@@ -225,12 +228,14 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
         {lay && shown ? lay.opponents.map(p => {
           const s = t.seats[p.seat];
           return (
-            <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={seatName(s)}
-              info={s?.botFor ? T.online.playingFor(s.name) : s && !s.online ? T.online.offline
-                : shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])}
+            <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={s?.bot ? T.online.botName : seatName(s)}
+              lines={[
+                ...(s?.bot ? [T.level[s.bot]] : s?.botFor ? [T.online.botPlays] : s && !s.online ? [T.online.offline] : []),
+                shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat]),
+              ]}
               role={!view || view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : null}
               active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat)}
-              left={p.x - oppW / 2} width={oppW} top={Math.max(0, p.y - lay.ch * 0.55 * 0.5 - 66)} />
+              left={p.x - oppW / 2} width={oppW} top={lay.plate.top} height={lay.plate.height} />
           );
         }) : null}
         {lay && shown && shown.talonSize > 0 ? (
@@ -240,7 +245,7 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
           <Text pointerEvents="none" style={[styles.talon, { left: lay.talon.x - 40, top: lay.talon.y - 10 }]}>{T.game.trumpIs(T.suits[Math.floor(shown.trump / 9)])}</Text>
         ) : null}
         {lay && view ? (
-          <View pointerEvents="box-none" style={[styles.controls, { top: lay.handTop - CONTROLS + 8 }]}>
+          <View pointerEvents="box-none" style={[styles.controls, { bottom: (size?.height ?? 0) - lay.handTop + CONTROLS_GAP }]}>
             <Text style={styles.hint} testID="hint">{note ?? hint}</Text>
             <View style={styles.buttons} pointerEvents="box-none">
               {transfer ? <Button label={T.game.transfer} kind="ghost" onPress={() => send(transfer)} testID="transfer" /> : null}

@@ -2,7 +2,7 @@
 // сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки». С двумя-тремя ботами — «Разные уровни»: строка
 // «Бот N ‹ Любитель ›» у каждого бота (docs/09-game-design.md, «Боты за столом»).
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import type { Variant } from '../engine';
 import { LEVELS, LOCKED_LEVEL } from '../bot';
@@ -23,6 +23,9 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void; onRules: () => void;
 }) {
   const insets = useInsets();
+  // узкий телефон: «Бот N» — над своей строкой уровня, иначе «Начинающий» крупным шрифтом не помещался между стрелками
+  // (13-art.md, §3 «Надписи целиком»; 360 точек: 124 на название, нужно 143)
+  const stack = useWindowDimensions().width < 390;
   // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна.
   // На какой строке он показан: 0 — общий уровень, N — бот N; `null` — нигде
   const [lockedAt, setLockedAt] = useState<number | null>(null);
@@ -61,9 +64,9 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
             onChange={on => { setLockedAt(null); onChange({ ...choice, mixed: on, levels: on ? choice.levels.map(() => choice.level) : choice.levels }); }} />
         ) : null}
         {mixed ? Array.from({ length: choice.bots }, (_, i) => (
-          <View key={i} style={styles.botRow} testID={`level-row-${i + 1}`}>
-            <Text style={styles.botName}>{T.game.bot(i + 1)}</Text>
-            <View style={styles.botStep}>{levelRow(i + 1)}</View>
+          <View key={i} style={stack ? styles.botColumn : styles.botRow} testID={`level-row-${i + 1}`}>
+            <Text style={stack ? styles.label : styles.botName}>{T.game.bot(i + 1)}</Text>
+            <View style={stack ? null : styles.botStep}>{levelRow(i + 1)}</View>
           </View>
         )) : levelRow(0)}
         {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
@@ -103,6 +106,7 @@ const styles = StyleSheet.create({
   botRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
   botName: { color: C.text, fontSize: TYPE.body, fontWeight: '700', minWidth: 52 },
   botStep: { flex: 1 },
+  botColumn: { gap: SPACE.xs },
   actions: { gap: SPACE.m },
   row: { flexDirection: 'row', gap: SPACE.m },
   cell: { flex: 1 },
