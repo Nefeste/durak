@@ -201,8 +201,9 @@ describe('проигрыватели: заранее и с починкой (src
   test('экраны стола заводят звуки и зовут отклик; ошибка проигрывателя слышна игре', () => {
     expect(FEEDBACK).toContain("addListener('playbackStatusUpdate'");
     expect(FEEDBACK).toContain('p.replace(file)');
+    // стол партии слушает то, что показан игроку: во время паузы перед «бито» — стол паузы (src/game/hold.ts)
     for (const f of ['src/game/GameScreen.tsx', 'src/game/OnlineGameScreen.tsx', 'src/game/PuzzleScreen.tsx']) {
-      expect(readFileSync(f, 'utf8')).toContain('useTableCues(view, ');
+      expect(readFileSync(f, 'utf8')).toMatch(/useTableCues\((view|shown), /);
     }
     // «Меньше движения» звук не выключает: отклик читает только «Звук» и «Вибрацию»
     expect(FEEDBACK).not.toContain('lessMotion');

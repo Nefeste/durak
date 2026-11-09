@@ -10,6 +10,7 @@ import type { ProofView, QuickView, TableView } from '../../src/state/protocol';
 import { createApp } from '../../server/src/app';
 import { FakeClock } from '../../server/src/clock';
 import { parseAction, simplest, waitingOf } from '../../server/src/core';
+import { heldView } from '../../src/game/hold';
 
 const V = '0.2.0';
 
@@ -56,6 +57,12 @@ function noLeak(t: TableView): void {
     expect(g.view.seat).toBe(t.you);
     expect(g.view.hand.length).toBe(g.view.handSizes[t.you]);
   }
+  // стол паузы перед «бито» — тоже наблюдение своего места: те же поля, своя рука
+  if (g.held) {
+    expect(Object.keys(g.held).sort()).toEqual(Object.keys(observe(newGame({ rules: RULES_V1, variant: 'podkidnoy', seats: 2, first: 0 }, [...Array(36).keys()]), 0)).sort());
+    expect(g.held.seat).toBe(t.you);
+    expect(g.held.hand.length).toBe(g.held.handSizes[t.you]);
+  }
   // доказательство (колода, зёрна) — только у законченной партии
   if (g.proof) expect(g.result).not.toBeNull();
   const raw = JSON.stringify(t);
@@ -99,6 +106,7 @@ describe('сервер', () => {
     expect(start.status).toBe(200);
     const id = t0.id;
     const seen: Map<string, Observation> = new Map();
+    const helds: Map<string, Observation> = new Map();
     const pick = makeRng(5);
     let final: TableView | null = null;
     for (let guard = 0; guard < 4000 && !final; guard++) {
@@ -110,6 +118,7 @@ describe('сервер', () => {
         if (t.status === 'finished') { final = t; break; }
         const v = t.game!.view!;
         seen.set(`${t.you}:${t.game!.n}`, v);
+        if (t.game!.held) helds.set(`${t.you}:${t.game!.n}`, t.game!.held);
         const acts = legalFor(v);
         if (!acts.length) continue;
         const a = chooseAction(v, 'average', pick);
@@ -135,6 +144,53 @@ describe('сервер', () => {
       expect(v).toEqual(observe(states[n], seat));
     }
     expect(seen.size).toBeGreaterThan(20);
+    // стол паузы — ровно `heldView` пересобранной позиции до последнего действия (ADR 0008)
+    expect(helds.size).toBeGreaterThan(0);
+    for (const [k, h] of helds) {
+      const [seat, n] = k.split(':').map(Number);
+      const last = proof.actions[n - 1];
+      expect(h).toEqual(heldView(observe(states[n - 1], seat), last.seat, last.action, states[n])!);
+    }
+    // после партии — стол последнего отбоя, своего места
+    const end = final!.game!.held!;
+    expect(end).not.toBeNull();
+    expect(end.seat).toBe(final!.you);
+    expect(end.table.length).toBeGreaterThan(0);
+  });
+
+  test('пауза перед «бито»: отбой кончился картой — бот ждёт, пока все разглядят стол', async () => {
+    let checked = false;
+    // отбой кончается картой не в каждой партии: несколько раздач, пока не встретится такой, а следом ходит бот
+    for (let deal = 0; deal < 40 && !checked; deal++) {
+      const e = setup(100 + deal);
+      const a = await e.player('Аня');
+      const t = (await e.call('POST', '/v1/tables', a, { variant: 'podkidnoy', seats: 2, bots: 'novice' })).body.table as TableView;
+      await joinByCode(e, a, t.code!);
+      await e.call('POST', `/v1/tables/${t.id}/start`, a);
+      const pick = makeRng(3 + deal);
+      for (let guard = 0; guard < 3000 && !checked; guard++) {
+        const v = (await e.call('GET', `/v1/tables/${t.id}`, a)).body.table as TableView;
+        if (v.status !== 'playing') break;
+        const g = v.game!;
+        const botNext = g.waiting.includes(1) && g.view!.table.length === 0;
+        if (g.held && botNext) {
+          // стол последнего отбоя виден, бот ещё молчит и после своей обычной паузы
+          expect(g.held.table.length).toBeGreaterThan(0);
+          e.clock.advance(ONLINE.botMs + 50);
+          expect(((await e.call('GET', `/v1/tables/${t.id}`, a)).body.table as TableView).game!.n).toBe(g.n);
+          e.clock.advance(ONLINE.holdMs);
+          const w = (await e.call('GET', `/v1/tables/${t.id}`, a)).body.table as TableView;
+          expect(w.game!.n).toBe(g.n + 1);
+          expect(w.game!.held).toBeNull();
+          checked = true;
+          break;
+        }
+        if (legalFor(g.view!).length && g.waiting.includes(0)) {
+          await e.call('POST', `/v1/tables/${t.id}/act`, a, { game: g.no, n: g.n, action: chooseAction(g.view!, 'average', pick) });
+        } else e.clock.advance(500);
+      }
+    }
+    expect(checked).toBe(true);
   });
 
   test('ошибки: занятый номер действия — stale, незаконное — причина, чужой ход, сменившийся отпечаток', async () => {

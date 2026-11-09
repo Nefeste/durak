@@ -29,9 +29,12 @@ const hand = (p: Page) => p.locator('[data-testid^="hand-"]');
 
 /** Одно своё действие, если оно есть: карта руки, «перевести», цель на столе, иначе «пас»/«беру». */
 async function step(p: Page): Promise<boolean> {
+  // пауза перед «бито»: стол не трогаем, пока его разглядывают (касание своей карты её кончает)
+  if (await visible(p, 'held')) return false;
   const before = await hand(p).count();
   const n = before;
   for (let k = 0; k < n; k++) {
+    if (await visible(p, 'held')) return false;
     await hand(p).nth(k).click({ timeout: 800, force: true }).catch(() => {});
     await p.waitForTimeout(40);
     if (await visible(p, 'transfer')) await p.getByTestId('transfer').click().catch(() => {});
@@ -66,6 +69,18 @@ async function main() {
   const phone = async (name: string) => {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 915 }, locale: 'ru-RU' });
     const page = await ctx.newPage();
+    // пауза перед «бито» и «беру» (src/game/hold.ts): что на столе паузы и сколько она стояла
+    await page.addInitScript(() => {
+      type Hold = { label: string; at: number; ms: number };
+      const w = globalThis as unknown as { __holds: Hold[] };
+      w.__holds = [];
+      let cur: Hold | null = null;
+      new MutationObserver(() => {
+        const el = document.querySelector('[data-testid="held"]');
+        if (el && !cur) { cur = { label: el.getAttribute('aria-label') ?? '', at: performance.now(), ms: -1 }; w.__holds.push(cur); }
+        if (!el && cur) { cur.ms = performance.now() - cur.at; cur = null; }
+      }).observe(document, { childList: true, subtree: true });
+    });
     page.on('console', m => { if (m.type() === 'error' && !m.text().includes('favicon')) errors.push(`${name}: ${m.text()}`); });
     page.on('pageerror', e => errors.push(`${name}: ${e}`));
     await page.goto(web.url, { waitUntil: 'networkidle' });
@@ -139,6 +154,16 @@ async function main() {
   await a.screenshot({ path: `${OUT}/online-02-game.png` });
 
   ok(await playOut([a, b], 'стол'), 'партия на троих дошла до итога');
+  {
+    // отбой кончился картой — оба телефона видят стол с ней, прежде чем карты уйдут в сброс
+    const holds = (p: Page) => p.evaluate(() => (globalThis as unknown as { __holds: { label: string; ms: number }[] }).__holds.filter(h => h.ms >= 0));
+    const ha = await holds(a), hb = await holds(b);
+    const both = ha.filter(h => hb.some(x => x.label === h.label));
+    ok(both.length > 0, `пауза перед «бито» у обоих: Миша ${ha.length}, Саша ${hb.length}, общих ${both.length}`, JSON.stringify([ha, hb]));
+    ok(both.some(h => h.label.split(', ').some(pair => pair.includes(' '))), 'на столе паузы у обоих — покрытая пара', JSON.stringify(both));
+    ok(ha.concat(hb).some(h => h.ms >= 900), 'пауза стоит своё время (1,2 с)', JSON.stringify(ha.concat(hb).map(h => Math.round(h.ms))));
+    ok(await a.getByTestId('table').locator('canvas').count() > 0, 'после партии под итогом — стол последнего отбоя');
+  }
   await a.waitForTimeout(500);
   for (const [p, n] of [[a, 'Миша'], [b, 'Саша']] as const) {
     const t = await p.getByTestId('deck-check').innerText().catch(() => '');
