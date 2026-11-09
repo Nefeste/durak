@@ -12,8 +12,9 @@ export const nextOrder = (o: HandOrder): HandOrder => (o === 'suit' ? 'rank' : '
 
 export function HandOrderButton({ order, x, y, onChange }: { order: HandOrder; x: number; y: number; onChange: (o: HandOrder) => void }) {
   const word = order === 'suit' ? T.settings.bySuit : T.settings.byRank;
+  // testID не начинается с «hand-»: так сценарии находят карты руки (`[data-testid^="hand-"]`)
   return (
-    <Pressable testID="hand-order" accessibilityRole="button" accessibilityLabel={T.game.handOrderButton(word.toLowerCase())}
+    <Pressable testID="order-hand" accessibilityRole="button" accessibilityLabel={T.game.handOrderButton(word.toLowerCase())}
       accessibilityHint={T.game.handOrderHint} onPress={() => onChange(nextOrder(order))} hitSlop={4}
       style={({ pressed }) => [styles.button, { left: x - SIZE / 2, top: y - SIZE / 2 }, pressed && styles.pressed]}>
       <HandOrderIcon order={order} />

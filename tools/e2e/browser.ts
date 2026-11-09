@@ -353,15 +353,15 @@ try {
       const ids = await ph.locator('[data-testid^="hand-"]').evaluateAll(els => els.map(e => [e.getAttribute('data-testid'), e.getBoundingClientRect().x] as [string, number]));
       return ids.sort((a, b) => a[1] - b[1]).map(x => x[0]).join(' ');
     };
-    const sortBox = await ph.getByTestId('hand-order').boundingBox();
+    const sortBox = await ph.getByTestId('order-hand').boundingBox();
     ok(!!sortBox && sortBox.width >= 40 && sortBox.height >= 40, `кнопка порядка руки у руки: ${sortBox ? `${Math.round(sortBox.width)}×${Math.round(sortBox.height)}` : 'нет'}`, JSON.stringify(sortBox));
     const o1 = await order();
-    await ph.getByTestId('hand-order').click();
+    await ph.getByTestId('order-hand').click();
     await ph.waitForTimeout(400);
     const o2 = await order();
     ok(o1 !== o2 && o1.split(' ').sort().join() === o2.split(' ').sort().join(), 'касание кнопки — рука в другом порядке, карты те же', `${o1} | ${o2}`);
     await ph.screenshot({ path: `${OUT}/02-hand-order.png` });
-    await ph.getByTestId('hand-order').click();
+    await ph.getByTestId('order-hand').click();
     await ph.waitForTimeout(400);
     ok(await order() === o1, 'второе касание — прежний порядок');
     // играем: свои карты касанием, «бито» и «беру» кнопками; реплики бота и «думает…»
