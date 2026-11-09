@@ -7,6 +7,8 @@
  *
  *   EXPO_OFFLINE=1 npm run export:web
  *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/flow.ts [папка]   # по умолчанию docs/design/2026-11-art/pass
+ *
+ * Колода и решения ботов закреплены (`?seed=11`, GameScreen): снимки «до» и «после» ловят один и тот же стол.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
@@ -55,14 +57,20 @@ async function until(p: Page, re: RegExp, steps = 80): Promise<boolean> {
   return false;
 }
 
-/** До итога; `mid` — снимок в середине партии, когда на столе есть пары, а в руке ещё много карт. */
-async function toEnd(p: Page, mid?: string) {
-  let taken = false;
+/** Середина партии: на столе не меньше двух пар, в руке не меньше пяти карт — снимок после того, как карты
+ *  долетели. С закреплённой колодой момент один и тот же в каждой сборке. */
+async function midGame(p: Page, name: string) {
+  for (let i = 0; i < 60 && !(await visible(p, 'result')); i++) {
+    const pairs = await p.getByTestId('table').locator('[data-testid^="table-"]').count();
+    if (pairs >= 2 && await hand(p).count() >= 5) { await shot(p, name, 900); return; }
+    await step(p);
+    await p.waitForTimeout(120);
+  }
+}
+
+/** До итога. */
+async function toEnd(p: Page) {
   for (let i = 0; i < 600 && !(await visible(p, 'result')); i++) {
-    if (mid && !taken && i > 3) {
-      const pairs = await p.getByTestId('table').locator('[data-testid^="table-"]').count();
-      if (pairs >= 1 && await hand(p).count() >= 4) { await shot(p, mid, 300); taken = true; }
-    }
     await step(p);
     await p.waitForTimeout(100);
   }
@@ -75,7 +83,7 @@ const errors: string[] = [];
 page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text().slice(0, 300)}`); });
 page.on('pageerror', e => errors.push(`page: ${String(e).slice(0, 300)}`));
 try {
-  await page.goto(`${web.url}?fast=1`);
+  await page.goto(`${web.url}?fast=1&seed=11`);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   await shot(page, '01-title', 1200);
 
@@ -92,7 +100,8 @@ try {
   await shot(page, '04-table-defence');
   await until(page, /Подкиньте|Ходите/);
   await shot(page, '05-table-attack');
-  await toEnd(page, '06-table-mid');
+  await midGame(page, '06-table-mid');
+  await toEnd(page);
   await shot(page, '07-result', 700);
   for (let w = 0; w < 120 && /Считаем/.test(await page.getByTestId('result-worst').innerText().catch(() => 'Считаем')); w++) await page.waitForTimeout(250);
   await shot(page, '08-result-review-line', 300);
@@ -134,8 +143,7 @@ try {
     await page.getByTestId('transfer-ok').click();
   }
   await shot(page, '16-table-four', 1500);
-  await until(page, /Переводите|Переведите|Отбивайтесь/);
-  await shot(page, '17-table-four-defence');
+  await midGame(page, '17-table-four-mid');
   if (await visible(page, 'advise')) {
     await page.getByTestId('advise').click();
     await page.waitForTimeout(2500);
