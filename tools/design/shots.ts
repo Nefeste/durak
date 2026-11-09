@@ -1,18 +1,21 @@
 /**
  * Снимки экранов для аудита вида и листа стиля (docs/reports/2026-11-08-design-audit.md, docs/13-art.md):
  * телефон 412 × 915, плотность 2, веб-сборка. Каждый экран — один файл в docs/design/; разбор на столе — 16 и 17, «Правила» — 18–20, окно «Что такое перевод» — 21, отчёт с раскрытой партией — 22, закрытый уровень — 23,
- * разные уровни ботов — 24–26.
+ * разные уровни ботов — 24–26, «Статистика» на настоящей истории из 60 партий ботов — 27–31.
  *
  *   EXPO_OFFLINE=1 npm run export:web
- *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка] [--levels]   # по умолчанию docs/design
+ *   NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts [папка] [--levels | --stats]   # по умолчанию docs/design
  */
 import { mkdirSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 import { serveWeb } from '../e2e/serve';
+import { fakeHistory } from './history';
 
 const OUT = process.argv[2] ?? 'docs/design'; // папка снимков «после» — аргументом
 /** `--levels` — только снимки «Разных уровней» (24–26), без партии до конца. */
 const ONLY_LEVELS = process.argv.includes('--levels');
+/** `--stats` — только «Статистика» (27–31): история подложена в хранилище, без «Про» и с «Про». */
+const ONLY_STATS = process.argv.includes('--stats');
 mkdirSync(OUT, { recursive: true });
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
 const hand = (p: Page) => p.locator('[data-testid^="hand-"]');
@@ -77,6 +80,30 @@ async function levels(page: Page) {
   await shot(page, '26-table-levels');
 }
 
+/** «Статистика» (09.11.2026): 60 настоящих партий ботов за четыре недели — сначала без «Про», потом с «Про»
+ *  (тестовый магазин веб-сборки), экран прокручивается снимок за снимком. */
+async function stats(page: Page) {
+  const history = JSON.stringify(fakeHistory(60, Date.now()));
+  await page.evaluate(h => { localStorage.setItem('durak.games', h); localStorage.removeItem('durak.test-store'); }, history);
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.getByTestId('stats-open').click();
+  await page.getByTestId('stats').waitFor({ timeout: 5000 });
+  await shot(page, '27-stats');
+  await page.getByTestId('stats-back').click();
+  await page.evaluate(() => localStorage.setItem('durak.test-store', JSON.stringify({ noAds: false, proUntil: Date.now() + 30 * 86400_000 })));
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(800);
+  await page.getByTestId('stats-open').click();
+  await page.getByTestId('stats').waitFor({ timeout: 5000 });
+  await page.mouse.move(206, 500);
+  for (let k = 0; k < 4; k++) {
+    await shot(page, `${28 + k}-stats-pro${k ? `-${k + 1}` : ''}`);
+    await page.mouse.wheel(0, 700);
+  }
+}
+
 const web = serveWeb();
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2 });
@@ -84,6 +111,7 @@ try {
   await page.goto(`${web.url}?fast=1`);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   if (ONLY_LEVELS) await levels(page);
+  else if (ONLY_STATS) await stats(page);
   else {
     await shot(page, '01-menu');
     await page.getByTestId('rules-open').click();
