@@ -15,7 +15,7 @@ import { Button } from '../ui/Button';
 import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
-import { CONTROLS, layoutTable } from '../render/layout';
+import { CONTROLS_GAP, layoutTable } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { useLessMotion, useSettings } from '../state/store';
@@ -127,7 +127,7 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
             hand={state.hands[you]} table={state.table} enabled={status === 'play'} touch={{ onCard, onTableCard, onDrop }} />
         ) : null}
         {layout ? (
-          <View pointerEvents="box-none" style={[styles.controls, { top: layout.handTop - CONTROLS + 8 }]}>
+          <View pointerEvents="box-none" style={[styles.controls, { bottom: (size?.height ?? 0) - layout.handTop + CONTROLS_GAP }]}>
             <Text style={styles.line} testID="puzzle-line">{line}</Text>
             <View style={styles.buttons} pointerEvents="box-none">
               {take ? <Button label={T.game.take} kind="ghost" onPress={() => act(take)} testID="puzzle-take" /> : null}

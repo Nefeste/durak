@@ -1,37 +1,48 @@
 // Место соперника над его веером (аудит 08.11.2026, находка 11; разбор соперников, раздел 6): стеклянная плашка
-// с именем, числом карт и ролью. Кто ходит или отбивается — золотая кромка плашки, её видно краем глаза, не читая
-// подпись. Бот всегда назван ботом: «Бот 1 · Средний» (устав «Честность», ADR 0011).
+// с именем, уровнем, числом карт и ролью. Кто ходит или отбивается — золотая кромка плашки, её видно краем глаза, не
+// читая подпись. Бот всегда назван ботом: «Бот 1» и его уровень (устав «Честность», ADR 0011).
+// Каждая надпись — своей строкой и целиком (docs/13-art.md, §3 «Надписи целиком»; владелец 09.11.2026): втроём строка
+// «Опытный · 6 карт» обрезалась до «Опытный · 6 ка…». Длинное имя переносится, плашка растёт вниз; высоту под плашку
+// раскладка стола держит по числу строк и шрифту телефона (`plateOf`, `plateHeight` в src/render/layout.ts).
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { PLATE } from '../render/layout';
 import { Glass } from '../ui/Glass';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 
-export function SeatPlate({ name, sub, info, role, active, testID, left, top, width }: {
-  name: string;
-  /** Вторая строка — уровень бота, когда плашка узкая и в имя он не помещается (ничего не обрезаем). */
-  sub?: string;
-  info: string; role: string | null; active: boolean; testID: string; left: number; top: number; width: number;
+/** Длинное слово имени (ник до 16 знаков) может переноситься между любыми буквами: невидимый пробел нулевой ширины
+ *  после каждой буквы слов длиннее восьми знаков. Многоточия нет — ник виден целиком, плашка растёт вниз. */
+export const breakable = (name: string) => name.replace(/\S{9,}/g, w => [...w].join('​'));
+
+/** Сколько строк у плашки: имя, `lines` и строка роли. */
+export const plateLines = (lines: number) => lines + 2;
+
+export function SeatPlate({ name, lines, role, active, testID, left, top, width, height }: {
+  name: string; lines: string[]; role: string | null; active: boolean; testID: string;
+  left: number; top: number; width: number; height: number;
 }) {
   return (
     <Glass radius={RADIUS.small} testID={testID} selected={active}
-      style={[styles.plate, active && styles.active, { left, top, width }]}>
+      style={[styles.plate, active && styles.active, { left, top, width, minHeight: height }]}>
       <View pointerEvents="none" style={styles.col}>
-      <Text style={styles.name} numberOfLines={1}>{name}</Text>
-      {sub ? <Text style={styles.info} numberOfLines={1}>{sub}</Text> : null}
-      <Text style={styles.info} testID={`${testID}-cards`} numberOfLines={1}>{info}</Text>
-      <Text style={[styles.role, !role && styles.hidden]} numberOfLines={1}>{role ?? '\u00A0'}</Text>
+        <Text style={styles.name} maxFontSizeMultiplier={PLATE.maxScale}>{breakable(name)}</Text>
+        {lines.map((l, i) => (
+          <Text key={i} style={styles.info} testID={i === lines.length - 1 ? `${testID}-cards` : undefined} maxFontSizeMultiplier={PLATE.maxScale}>{l}</Text>
+        ))}
+        <Text style={[styles.role, !role && styles.hidden]} maxFontSizeMultiplier={PLATE.maxScale}>{role ?? ' '}</Text>
       </View>
     </Glass>
   );
 }
 
 const styles = StyleSheet.create({
-  plate: { position: 'absolute', paddingHorizontal: SPACE.s, paddingVertical: SPACE.xs },
+  // поле 4 и кромка 1 — `PLATE.pad`; плашка растёт вниз, если ник перенёсся
+  plate: { position: 'absolute', justifyContent: 'center', paddingHorizontal: SPACE.xs, paddingVertical: PLATE.pad - 1 },
   col: { alignItems: 'center' },
   // кромка в 2 точки, а размер плашки тот же: поле на точку уже
-  active: { borderColor: C.accent, borderWidth: 2, paddingHorizontal: SPACE.s - 1, paddingVertical: SPACE.xs - 1 },
-  name: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
-  info: { color: C.dim, fontSize: TYPE.caption },
-  role: { color: C.accent, fontSize: TYPE.caption, fontWeight: '700' },
+  active: { borderColor: C.accent, borderWidth: 2, paddingHorizontal: SPACE.xs - 1, paddingVertical: PLATE.pad - 2 },
+  name: { color: C.text, fontSize: TYPE.body, lineHeight: PLATE.name, fontWeight: '700', textAlign: 'center' },
+  info: { color: C.dim, fontSize: TYPE.caption, lineHeight: PLATE.line, textAlign: 'center' },
+  role: { color: C.accent, fontSize: TYPE.caption, lineHeight: PLATE.line, fontWeight: '700', textAlign: 'center' },
   hidden: { opacity: 0 },
 });

@@ -7,6 +7,7 @@ import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { T } from '../i18n';
+import { breakable } from './SeatPlate';
 import type { ResultPlace } from './outcome';
 import { useLessMotion } from '../state/store';
 import { Glass } from '../ui/Glass';
@@ -36,10 +37,10 @@ export function ResultSheet({ title, places, lines, main, rest, bottom }: {
         <View style={styles.places} testID="result-places" accessibilityLabel={places.map(p => `${p.n}. ${p.name}${p.fool ? ` — ${T.result.withCards}` : ''}`).join('; ')}>
           {places.map(p => (
             // своё место — золотой кромкой, но не когда остались с картами: итог спокойный, без «награды» за проигрыш
-            <Glass key={p.n} radius={RADIUS.small} style={[styles.place, p.you && !p.fool && styles.mine]} testID={`place-${p.n}`}>
+            <Glass key={p.n} radius={RADIUS.small} style={[styles.place, places.length > 3 && styles.placeHalf, p.you && !p.fool && styles.mine]} testID={`place-${p.n}`}>
               <Text style={[styles.placeN, p.fool && styles.foolText]} maxFontSizeMultiplier={1.3}>{p.fool ? T.result.withCards : T.result.placeN(p.n)}</Text>
-              <Text style={[styles.placeName, p.fool && styles.foolText]} numberOfLines={1} maxFontSizeMultiplier={1.3}>{p.name}</Text>
-              {p.sub ? <Text style={styles.placeSub} numberOfLines={1} maxFontSizeMultiplier={1.3}>{p.sub}</Text> : null}
+              <Text style={[styles.placeName, p.fool && styles.foolText]} maxFontSizeMultiplier={1.3}>{breakable(p.name)}</Text>
+              {p.sub ? <Text style={styles.placeSub} maxFontSizeMultiplier={1.3}>{p.sub}</Text> : null}
             </Glass>
           ))}
         </View>
@@ -66,7 +67,9 @@ const styles = StyleSheet.create({
   grip: { alignSelf: 'center', width: 36, height: 4, borderRadius: RADIUS.pill, backgroundColor: C.glassLine },
   title: { color: C.text, fontSize: TYPE.title, fontWeight: '700', textAlign: 'center' },
   ornament: { alignItems: 'center', marginTop: -SPACE.xs },
-  places: { flexDirection: 'row', gap: SPACE.s, justifyContent: 'center' },
+  // вчетвером — два ряда по два: в ряд из четырёх на 360 точках «Начинающий» не помещался (13-art.md, §3 «Надписи целиком»)
+  places: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.s, justifyContent: 'center' },
+  placeHalf: { flexBasis: '45%' },
   place: { flex: 1, maxWidth: 160, minHeight: 64, paddingHorizontal: SPACE.s, paddingVertical: SPACE.xs, alignItems: 'center', justifyContent: 'center', gap: SPACE.xs / 2 },
   // своё место — золотая кромка в 2 точки, размер тот же
   mine: { borderColor: C.accent, borderWidth: 2, paddingHorizontal: SPACE.s - 1, paddingVertical: SPACE.xs - 1 },

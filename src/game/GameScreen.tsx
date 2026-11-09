@@ -11,7 +11,7 @@ import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
 import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
 import type { Action, Card, GameRecord, Observation, Result, State, Variant } from '../engine';
-import { adviseThink, makeRng, oneLevel, think, THINK_MS, TOP } from '../bot';
+import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
 import { reviewGame } from './review';
 import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
@@ -21,7 +21,7 @@ import { gameEnded, gameStarted, leavingEnd } from '../money';
 import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
-import { CONTROLS, layoutTable, plateOf } from '../render/layout';
+import { CONTROLS_GAP, layoutTable, plateOf, plateHeight, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { botDelay } from '../state/settings';
@@ -33,7 +33,7 @@ import { autoPass, canUndo, seenGrid } from './flow';
 import { heldView, holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
 import { SeenCards } from './SeenCards';
-import { SeatPlate } from './SeatPlate';
+import { plateLines, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
 import { resultPlaces } from './outcome';
 import { ReviewScreen } from './ReviewScreen';
@@ -104,13 +104,13 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const [lvls] = useState(() => restored?.levels ?? levels);
   /** Уровень бота на месте `seat` (места ботов — 1 … bots). */
   const lvlAt = (seat: number): Level => levelAt(lvls, seat);
-  const one = oneLevel(lvls);
   // первая партия (docs/09-game-design.md, «Первая партия»): окно о переводе перед первым переводным столом и
   // «Правила» поверх стола; пока они открыты, боты ждут
   const [told, setTold] = useState(() => variant === 'perevodnoy' && !restored && !settings.transferTold);
   const [rulesOpen, setRulesOpen] = useState(false);
   const paused = told || rulesOpen;
-  const { width: winW } = useWindowDimensions();
+  const { width: winW, fontScale } = useWindowDimensions();
+  // плашка бота: имя, уровень, число карт, роль — каждая строкой (docs/13-art.md, §3 «Надписи целиком»)
   // подсказки новичка гаснут после партии, которую начали с ними (включённые посреди партии — со следующей)
   const teaching = useRef(settings.newbie);
   // деньги (src/money): полноэкранная грузится в начале партии и показывается только при уходе с итога
@@ -202,9 +202,9 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   const origins = useOrigins(shown);
   useTableCues(shown, deal, less);
-  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid }) : null),
+  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid, plate: plateHeight(plateLines(2), fontScale) }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shown, origins, size, settings.handOrder, settings.memoryAid, picked]);
+    [shown, origins, size, settings.handOrder, settings.memoryAid, picked, fontScale]);
 
   const explain = (c: Card) => {
     const probe: Action = state.table.length === 0 ? { type: 'attack', cards: [c] }
@@ -278,7 +278,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     : r.fool === YOU ? T.result.lose
     : seats === 2 ? T.result.win : r.order[0] === YOU ? T.result.first : T.result.win;
 
-  const plate = plateOf(size?.width ?? 412, bots);
+  const plate = plateOf(size?.width ?? 412, bots, plateLines(2), fontScale);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
@@ -292,8 +292,9 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
       <View style={styles.top}>
         <Button small label={T.game.menu} kind="ghost" onPress={onExit} testID="game-menu" />
-        {/* у ботов разные уровни — здесь только стол: уровень каждого — на его плашке (полоса узкая, с «Вышедшими» не влезло бы) */}
-        <Text style={styles.variant} numberOfLines={1} testID="game-title">{one ? `${T.variant[variant]} · ${T.level[one]}` : T.variant[variant]}</Text>
+        {/* в полосе — только стол: уровень каждого бота — на его плашке («Переводной · Начинающий» с «Вышедшими» на 360 точках
+            обрезался); название растёт с шрифтом телефона до ×1,15 — так на 360 точках рядом помещаются обе кнопки */}
+        <Text style={styles.variant} maxFontSizeMultiplier={TITLE_SCALE} testID="game-title">{T.variant[variant]}</Text>
         {settings.memoryAid ? <Button small label={T.game.seen} kind="ghost" onPress={() => setShowSeen(v => !v)} testID="seen" /> : null}
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
@@ -303,31 +304,29 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
             touch={{ onCard, onTableCard, onDrop }} />
         ) : null}
         {layout ? layout.opponents.map(p => (
-          // вчетвером «Бот 1 · Средний» в строку не влезает — уровень своей строкой, плашка выше (plateOf)
-          <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={plate.narrow ? T.game.bot(p.seat) : `${T.game.bot(p.seat)} · ${name(p.seat)}`}
-            sub={plate.narrow ? name(p.seat) : undefined}
-            info={shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])}
+          <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={T.game.bot(p.seat)}
+            lines={[name(p.seat), shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])]}
             role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : null}
             active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat)}
-            left={p.x - plate.w / 2} width={plate.w} top={Math.max(0, p.y - layout.ch * 0.55 * 0.5 - plate.h)} />
+            left={p.x - plate.w / 2} width={plate.w} top={layout.plate.top} height={layout.plate.height} />
         )) : null}
         {layout && shown.talonSize > 0 ? (
           <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talon.x - 44, top: layout.talon.y + layout.ch * 0.6 }]}>
-            <Text pointerEvents="none" style={styles.talonText} testID="talon" numberOfLines={1}>{T.game.talon(shown.talonSize)}</Text>
+            <Text pointerEvents="none" style={styles.talonText} testID="talon">{T.game.talon(shown.talonSize)}</Text>
           </Glass>
         ) : null}
         {layout && shown.talonSize === 0 ? (
           <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talon.x - 44, top: layout.talon.y - 14 }]}>
-            <Text pointerEvents="none" style={styles.talonText} numberOfLines={1}>{T.game.trumpIs(T.suits[Math.floor(state.trump / 9)])}</Text>
+            <Text pointerEvents="none" style={styles.talonText}>{T.game.trumpIs(T.suits[Math.floor(state.trump / 9)])}</Text>
           </Glass>
         ) : null}
         {layout ? (
-          <View pointerEvents="box-none" style={[styles.controls, { top: layout.handTop - CONTROLS + 8 }]}>
+          <View pointerEvents="box-none" style={[styles.controls, { bottom: (size?.height ?? 0) - layout.handTop + CONTROLS_GAP }]}>
             {/* подсказка — стеклянная капсула над рукой (13-art.md §6); пустая строка — капсулы нет, место остаётся */}
             <View style={styles.hintRow} pointerEvents="none">
               {state.phase === 'end' || !(note ?? hint) ? <Text style={styles.hint} testID="hint">{''}</Text> : (
                 <Glass radius={RADIUS.pill} style={styles.hintPill}>
-                  <Text style={styles.hint} testID="hint" numberOfLines={2} maxFontSizeMultiplier={1.3}>{note ?? hint}</Text>
+                  <Text style={styles.hint} testID="hint" maxFontSizeMultiplier={1.3}>{note ?? hint}</Text>
                 </Glass>
               )}
             </View>

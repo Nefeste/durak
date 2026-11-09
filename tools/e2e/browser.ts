@@ -254,7 +254,7 @@ try {
   ok(await handCount(page) === 6, 'на руке шесть карт', await handCount(page));
   ok(await visible(page, 'opp-1'), 'соперник с подписью «бот»', await page.getByTestId('opp-1').innerText().catch(() => ''));
   const seat = await page.getByTestId('opp-1').innerText().catch(() => '');
-  ok(/^Бот 1 · Начинающий/.test(seat.trim()), `место соперника — «Бот 1 · Начинающий» (первая партия, спецификация §3): ${seat.split('\n')[0]}`, seat);
+  ok(/^Бот 1\s+Начинающий\s+\d+ карт/.test(seat.trim()), `место соперника — «Бот 1», «Начинающий», «N карт» строками (первая партия, спецификация §3): ${seat.replace(/\n/g, ' · ')}`, seat);
   // вдвоём бот всегда ходит или отбивается — его плашка с золотой кромкой
   ok(await page.getByTestId('opp-1').getAttribute('aria-selected').catch(() => null) === 'true', 'плашка ходящего соперника выделена');
   // первая партия: строка над рукой учит первые три отбоя (docs/09-game-design.md, «Первая партия»)
