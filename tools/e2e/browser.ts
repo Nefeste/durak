@@ -246,6 +246,74 @@ try {
     await ctx.close();
   }
 
+  console.log('Перетаскивание и подсказка (игра владельца 09.11.2026)');
+  {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
+    const ph = await ctx.newPage();
+    ph.on('pageerror', e => errors.push(String(e)));
+    // где карта нарисована на самом деле, кадр за кадром (PROBE в src/render/TableCanvas.tsx)
+    await ph.addInitScript(() => {
+      const w = globalThis as unknown as { __cardAt: (k: string, x: number, y: number) => void; __trace: Record<string, [number, number][]> };
+      w.__trace = {};
+      w.__cardAt = (k, x, y) => { (w.__trace[k] ??= []).push([x, y]); };
+    });
+    await ph.goto(`${web.url}?seed=11&fast=1`);
+    await ph.getByTestId('menu').waitFor({ timeout: 20000 });
+    await ph.getByTestId('play').click();
+    await ph.getByTestId('game').waitFor({ timeout: 10000 });
+    for (let i = 0; i < 50 && !(await visible(ph, 'advise')); i++) await ph.waitForTimeout(100);
+    await ph.waitForTimeout(1600); // раздача
+    // «Подсказка» — совет к этой минуте
+    await ph.getByTestId('advise').click();
+    let advice = '';
+    for (let i = 0; i < 60 && !/^Ходите/.test(advice); i++) { advice = await ph.getByTestId('hint').innerText().catch(() => ''); await ph.waitForTimeout(100); }
+    ok(/^Ходите/.test(advice), `подсказка: «${advice}»`, advice);
+    const felt = (await ph.getByTestId('felt').boundingBox())!;
+    const first = ph.locator('[data-testid^="hand-"]').first();
+    const id = Number((await first.getAttribute('data-testid'))!.slice(5));
+    const card = (await first.boundingBox())!;
+    const plate = (await ph.getByTestId('opp-1').boundingBox())!;
+    const clip = { x: plate.x, y: plate.y, width: plate.width, height: plate.height + 40 };
+    const plateBefore = await ph.screenshot({ clip });
+    // путь пальца: от карты руки через «Подсказку» на середину сукна
+    const adv = (await ph.getByTestId('advise').boundingBox())!;
+    const path = [
+      [card.x + 8, card.y + card.height / 2],
+      [adv.x + adv.width / 2, adv.y + adv.height / 2],
+      [felt.x + felt.width / 2, felt.y + felt.height * 0.45],
+    ];
+    await ph.mouse.move(path[0][0], path[0][1]);
+    await ph.mouse.down();
+    let plateSame = true;
+    for (let k = 1; k < path.length; k++) {
+      for (let t = 1; t <= 8; t++) {
+        const [ax, ay] = path[k - 1], [bx, by] = path[k];
+        await ph.mouse.move(ax + ((bx - ax) * t) / 8, ay + ((by - ay) * t) / 8);
+        await ph.waitForTimeout(25);
+        if (k === 1 && t === 8) plateSame = Buffer.compare(plateBefore, await ph.screenshot({ clip })) === 0;
+      }
+    }
+    ok(plateSame, 'над плашкой соперника нет второй карты, пока палец над кнопкой у руки');
+    const drop = { x: path[2][0] - felt.x, y: path[2][1] - felt.y };
+    await ph.evaluate(k => { (globalThis as unknown as { __trace: Record<string, unknown[]> }).__trace[k] = []; }, `c${id}`);
+    await ph.mouse.up();
+    await ph.waitForTimeout(120);
+    // ход сделан: карты нет в руке (бот потом может и взять стол — тогда она уйдёт к нему)
+    const laid = await ph.getByTestId(`hand-${id}`).count() === 0;
+    await ph.waitForTimeout(380);
+    const trace = await ph.evaluate(k => (globalThis as unknown as { __trace: Record<string, [number, number][]> }).__trace[k] ?? [], `c${id}`);
+    const handY = card.y - felt.y + card.height / 2;
+    const back = trace.filter(([, y]) => y > drop.y + 60);
+    ok(trace.length > 0 && Math.hypot(trace[0][0] - drop.x, trace[0][1] - drop.y) < 30,
+      `отпущенная карта на следующем кадре там, где её отпустили: (${trace[0]?.map(Math.round).join(', ')}) у (${Math.round(drop.x)}, ${Math.round(drop.y)})`, JSON.stringify(trace.slice(0, 4)));
+    ok(back.length === 0, `карта не возвращается к руке (y ≈ ${Math.round(handY)}) и не летит оттуда второй раз`, JSON.stringify(back.slice(0, 4)));
+    ok(laid, 'брошенная карта легла на стол');
+    const after = await ph.getByTestId('hint').innerText().catch(() => '');
+    ok(!/^Ходите/.test(after), `подсказка погасла после хода: «${after}»`, after);
+    await ph.screenshot({ path: `${OUT}/02-drop.png` });
+    await ctx.close();
+  }
+
   console.log('Подкидной, один бот');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });

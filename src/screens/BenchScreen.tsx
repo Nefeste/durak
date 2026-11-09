@@ -34,7 +34,7 @@ const ROUNDS = { full: { deal: 4, take: 6, flight: 12, master: 8 }, quick: { dea
 
 const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 const noop = () => {};
-const touch = { onCard: noop, onTableCard: noop, onDrop: noop };
+const touch = { onCard: noop, onTableCard: noop, onDrop: () => false };
 
 interface Row { scene: Scene; ui: FrameSummary; js: FrameSummary; bot?: { n: number; p50: number; worst: number } }
 

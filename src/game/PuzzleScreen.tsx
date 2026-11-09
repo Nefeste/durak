@@ -103,12 +103,14 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
     if ('now' in r) act(r.now); else setPicked({ card: c, options: r.choose });
   };
   const onTableCard = (on: Card) => { const a = picked?.options.find(o => o.type === 'beat' && o.on === on); if (a) act(a); };
-  const onDrop = (c: Card, on: Card | null) => {
+  const onDrop = (c: Card, on: Card | null): boolean => {
     const r = tapCard(state, you, c);
-    if (!r) return;
-    if ('now' in r) { act(r.now); return; }
+    if (!r) return false;
+    if ('now' in r) { act(r.now); return true; }
     const a = (on !== null && r.choose.find(o => o.type === 'beat' && o.on === on)) || null;
-    if (a) act(a); else setPicked({ card: c, options: r.choose });
+    if (a) { act(a); return true; }
+    setPicked({ card: c, options: r.choose });
+    return false;
   };
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
