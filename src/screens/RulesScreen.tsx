@@ -1,14 +1,15 @@
 // «Правила» своими словами с картинками (docs/specs/2026-11-v1.md, «Обёртка»; docs/09-game-design.md, «Первая
 // партия»): пересказ docs/08-rules.md по разделам, у каждого — пример из карт тем же рисунком, что за столом.
 // Открывается из меню и из окна «Что такое перевод» (сразу на разделе «Перевод»).
+import { Glass } from '../ui/Glass';
 import React, { useEffect, useRef } from 'react';
-import { BackHandler, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { BackHandler, ScrollView, StyleSheet, Text, useWindowDimensions } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { RULES_SECTIONS, T } from '../i18n';
 import type { RulesSection } from '../i18n';
 import { Header } from '../ui/Header';
-import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
+import { C, SPACE, TYPE } from '../ui/theme';
 import { CardPicture } from '../render/CardPicture';
 import { RULES_PICTURES } from '../game/rulesPictures';
 
@@ -46,11 +47,11 @@ export function RulesScreen({ onBack, section }: { onBack: () => void; section?:
         const slots = RULES_PICTURES[key];
         const labels = (T.rules.pictures as Partial<Record<RulesSection, string[]>>)[key];
         return (
-          <View key={key} style={[styles.panel, key === section && styles.focus]} onLayout={onSection(key)} testID={`rules-${key}`}>
+          <Glass key={key} style={[styles.panel, key === section && styles.focus]} onLayout={onSection(key)} testID={`rules-${key}`}>
             <Text style={styles.title} accessibilityRole="header">{s.title}</Text>
             <Text style={styles.text}>{s.text}</Text>
             {slots ? <CardPicture spec={{ slots, labels }} width={pic} testID={`rules-picture-${key}`} /> : null}
-          </View>
+          </Glass>
         );
       })}
     </ScrollView>
@@ -58,10 +59,10 @@ export function RulesScreen({ onBack, section }: { onBack: () => void; section?:
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   content: { alignSelf: 'center', paddingHorizontal: SPACE.l, gap: SPACE.l },
   intro: { color: C.dim, fontSize: TYPE.body, lineHeight: 21 },
-  panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  panel: { gap: SPACE.m, padding: SPACE.l,  },
   focus: { borderColor: C.accent },
   title: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },
   text: { color: C.text, fontSize: TYPE.body, lineHeight: 22 },

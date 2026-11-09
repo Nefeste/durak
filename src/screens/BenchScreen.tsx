@@ -193,7 +193,7 @@ export function BenchScreen({ onBack, quick = false }: { onBack: () => void; qui
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingHorizontal: SPACE.s, gap: SPACE.s },
+  root: { flex: 1, paddingHorizontal: SPACE.s, gap: SPACE.s },
   table: { height: '55%' },
   panel: { flex: 1 },
   panelIn: { gap: SPACE.m, padding: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass },

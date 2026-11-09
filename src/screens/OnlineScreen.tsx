@@ -9,6 +9,7 @@ import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
+import { Glass } from '../ui/Glass';
 import { Header } from '../ui/Header';
 import { Chips } from '../ui/Chips';
 import { Checkbox } from '../ui/Toggle';
@@ -153,7 +154,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
     return (
       <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="online-profile">
         <Header title={mode === 'quick' ? T.online.quickTitle : T.online.title} back={T.online.back} onBack={onBack} backTestID="online-back" />
-        <View style={styles.panel}>
+        <Glass style={styles.panel}>
           <Checkbox id="adult" label={T.online.adult} value={adult} onChange={on => { setAdultState(on); void setAdult(on); }} />
           <Text style={styles.note}>{T.online.adultNote}</Text>
           {adult ? (
@@ -165,7 +166,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
             </>
           ) : null}
           {errorBlock}
-        </View>
+        </Glass>
       </ScrollView>
     );
   }
@@ -175,7 +176,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
     return (
       <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="quick">
         <Header title={T.online.quickTitle} back={T.online.back} onBack={onBack} backTestID="online-back" />
-        <View style={styles.panel}>
+        <Glass style={styles.panel}>
           <Chips id="q-variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={variant} label={v => T.variant[v]} onChange={setVariant} />
           {q?.status === 'searching' ? (
             <>
@@ -193,7 +194,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
             <Button label={T.online.find} onPress={find} disabled={busy} testID="quick-find" />
           )}
           {errorBlock}
-        </View>
+        </Glass>
       </ScrollView>
     );
   }
@@ -203,12 +204,12 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
     return (
       <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} testID="pick-seat">
         <Header title={T.online.pickSeat} back={T.online.back} onBack={() => { setPicking(null); setErr(null); }} backTestID="pick-back" />
-        <View style={styles.panel}>
+        <Glass style={styles.panel}>
           <Text style={styles.label}>{T.variant[i.variant]} · {i.host}</Text>
           <Text style={styles.note}>{T.online.pickSeatNote}</Text>
           <SeatMap places={i.places!} host={Math.max(0, i.places!.findIndex(p => p?.host))} onSit={busy ? undefined : sit} />
           {errorBlock}
-        </View>
+        </Glass>
       </ScrollView>
     );
   }
@@ -216,7 +217,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   return (
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="friends">
       <Header title={T.online.title} back={T.online.back} onBack={onBack} backTestID="online-back" />
-      <View style={styles.panel}>
+      <Glass style={styles.panel}>
         <Text style={styles.label}>{T.menu.variant}</Text>
         <Chips id="f-variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={variant} label={v => T.variant[v]} onChange={setVariant} />
         <Text style={styles.label}>{T.online.seats}</Text>
@@ -224,14 +225,14 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         <Text style={styles.label}>{T.online.bots}</Text>
         <Chips id="f-bots" items={['none', ...LEVELS] as (Level | 'none')[]} value={bots} label={l => (l === 'none' ? T.online.noBots : T.level[l])} onChange={setBots} />
         <Button label={T.online.create} onPress={create} disabled={busy} testID="create" />
-      </View>
-      <View style={styles.panel}>
+      </Glass>
+      <Glass style={styles.panel}>
         <Text style={styles.label}>{T.online.joinByCode}</Text>
         <TextInput testID="code" value={code} onChangeText={v => setCode(v.toUpperCase())} placeholder={T.online.codePlaceholder} placeholderTextColor={C.dim}
           style={styles.input} maxLength={6} autoCapitalize="characters" autoCorrect={false} />
         <Button label={T.online.join} kind="ghost" onPress={join} disabled={busy} testID="join" />
         {errorBlock}
-      </View>
+      </Glass>
     </ScrollView>
   );
 }
@@ -239,9 +240,9 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
 export const adultNow = isAdult;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root: { flex: 1 },
   content: { paddingHorizontal: SPACE.l, gap: SPACE.l },
-  panel: { gap: SPACE.m, padding: SPACE.l, borderRadius: RADIUS.panel, backgroundColor: C.glass, borderWidth: 1, borderColor: C.glassLine },
+  panel: { gap: SPACE.m, padding: SPACE.l,  },
   label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
   note: { color: C.dim, fontSize: TYPE.caption },
   big: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },

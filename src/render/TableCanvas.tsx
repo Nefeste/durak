@@ -6,14 +6,14 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { GestureResponderEvent } from 'react-native';
-import { Canvas, Group, LinearGradient, Picture, RoundedRect, vec } from '@shopify/react-native-skia';
+import { Canvas, Group, Picture } from '@shopify/react-native-skia';
 import type { SkFont } from '@shopify/react-native-skia';
 import { Easing, useDerivedValue, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 import type { Card } from '../engine';
 import { nameOf } from '../engine';
-import { C } from '../ui/theme';
 import { makeFaces } from './faces';
+import { makeFelt } from './felt';
 import type { Faces } from './faces';
 import { handCardAt, inTable, tableCardAt } from './layout';
 import type { Layout, Sprite } from './layout';
@@ -84,6 +84,9 @@ export function TableCanvas({ layout, font, small, fourColor, less, hand, table,
 }) {
   const { cw, ch } = layout;
   const faces = useMemo(() => makeFaces(cw, ch, font, small, fourColor), [cw, ch, font, small, fourColor]);
+  // сукно с бортом и светом лампы — одна картинка на размер стола (src/render/felt.ts)
+  const { x: fx, y: fy, w: fw, h: fh } = layout.felt;
+  const felt = useMemo(() => makeFelt({ x: fx, y: fy, w: fw, h: fh }, cw * 0.4), [fx, fy, fw, fh, cw]);
   // раздача: пока она идёт, появившиеся карты вылетают из колоды по очереди; позже новая карта
   // прилетает сразу (с места, откуда её положили, — `from` раскладки)
   const [dealing, setDealing] = React.useState(!less);
@@ -142,9 +145,7 @@ export function TableCanvas({ layout, font, small, fourColor, less, hand, table,
       onResponderTerminate={() => { drag.current = null; dragX.set(0); dragY.set(0); setDragCard(null); }}
       testID="felt">
       <Canvas style={StyleSheet.absoluteFill}>
-        <RoundedRect x={layout.felt.x} y={layout.felt.y} width={layout.felt.w} height={layout.felt.h} r={cw * 0.4}>
-          <LinearGradient start={vec(0, layout.felt.y)} end={vec(0, layout.felt.y + layout.felt.h)} colors={[C.feltLight, C.felt]} />
-        </RoundedRect>
+        <Picture picture={felt} />
         {ordered.map(s => (
           <CardSprite key={s.key} s={s} faces={faces} delay={dealing ? Math.round(s.z * step) : 0} less={less}
             dragX={dragX} dragY={dragY} dragged={dragCard !== null && s.key === `c${dragCard}`} />

@@ -115,6 +115,14 @@ export function sortHand(hand: Card[], trumpSuit: number, order: HandOrder): Car
 /** Высота строки подсказки и ряда кнопок над рукой. */
 export const CONTROLS = 100;
 
+/** Плашка места соперника над его веером (SeatPlate): ширина по числу соперников; узкая (три соперника на 412 dp) —
+ *  уровень отдельной строкой, и плашка выше, чтобы ничего не обрезалось. Одна функция для раскладки и экранов. */
+export function plateOf(W: number, others: number): { w: number; h: number; narrow: boolean } {
+  const w = Math.min(180, W / Math.max(1, others) - 6);
+  const narrow = w < 150;
+  return { w, h: narrow ? 82 : 66, narrow };
+}
+
 /** Небольшой постоянный поворот карты в сбросе — по номеру карты, без случайности. */
 const tilt = (c: Card) => ((c * 37) % 21) - 10;
 
@@ -129,8 +137,8 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
 
   // соперники: по часовой стрелке от вас — слева направо по верху
   const others = Array.from({ length: o.seats - 1 }, (_, i) => (o.seat + 1 + i) % o.seats);
-  // место под имя и число карт над веером соперника
-  const oppY = Math.round(ch * 0.55 * 0.5 + 58 + m);
+  // место под плашку (имя, уровень, число карт, роль) над веером соперника
+  const oppY = Math.round(ch * 0.55 * 0.5 + plateOf(W, others.length).h - 8 + m);
   const opponents: Seat[] = others.map((seat, i) => ({ seat, x: Math.round((W * (2 * i + 1)) / (2 * others.length)), y: oppY }));
   const oppScale = 0.55;
   for (const p of opponents) {
@@ -167,8 +175,8 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
     }
   }
 
-  // сброс справа: рубашками, вразброс
-  const discard = { x: Math.round(W - m - cw / 2), y: midY };
+  // сброс справа: рубашками, вразброс; повёрнутые карты не выходят за борт (tilt до 10°, запас 0,15 ширины карты)
+  const discard = { x: Math.round(W - m - cw * 0.65), y: midY };
   for (const c of o.discard) {
     sprites.push({ key: `c${c}`, card: null, x: discard.x, y: discard.y, rot: tilt(c), scale: 1, z: z++, glow: false, from: discard });
   }
@@ -218,7 +226,8 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   return {
     cw, ch, sprites, opponents, talon, discard, table: tableBox,
     handTop: Math.round(handY - ch * 0.75),
-    felt: { x: Math.round(m / 2), y: Math.round(top - m / 2), w: Math.round(W - m), h: Math.round(bottom - top + m) },
+    // сукно кончается над строкой подсказки (она стоит на handTop − CONTROLS + 8): капсула подсказки не ложится на борт
+    felt: { x: Math.round(m / 2), y: Math.round(top - m / 2), w: Math.round(W - m), h: Math.round(handY - ch * 0.75 - CONTROLS + 4 - (top - m / 2)) },
   };
 }
 
