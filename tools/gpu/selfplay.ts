@@ -4,16 +4,16 @@
 // наблюдений этого места до исхода (TD(λ)), на этапе поиска для своих решений сети — смесь с оценкой поиска.
 //
 //   bun tools/gpu/selfplay.ts --net cur.bin --games 200 --seed 7 --out shard.bin [--mode td|search] …
-// Печатает одну строку JSON со счётом круга. Файл: 'DKS1', n, 56, 0 (u32), затем n × 56 байт записей и n float32 целей.
+// Печатает одну строку JSON со счётом круга. Файл: 'DKS1', n, 64, 0 (u32), затем n × 64 байта записей и n float32 целей.
 import { writeFileSync } from 'node:fs';
-import { apply, observe } from '../../src/engine';
-import type { State, Variant } from '../../src/engine';
+import { apply, observe, rulesWith } from '../../src/engine';
+import type { State, ThrowOrder, Variant } from '../../src/engine';
 import { legalFor, makeRng, thinkSync } from '../../src/bot';
 import type { Rng } from '../../src/bot';
 import { encode, netScores, pack, RAW_SIZE, valueOf } from '../../src/bot/net';
 import type { NetParams } from '../../src/bot/net';
 import { actorOf, outcome } from '../../src/bot/sim';
-import { loadNet, playerOf, shuffled, startOf, trainingRules } from './play';
+import { loadNet, playerOf, shuffled, startOf } from './play';
 import type { Player } from './play';
 
 function args(): Record<string, string> {
@@ -50,7 +50,8 @@ const params: NetParams = {
 const pickSeats = weighted(A.seats ?? '2:0.6,3:0.2,4:0.2');
 const pickVariant = weighted(A.variants ?? 'podkidnoy:0.5,perevodnoy:0.5');
 const pickPlayer = weighted(A.mix ?? 'net:0.7,average:0.12,amateur:0.06,experienced:0.12');
-const rules = await trainingRules();
+// «Подкидывать»: по умолчанию стола — по очереди (#57); «кто успел» — настройка, её тоже в смесь
+const pickOrder = weighted(A.orders ?? 'queue:0.8,free:0.2');
 
 const rng = makeRng(seed * 7919 + 13);
 const players: Record<string, Player> = {};
@@ -69,6 +70,7 @@ for (let g = 0; g < games; g++) {
   const seats = Number(pickSeats(rng));
   const variant = pickVariant(rng) as Variant;
   const kinds = Array.from({ length: seats }, () => pickPlayer(rng));
+  const rules = rulesWith(pickOrder(rng) as ThrowOrder);
   let s: State = startOf(shuffled(rng), seats, variant, rules);
   const seqs: Rec[][] = Array.from({ length: seats }, () => []);
   const record = (st: State) => {

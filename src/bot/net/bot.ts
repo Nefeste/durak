@@ -35,6 +35,7 @@ const LOOP_BOUT = 60;
 /** Оценка места `seat` в позиции `s`: исход, если партия кончилась или место вышло; иначе — сеть по наблюдению. */
 export function valueAt(net: Net, s: State, seat: number, x?: Float32Array): number {
   if (s.phase === 'end') return outcome(s, seat);
+  if (s.resigned.includes(seat)) return 0;
   if (s.out.includes(seat)) return 1;
   return valueOf(net, features(observe(s, seat), x));
 }

@@ -4,7 +4,7 @@
 //
 //   bun tools/gpu/vectors.ts --net tools/gpu/vectors/tiny.bin --positions 1500 --out tools/gpu/vectors/features.jsonl.gz [--seed 1]
 import { writeFileSync } from 'node:fs';
-import { apply, observe } from '../../src/engine';
+import { apply, observe, RULES_V1 } from '../../src/engine';
 import type { Variant } from '../../src/engine';
 import { makeRng } from '../../src/bot';
 import { encode, pack, valueOf } from '../../src/bot/net';
@@ -28,7 +28,9 @@ for (let g = 0; lines.length < count; g++) {
   const seats = 2 + (g % 3);
   const variant: Variant = (g >> 1) % 2 ? 'perevodnoy' : 'podkidnoy';
   const players = Array.from({ length: seats }, (_, i) => playerOf(kinds[(g + i) % kinds.length]));
-  let s = startOf(shuffled(rng), seats, variant, rules);
+  // каждая четвёртая партия — «кто успел», остальные — по очереди; в части партий на 3–4 места кто-то сдаётся (#58)
+  let s = startOf(shuffled(rng), seats, variant, g % 4 === 3 ? RULES_V1 : rules);
+  let resignAt = seats > 2 && (g >> 2) % 2 === 0 ? 5 + rng.int(40) : -1;
   for (let step = 0; s.phase !== 'end' && step < 3000 && lines.length < count; step++) {
     const seat = actorOf(s);
     // наблюдение места наугад (не только ходящего), примерно каждое пятое действие
@@ -42,6 +44,11 @@ for (let g = 0; lines.length < count; g++) {
         x.forEach((v, i) => { if (v !== 0) feat.push([i, v]); });
         lines.push(JSON.stringify({ obs: o, raw: Array.from(raw), feat, value: valueOf(net, x) }));
       }
+    }
+    if (step === resignAt) {
+      const who = rng.int(seats);
+      if (!s.out.includes(who) && !s.resigned.includes(who)) { s = apply(s, who, { type: 'resign' }); resignAt = -1; continue; }
+      resignAt++;
     }
     s = apply(s, seat, players[seat](observe(s, seat), rng));
   }
