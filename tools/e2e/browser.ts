@@ -75,6 +75,9 @@ async function setLevel(p: Page, name: string, id = 'level') {
 const NEWBIE = /положите любую карту|Бейте старшей|Бейте, переводите|Нечем побить|Подкиньте то же достоинство/;
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
 const handCount = (p: Page) => p.locator('[data-testid^="hand-"]').count();
+/** Лист итога уже на странице — хоть ещё выезжает и `isVisible` его не видит. Касаться руки дальше нельзя: лист
+ *  встаёт поверх неё, и «касание карты» по прежним координатам попадает в его «В меню» (так терялись партии). */
+const over = (p: Page) => p.getByTestId('result').count().then(n => n > 0).catch(() => false);
 
 /** Играть до итога: сначала карты руки по очереди (ход, подкидывание, отбой, перевод), если ни одна
  *  не легла — «пас»/«бито», иначе «беру». Возвращает, сколько раз легла своя карта. */
@@ -82,7 +85,11 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
   let played = 0;
   const t0 = Date.now();
   for (let i = 0; i < 600; i++) {
-    if (await visible(p, 'result')) { console.log(`  … ${label}: ${i} шагов, ${Math.round((Date.now() - t0) / 1000)} с`); return { ended: true, played }; }
+    if (await over(p)) {
+      await p.getByTestId('result').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      console.log(`  … ${label}: ${i} шагов, ${Math.round((Date.now() - t0) / 1000)} с`);
+      return { ended: true, played };
+    }
     // пауза перед «бито»: стол не трогаем, пока его разглядывают (касание своей карты её кончает)
     if (await visible(p, 'held')) { await p.waitForTimeout(60); continue; }
     const before = await handCount(p);
@@ -92,7 +99,7 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
     let moved = false;
     for (let k = 0; k < n && !moved; k++) {
       // бот кончил отбой, пока мы перебирали карты, — не трогаем стол паузы (касание кончает её)
-      if (await visible(p, 'held')) break;
+      if (await visible(p, 'held') || await over(p)) break;
       await cards.nth(k).click({ timeout: 1000, force: true }).catch(() => {});
       await p.waitForTimeout(30);
       if (await visible(p, 'transfer')) await p.getByTestId('transfer').click().catch(() => {});
@@ -104,7 +111,7 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
       const after = await handCount(p).catch(() => before);
       if (after < before) { moved = true; played++; }
     }
-    if (!moved) {
+    if (!moved && !(await over(p))) {
       if (await visible(p, 'pass')) await p.getByTestId('pass').click().catch(() => {});
       else if (await visible(p, 'take')) await p.getByTestId('take').click().catch(() => {});
     }
