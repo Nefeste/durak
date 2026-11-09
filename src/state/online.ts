@@ -33,6 +33,8 @@ export class OnlineTable {
   private emit() { for (const f of this.listeners) f(); }
 
   remember(s: MySeed) { this.seeds.set(s.game, s); }
+  /** Зерно, которое телефон отдал за партию `game`: пересесть до начала — с ним же. */
+  seedOf(game: number): MySeed | null { return this.seeds.get(game) ?? null; }
 
   start(): void {
     this.stopped = false;

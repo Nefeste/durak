@@ -91,8 +91,12 @@ export class Net {
   createTable = (variant: Variant, seats: number, bots: Level | null, rid: string) =>
     this.request<{ table: TableView }>('POST', '/v1/tables', { rid, variant, seats, bots }, undefined, true).then(r => r.table);
   codeInfo = (code: string) => this.request<CodeInfo>('GET', `/v1/tables/code/${code}`, undefined, undefined, true);
-  join = (code: string, seed: string, commit: string) =>
-    this.request<{ table: TableView }>('POST', '/v1/tables/join', { code, seed, commit }, undefined, true).then(r => r.table);
+  /** `seat` — выбранное место; без него сервер сажает на первое свободное. Уже сидящий так пересаживается до начала. */
+  join = (code: string, seed: string, commit: string, seat?: number) =>
+    this.request<{ table: TableView }>('POST', '/v1/tables/join', seat === undefined ? { code, seed, commit } : { code, seed, commit, seat }, undefined, true).then(r => r.table);
+  /** Хозяин: уровень бота на месте до начала. */
+  setBot = (id: string, seat: number, level: Level) =>
+    this.request<{ table: TableView }>('POST', `/v1/tables/${id}/bot`, { seat, level }, undefined, true).then(r => r.table);
   start = (id: string) => this.request<{ table: TableView }>('POST', `/v1/tables/${id}/start`, {}, undefined, true).then(r => r.table);
   cancel = (id: string) => this.request<{ ok: true }>('POST', `/v1/tables/${id}/cancel`, {}, undefined, true);
   /** Действие с номером: повтор того же — безопасен (сервер ответит тем же). */

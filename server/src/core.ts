@@ -277,8 +277,10 @@ export class Core {
       const code = this.freshCode('SELECT 1 FROM tables WHERE code = ?');
       this.db.query(`INSERT INTO tables (id, code, kind, host, rid, variant, seats, bots, status, created)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', ?)`).run(id, code, kind, p.id, rid, variant, seats as number, bots, this.now());
+      // свободные места сразу за ботами стола: хозяин видит их уровни и меняет каждому (`setBot`), а человек может
+      // сесть на место бота до начала — бот уходит
       for (let s = 0; s < (seats as number); s++) {
-        this.db.query('INSERT INTO table_seats (table_id, seat, player) VALUES (?, ?, ?)').run(id, s, s === 0 ? p.id : null);
+        this.db.query('INSERT INTO table_seats (table_id, seat, player, bot) VALUES (?, ?, ?, ?)').run(id, s, s === 0 ? p.id : null, s === 0 ? null : bots);
       }
       this.newGameRow(id, 0, seats as number);
       this.bump(id);
@@ -295,18 +297,33 @@ export class Core {
     if (!t) throw new ApiError('no-table');
     const seats = this.seats(t.id), g = this.gameRow(t.id, t.game)!;
     const host = this.db.query('SELECT name FROM players WHERE id = ?').get(t.host) as { name: string };
+    const names = this.namesOf(seats);
     return {
       id: t.id, host: host.name, variant: t.variant, seats: t.seats,
       taken: seats.filter(s => s.player !== null).length, status: t.status, commit: g.commit_,
       mine: seats.some(s => s.player === p.id),
+      places: seats.map(s => (s.player !== null
+        ? { name: names.get(s.player)?.name ?? '', bot: null, host: s.player === t.host, you: s.player === p.id }
+        : s.bot !== null ? { name: '', bot: s.bot, host: false, you: false } : null)),
     };
   }
 
-  /** Сесть за стол (или отдать зерно, если место уже ваше): зерно — только при неизменном отпечатке. */
-  join(p: Player, body: { code?: unknown; seed?: unknown; commit?: unknown }): TableView {
+  private namesOf(rows: SeatRow[]): Map<number, Player> {
+    return new Map((this.db.query(`SELECT id, name, tag FROM players WHERE id IN (${rows.map(() => '?').join(',')})`)
+      .all(...rows.map(r => r.player ?? -1)) as Player[]).map(x => [x.id, x]));
+  }
+
+  /**
+   * Сесть за стол (или отдать зерно, если место уже ваше): зерно — только при неизменном отпечатке. `seat` — какое
+   * место выбрали: свободное или место бота (бот уходит); уже сидящий до начала так пересаживается, зерно — с ним.
+   * Без `seat` (телефоны до 0.8.0) — первое свободное без бота, а нет такого — первое место бота.
+   */
+  join(p: Player, body: { code?: unknown; seed?: unknown; commit?: unknown; seat?: unknown }): TableView {
     if (!isCode(body.code)) throw new ApiError('bad-code');
     if (!isSeed(body.seed)) throw new ApiError('bad-seed');
     if (!isCommit(body.commit)) throw new ApiError('bad-body');
+    const want = body.seat ?? null;
+    if (want !== null && !Number.isInteger(want)) throw new ApiError('bad-seat');
     const seed = body.seed, commit = body.commit, code = body.code;
     let seat = -1, tableId = '';
     this.tx(() => {
@@ -316,21 +333,34 @@ export class Core {
       const g = this.gameRow(t.id, t.game)!;
       if (g.commit_ !== commit) throw new ApiError('commit-changed', { commit: g.commit_ });
       const rows = this.seats(t.id);
+      if (want !== null && ((want as number) < 0 || (want as number) >= t.seats)) throw new ApiError('bad-seat');
       const mine = rows.find(s => s.player === p.id);
-      if (mine) seat = mine.seat;
+      const seeds = JSON.parse(g.seeds) as (string | null)[];
+      const take = (to: number) => {
+        // место бота: бот уходит — на этом месте будет человек
+        this.db.query('UPDATE table_seats SET player = ?, bot = NULL WHERE table_id = ? AND seat = ?').run(p.id, t.id, to);
+      };
+      if (mine && (want === null || want === mine.seat)) seat = mine.seat;
       else {
-        if (t.status !== 'waiting' || t.kind === 'quick') throw new ApiError(t.status === 'waiting' ? 'full' : 'not-waiting');
-        const free = rows.find(s => s.player === null && s.bot === null);
-        if (!free) throw new ApiError('full');
-        seat = free.seat;
-        this.db.query('UPDATE table_seats SET player = ? WHERE table_id = ? AND seat = ?').run(p.id, t.id, seat);
+        if (t.status !== 'waiting' || t.kind === 'quick') throw new ApiError(t.status !== 'waiting' ? 'not-waiting' : mine ? 'bad-seat' : 'full');
+        let to: SeatRow | undefined;
+        if (want !== null) {
+          to = rows[want as number];
+          if (to.player !== null) throw new ApiError('seat-taken');
+        } else to = rows.find(s => s.player === null && s.bot === null) ?? rows.find(s => s.player === null);
+        if (!to) throw new ApiError('full');
+        if (mine) {
+          // пересесть до начала: прежнее место — снова за ботом стола (или свободно), зерно — на новое место
+          this.db.query('UPDATE table_seats SET player = NULL, bot = ? WHERE table_id = ? AND seat = ?').run(t.bots, t.id, mine.seat);
+          seeds[to.seat] = seeds[mine.seat];
+          seeds[mine.seat] = null;
+        }
+        seat = to.seat;
+        take(seat);
       }
       if (t.status === 'waiting') {
-        const seeds = JSON.parse(g.seeds) as (string | null)[];
-        if (seeds[seat] === null) {
-          seeds[seat] = seed;
-          this.db.query('UPDATE games SET seeds = ? WHERE table_id = ? AND no = ?').run(JSON.stringify(seeds), t.id, g.no);
-        }
+        if (seeds[seat] === null) seeds[seat] = seed;
+        this.db.query('UPDATE games SET seeds = ? WHERE table_id = ? AND no = ?').run(JSON.stringify(seeds), t.id, g.no);
         this.bump(t.id);
         // быстрый стол начинается сам, когда оба отдали зёрна
         if (t.kind === 'quick' && this.seats(t.id).every((s, i) => s.bot !== null || (s.player !== null && seeds[i] !== null))) {
@@ -340,6 +370,24 @@ export class Core {
     });
     this.touch(tableId, seat);
     return this.view(tableId, seat);
+  }
+
+  /** Хозяин стола с ботами до начала выбирает уровень бота на месте (каждому свой, ADR 0011: имя — по уровню). */
+  setBot(p: Player, id: unknown, body: { seat?: unknown; level?: unknown }): TableView {
+    const t = this.tableRow(id);
+    if (t.host !== p.id) throw new ApiError('not-host');
+    if (t.status !== 'waiting' || t.kind !== 'friend') throw new ApiError('not-waiting');
+    if (t.bots === null || !isLevel(body.level)) throw new ApiError('bad-level');
+    const seat = body.seat;
+    if (!Number.isInteger(seat) || (seat as number) < 0 || (seat as number) >= t.seats) throw new ApiError('bad-seat');
+    const level = body.level;
+    this.tx(() => {
+      const row = this.seats(t.id)[seat as number];
+      if (row.player !== null) throw new ApiError('seat-taken');
+      this.db.query('UPDATE table_seats SET bot = ? WHERE table_id = ? AND seat = ?').run(level, t.id, seat as number);
+      this.bump(t.id);
+    });
+    return this.view(t.id, this.seatOfPlayer(t, p));
   }
 
   /** Создатель начинает партию: свободные места — боты стола (если не выключены). */
@@ -643,8 +691,7 @@ export class Core {
     const row = this.gameRow(tableId, g ? g.no : t.game)!;
     // законченная партия: показываем её итог, пока следующая не началась
     const last = !g && t.game > 0 ? this.gameRow(tableId, t.game - 1) : null;
-    const names = new Map((this.db.query(`SELECT id, name, tag FROM players WHERE id IN (${rows.map(() => '?').join(',')})`)
-      .all(...rows.map(r => r.player ?? -1)) as Player[]).map(p => [p.id, p]));
+    const names = this.namesOf(rows);
     const obs = g ? observe(g.state, you) : null;
     const seats: (SeatView | null)[] = rows.map(s => {
       if (s.player === null && s.bot === null) return null;
