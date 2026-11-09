@@ -38,7 +38,7 @@ const levelsText = (g: FinishedGame) => { const one = oneLevel(g.levels); return
 
 const resultOf = (g: FinishedGame) => {
   const r = g.record.result!;
-  return r.draw ? T.result.draw : r.fool === ME ? T.result.lose : T.result.win;
+  return (r.resigned ?? []).includes(ME) ? T.result.youResigned : r.draw ? T.result.draw : r.fool === ME ? T.result.lose : T.result.win;
 };
 
 const countPlaces = (ps: readonly Place[]): Record<Place, number> => {

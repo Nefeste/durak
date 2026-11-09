@@ -1,7 +1,7 @@
 // Поиск по раскладам и точная концовка (docs/10-bot.md): быстрое доигрывание решает так же, как правила
 // «Среднего»; решатель концовки совпадает с полным перебором; поиск видит только наблюдение.
 import { describe, expect, test } from 'bun:test';
-import { apply, legalActions, newGame, observe, RULES_V1 } from '../../src/engine';
+import { apply, legalActions, newGame, observe, RULES, RULES_V1 } from '../../src/engine';
 import { makeRng } from '../../src/bot';
 import { actorFast, decideFast } from '../../src/bot/fast';
 import { chooseByRules } from '../../src/bot/rules';
@@ -15,7 +15,7 @@ describe('быстрое доигрывание', () => {
     const rng = makeRng(21);
     let checked = 0;
     for (let g = 0; g < 800; g++) {
-      let s = newGame({ rules: RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2 + (g % 3), first: g % 2 }, shuffled(rng));
+      let s = newGame({ rules: Math.floor(g / 6) % 2 ? RULES : RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2 + (g % 3), first: g % 2 }, shuffled(rng));
       for (let n = 0; n < 200 && s.phase !== 'end'; n++) {
         const who = actorOf(s);
         expect(actorFast(s)).toBe(who);

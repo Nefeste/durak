@@ -1,5 +1,5 @@
 // Настройки (docs/09-game-design.md, «Настройки»): звук, вибрация, «Меньше движения» (как в системе,
-// пока игрок не выбрал сам — ADR устава 0023, правило 6), скорость ботов, порядок руки,
+// пока игрок не выбрал сам — ADR устава 0023, правило 6), скорость ботов, порядок руки, «Подкидывать»,
 // четырёхцветная колода, «Помощь памяти (для учёбы)», персональная реклама (этап Е, как в «Нардах»).
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -47,6 +47,9 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
         </Row>
         <Row title={T.settings.handOrder} note={T.settings.handOrderNote}>
           <Chips id="order" items={['suit', 'rank'] as const} value={s.handOrder} label={v => (v === 'suit' ? T.settings.bySuit : T.settings.byRank)} onChange={handOrder => setSettings({ handOrder })} />
+        </Row>
+        <Row title={T.settings.throwOrder} note={T.settings.throwOrderNote}>
+          <Chips id="throw" items={['queue', 'free'] as const} value={s.throwOrder} label={v => (v === 'queue' ? T.settings.throwQueue : T.settings.throwFree)} onChange={throwOrder => setSettings({ throwOrder })} />
         </Row>
         <Toggle id="four" title={T.settings.fourColor} note={T.settings.fourColorNote} value={s.fourColor} onChange={v => setSettings({ fourColor: v })} />
         <Toggle id="memory" title={T.settings.memoryAid} note={T.settings.memoryAidNote} value={s.memoryAid} onChange={v => setSettings({ memoryAid: v })} />

@@ -6,9 +6,10 @@
 import { ClipOp, PaintStyle, Skia, TileMode } from '@shopify/react-native-skia';
 import type { SkCanvas, SkPicture, SkRuntimeEffect } from '@shopify/react-native-skia';
 import { C } from '../ui/theme';
+import { RIM } from './layout';
 
-/** Ширина деревянного борта, dp. */
-export const RIM = 14;
+export { RIM };
+
 /** Плотность закадровой картинки стола: пиксели на dp. */
 const DENSITY = 2;
 

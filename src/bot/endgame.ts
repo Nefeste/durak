@@ -19,9 +19,10 @@ export class TooDeep extends Error {
   }
 }
 
-/** Двое в партии и колода пуста — концовка с полной информацией. */
-export function isEndgame(o: { talonSize: number; seats: number; out: number[]; phase: string }): boolean {
-  return o.phase !== 'end' && o.talonSize === 0 && o.seats - o.out.length === 2;
+/** Двое в партии и колода пуста — концовка с полной информацией. Если кто-то сдался, его карты ушли из игры
+ *  рубашкой вверх (docs/08-rules.md, п. 8.2): невидимые карты уже не все у соперника — точного расчёта нет. */
+export function isEndgame(o: { talonSize: number; seats: number; out: number[]; phase: string; resigned?: number[] }): boolean {
+  return o.phase !== 'end' && o.talonSize === 0 && o.seats - o.out.length === 2 && !o.resigned?.length;
 }
 
 /** Позиция концовки из наблюдения: все невидимые карты — у второго оставшегося. */
@@ -51,7 +52,7 @@ export interface Solver {
  *  Порядок: дешёвые раньше, «беру» и «пас» — последними (раньше находится выигрыш — раньше отсечка). */
 export function moves(s: State, who: number): Action[] {
   const ts = suitOf(s.trump);
-  const price = (a: Action) => (a.type === 'take' || a.type === 'pass' ? 100
+  const price = (a: Action) => (a.type === 'take' || a.type === 'pass' || a.type === 'resign' ? 100
     : a.type === 'beat' ? costOf(a.card, ts) : costOf(a.cards[0], ts));
   return legalActions(s, who)
     .filter(a => (a.type !== 'attack' && a.type !== 'transfer') || a.cards.length === 1)

@@ -2,7 +2,7 @@
 // генератор. Главное — ADR 0008: ни один ответ и ни одно сообщение WebSocket не несёт чужой руки и
 // порядка колоды; вид места совпадает с `observe` той же позиции, пересобранной из доказательства.
 import { describe, expect, test } from 'bun:test';
-import { apply, checkDeck, newGame, observe, RULES_V1, serverDeck } from '../../src/engine';
+import { apply, checkDeck, newGame, observe, RULES, RULES_V1, serverDeck } from '../../src/engine';
 import type { Action, Observation, State } from '../../src/engine';
 import { chooseAction, legalFor, makeRng } from '../../src/bot';
 import { ONLINE, PROTOCOL } from '../../src/state/protocol';
@@ -14,12 +14,14 @@ import { heldView } from '../../src/game/hold';
 
 const V = '0.2.0';
 
-function setup(seed = 7) {
+/** `knows` — телефон с очередью атакующих: шлёт `x-durak-rules` (ADR 0013); без него — старая версия игры. */
+function setup(seed = 7, knows = false) {
   const clock = new FakeClock();
   const rng = makeRng(seed);
   const app = createApp({ db: ':memory:', clock, random: n => Uint8Array.from({ length: n }, () => rng.int(256)) });
   const call = async (method: string, path: string, key?: string, body?: unknown) => {
     const headers: Record<string, string> = { 'x-durak-version': V };
+    if (knows) headers['x-durak-rules'] = RULES.id;
     if (key) headers.authorization = `Bearer ${key}`;
     if (body !== undefined) headers['content-type'] = 'application/json';
     const res = await app.http.handle(new Request(`http://durak.test${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }), '10.0.0.1');
@@ -52,14 +54,15 @@ function noLeak(t: TableView): void {
   const g = t.game;
   if (!g) return;
   if (g.view) {
-    const keys = Object.keys(g.view).sort();
+    // `resigned` — только когда кто-то сдался (docs/08-rules.md, п. 8)
+    const keys = Object.keys(g.view).filter(k => k !== 'resigned').sort();
     expect(keys).toEqual(Object.keys(observe(newGame({ rules: RULES_V1, variant: 'podkidnoy', seats: 2, first: 0 }, [...Array(36).keys()]), 0)).sort());
     expect(g.view.seat).toBe(t.you);
     expect(g.view.hand.length).toBe(g.view.handSizes[t.you]);
   }
   // стол паузы перед «бито» — тоже наблюдение своего места: те же поля, своя рука
   if (g.held) {
-    expect(Object.keys(g.held).sort()).toEqual(Object.keys(observe(newGame({ rules: RULES_V1, variant: 'podkidnoy', seats: 2, first: 0 }, [...Array(36).keys()]), 0)).sort());
+    expect(Object.keys(g.held).filter(k => k !== 'resigned').sort()).toEqual(Object.keys(observe(newGame({ rules: RULES_V1, variant: 'podkidnoy', seats: 2, first: 0 }, [...Array(36).keys()]), 0)).sort());
     expect(g.held.seat).toBe(t.you);
     expect(g.held.hand.length).toBe(g.held.handSizes[t.you]);
   }
@@ -158,6 +161,132 @@ describe('сервер', () => {
     expect(end.table.length).toBeGreaterThan(0);
   });
 
+  test('очередь атакующих (ADR 0013): стол «по очереди» втроём до конца; старой версии за него нельзя, её стол — «кто успел»', async () => {
+    const e = setup(23, true);
+    const keys = [await e.player('Миша'), await e.player('Саша')];
+    const created = await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: 'average', order: 'queue' });
+    expect(created.status).toBe(201);
+    const t0 = created.body.table as TableView;
+    expect([t0.rules, t0.order]).toEqual([RULES.id, 'queue']);
+    expect(((await e.call('GET', `/v1/tables/code/${t0.code}`, keys[0])).body as CodeInfo).order).toBe('queue');
+    expect((await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: null, order: 'turns' })).body.error).toBe('bad-body');
+    // старая версия игры (без заголовка) за стол с очередью не садится: она не знает правила
+    const info = await e.call('GET', `/v1/tables/code/${t0.code}`, keys[1]);
+    const res = await e.app.http.handle(new Request('http://durak.test/v1/tables/join', {
+      method: 'POST', headers: { 'x-durak-version': V, authorization: `Bearer ${keys[1]}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ code: t0.code, seed: e.seed16(), commit: info.body.commit }),
+    }), '10.0.0.1');
+    expect(res.status).toBe(426);
+    expect((await res.json()).error).toBe('upgrade');
+    await joinByCode(e, keys[0], t0.code!);
+    await joinByCode(e, keys[1], t0.code!);
+    expect((await e.call('POST', `/v1/tables/${t0.id}/start`, keys[0])).status).toBe(200);
+    const seen = new Map<string, Observation>();
+    const pick = makeRng(9);
+    let final: TableView | null = null;
+    let waited = 0;
+    for (let guard = 0; guard < 4000 && !final; guard++) {
+      let acted = false;
+      for (let i = 0; i < 2; i++) {
+        const t = (await e.call('GET', `/v1/tables/${t0.id}`, keys[i])).body.table as TableView;
+        noLeak(t);
+        if (t.status === 'finished') { final = t; break; }
+        const v = t.game!.view!;
+        expect(v.rules).toEqual(RULES);
+        seen.set(`${t.you}:${t.game!.n}`, v);
+        // не своя очередь — сервер отказывает с причиной движка
+        if (legalFor(v).length === 0 && v.table.length > 0 && v.seat !== v.defender && !v.passed[v.seat] && v.handSizes[v.seat] > 0) {
+          const no = await e.call('POST', `/v1/tables/${t0.id}/act`, keys[i], { game: t.game!.no, n: t.game!.n, action: { type: 'pass' } });
+          expect(no.body.reason).toBe('waitTurn');
+          waited++;
+        }
+        if (!legalFor(v).length) continue;
+        const r = await e.call('POST', `/v1/tables/${t0.id}/act`, keys[i], { game: t.game!.no, n: t.game!.n, action: chooseAction(v, 'average', pick) });
+        if (r.status === 200) acted = true;
+        else expect(r.body.error).toBe('stale');
+      }
+      if (!acted && !final) e.clock.advance(1000);
+    }
+    expect(final).not.toBeNull();
+    expect(waited).toBeGreaterThan(0);
+    const proof = final!.game!.proof as ProofView;
+    let s: State = newGame({ rules: RULES, variant: 'podkidnoy', seats: 3, first: proof.first }, proof.deck);
+    const states: State[] = [s];
+    for (const a of proof.actions) states.push(s = apply(s, a.seat, a.action));
+    expect(s.phase).toBe('end');
+    for (const [k, v] of seen) {
+      const [seat, n] = k.split(':').map(Number);
+      expect(v).toEqual(observe(states[n], seat));
+    }
+    // стол без поля `order` (старая версия) — «кто успел», свод v1
+    const plain = await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: 'average' });
+    expect([plain.body.table.rules, plain.body.table.order]).toEqual([RULES_V1.id, 'free']);
+  });
+  test('сдача (п. 8): втроём сдавшийся выбывает, его карт нет ни в одном виде, остальные доигрывают; вдвоём — конец', async () => {
+    const e = setup(31, true);
+    const keys = [await e.player('Миша'), await e.player('Саша'), await e.player('Оля')];
+    const t0 = (await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: null, order: 'queue' })).body.table as TableView;
+    for (const k of keys) await joinByCode(e, k, t0.code!);
+    expect((await e.call('POST', `/v1/tables/${t0.id}/start`, keys[0])).status).toBe(200);
+    const before = (await e.call('GET', `/v1/tables/${t0.id}`, keys[2])).body.table as TableView;
+    const gone = before.game!.view!.hand;
+    expect((await e.call('POST', `/v1/tables/${t0.id}/resign`, keys[2], {})).status).toBe(200);
+    const pick = makeRng(4);
+    const seen = new Map<string, Observation>();
+    let final: TableView | null = null;
+    for (let guard = 0; guard < 4000 && !final; guard++) {
+      let acted = false;
+      e.clock.advance(150);
+      for (let i = 0; i < 2; i++) {
+        const got = await e.call('GET', `/v1/tables/${t0.id}`, keys[i]);
+        if (!got.body.table) throw new Error(`${got.status} ${got.text}`);
+        const t = got.body.table as TableView;
+        noLeak(t);
+        if (t.status === 'finished') { final = t; break; }
+        const v = t.game!.view!;
+        expect(v.resigned).toEqual([2]);
+        seen.set(`${t.you}:${t.game!.n}`, v);
+        // карт сдавшегося не видит никто: ни в руке, ни в сбросе, ни на столе
+        for (const c of gone) expect([...v.discard, ...v.openly.flat(), ...v.table.flat()]).not.toContain(c);
+        if (!legalFor(v).length) continue;
+        const r = await e.call('POST', `/v1/tables/${t0.id}/act`, keys[i], { game: t.game!.no, n: t.game!.n, action: chooseAction(v, 'average', pick) });
+        if (r.status === 200) acted = true;
+      }
+      if (!acted && !final) e.clock.advance(1000);
+    }
+    expect(final).not.toBeNull();
+    const res = final!.game!.result!;
+    expect(res.resigned).toEqual([2]);
+    expect(res.fool === 0 || res.fool === 1 || res.draw).toBe(true);
+    const proof = final!.game!.proof as ProofView;
+    expect(proof.actions[0]).toEqual({ seat: 2, action: { type: 'resign' } });
+    let s: State = newGame({ rules: RULES, variant: 'podkidnoy', seats: 3, first: proof.first }, proof.deck);
+    const states: State[] = [s];
+    for (const a of proof.actions) states.push(s = apply(s, a.seat, a.action));
+    for (const [k, v] of seen) {
+      const [seat, n] = k.split(':').map(Number);
+      expect(v).toEqual(observe(states[n], seat));
+    }
+    // вдвоём: сдался — партия кончена, соперник вышел
+    const two = (await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 2, bots: null, order: 'queue' })).body.table as TableView;
+    for (const k of keys.slice(0, 2)) await joinByCode(e, k, two.code!);
+    await e.call('POST', `/v1/tables/${two.id}/start`, keys[0]);
+    await e.call('POST', `/v1/tables/${two.id}/resign`, keys[0], {});
+    const end = (await e.call('GET', `/v1/tables/${two.id}`, keys[1])).body.table as TableView;
+    expect(end.status).toBe('finished');
+    expect(end.game!.result).toEqual({ fool: 0, draw: false, order: [1], resigned: [0] });
+  });
+  test('сдача со старой версии игры и «Выйти»: как раньше — за вас доигрывает бот, действия в записи нет', async () => {
+    const e = setup(32, false);
+    const keys = [await e.player('Миша'), await e.player('Саша')];
+    const t0 = (await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: 'average' })).body.table as TableView;
+    for (const k of keys) await joinByCode(e, k, t0.code!);
+    await e.call('POST', `/v1/tables/${t0.id}/start`, keys[0]);
+    expect((await e.call('POST', `/v1/tables/${t0.id}/resign`, keys[1])).status).toBe(200);
+    const t = (await e.call('GET', `/v1/tables/${t0.id}`, keys[0])).body.table as TableView;
+    expect(t.seats[t.you === 0 ? 1 : 0]!.botFor || t.seats.some(x => x?.botFor)).toBe(true);
+    expect(t.game!.view!.resigned).toBeUndefined();
+  });
   test('пауза перед «бито»: отбой кончился картой — бот ждёт, пока все разглядят стол', async () => {
     let checked = false;
     // отбой кончается картой не в каждой партии: несколько раздач, пока не встретится такой, а следом ходит бот

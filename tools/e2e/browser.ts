@@ -249,6 +249,74 @@ try {
     await ctx.close();
   }
 
+  console.log('Перетаскивание и подсказка (игра владельца 09.11.2026)');
+  {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
+    const ph = await ctx.newPage();
+    ph.on('pageerror', e => errors.push(String(e)));
+    // где карта нарисована на самом деле, кадр за кадром (PROBE в src/render/TableCanvas.tsx)
+    await ph.addInitScript(() => {
+      const w = globalThis as unknown as { __cardAt: (k: string, x: number, y: number) => void; __trace: Record<string, [number, number][]> };
+      w.__trace = {};
+      w.__cardAt = (k, x, y) => { (w.__trace[k] ??= []).push([x, y]); };
+    });
+    await ph.goto(`${web.url}?seed=11&fast=1`);
+    await ph.getByTestId('menu').waitFor({ timeout: 20000 });
+    await ph.getByTestId('play').click();
+    await ph.getByTestId('game').waitFor({ timeout: 10000 });
+    for (let i = 0; i < 50 && !(await visible(ph, 'advise')); i++) await ph.waitForTimeout(100);
+    await ph.waitForTimeout(1600); // раздача
+    // «Подсказка» — совет к этой минуте
+    await ph.getByTestId('advise').click();
+    let advice = '';
+    for (let i = 0; i < 60 && !/^Ходите/.test(advice); i++) { advice = await ph.getByTestId('hint').innerText().catch(() => ''); await ph.waitForTimeout(100); }
+    ok(/^Ходите/.test(advice), `подсказка: «${advice}»`, advice);
+    const felt = (await ph.getByTestId('felt').boundingBox())!;
+    const first = ph.locator('[data-testid^="hand-"]').first();
+    const id = Number((await first.getAttribute('data-testid'))!.slice(5));
+    const card = (await first.boundingBox())!;
+    const plate = (await ph.getByTestId('opp-1').boundingBox())!;
+    const clip = { x: plate.x, y: plate.y, width: plate.width, height: plate.height + 40 };
+    const plateBefore = await ph.screenshot({ clip });
+    // путь пальца: от карты руки через «Подсказку» на середину сукна
+    const adv = (await ph.getByTestId('advise').boundingBox())!;
+    const path = [
+      [card.x + 8, card.y + card.height / 2],
+      [adv.x + adv.width / 2, adv.y + adv.height / 2],
+      [felt.x + felt.width / 2, felt.y + felt.height * 0.45],
+    ];
+    await ph.mouse.move(path[0][0], path[0][1]);
+    await ph.mouse.down();
+    let plateSame = true;
+    for (let k = 1; k < path.length; k++) {
+      for (let t = 1; t <= 8; t++) {
+        const [ax, ay] = path[k - 1], [bx, by] = path[k];
+        await ph.mouse.move(ax + ((bx - ax) * t) / 8, ay + ((by - ay) * t) / 8);
+        await ph.waitForTimeout(25);
+        if (k === 1 && t === 8) plateSame = Buffer.compare(plateBefore, await ph.screenshot({ clip })) === 0;
+      }
+    }
+    ok(plateSame, 'над плашкой соперника нет второй карты, пока палец над кнопкой у руки');
+    const drop = { x: path[2][0] - felt.x, y: path[2][1] - felt.y };
+    await ph.evaluate(k => { (globalThis as unknown as { __trace: Record<string, unknown[]> }).__trace[k] = []; }, `c${id}`);
+    await ph.mouse.up();
+    await ph.waitForTimeout(120);
+    // ход сделан: карты нет в руке (бот потом может и взять стол — тогда она уйдёт к нему)
+    const laid = await ph.getByTestId(`hand-${id}`).count() === 0;
+    await ph.waitForTimeout(380);
+    const trace = await ph.evaluate(k => (globalThis as unknown as { __trace: Record<string, [number, number][]> }).__trace[k] ?? [], `c${id}`);
+    const handY = card.y - felt.y + card.height / 2;
+    const back = trace.filter(([, y]) => y > drop.y + 60);
+    ok(trace.length > 0 && Math.hypot(trace[0][0] - drop.x, trace[0][1] - drop.y) < 30,
+      `отпущенная карта на следующем кадре там, где её отпустили: (${trace[0]?.map(Math.round).join(', ')}) у (${Math.round(drop.x)}, ${Math.round(drop.y)})`, JSON.stringify(trace.slice(0, 4)));
+    ok(back.length === 0, `карта не возвращается к руке (y ≈ ${Math.round(handY)}) и не летит оттуда второй раз`, JSON.stringify(back.slice(0, 4)));
+    ok(laid, 'брошенная карта легла на стол');
+    const after = await ph.getByTestId('hint').innerText().catch(() => '');
+    ok(!/^Ходите/.test(after), `подсказка погасла после хода: «${after}»`, after);
+    await ph.screenshot({ path: `${OUT}/02-drop.png` });
+    await ctx.close();
+  }
+
   console.log('Подкидной, один бот');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
@@ -318,6 +386,7 @@ try {
   await page.waitForTimeout(300);
   const handBefore = await handCount(page);
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
   await page.waitForTimeout(300);
   ok(await visible(page, 'resume'), 'в меню — «Продолжить партию»');
@@ -331,6 +400,7 @@ try {
   ok(await handCount(page) === handBefore, `партия продолжилась с той же рукой: ${handBefore}`, await handCount(page));
   // отмена: боты с обычной паузой (0,5–0,9 с) — успеваем отменить свой ход до их ответа
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.goto(web.url);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   await page.waitForTimeout(400);
@@ -389,6 +459,8 @@ try {
   await page.waitForTimeout(300);
   ok(await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null) === 'true', 'выбор «Меньше движения» пережил перезагрузку',
     await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null));
+  // «Подкидывать» (п. 4.3, #57): по умолчанию — по очереди; стол втроём ниже играет по очереди до итога
+  ok(await page.getByTestId('throw-queue').getAttribute('aria-selected').catch(() => null) === 'true', 'настройка «Подкидывать»: по умолчанию «По очереди»');
   await page.getByTestId('settings-back').click();
 
   console.log('Переводной, два бота, четырёхцветная колода, без полёта');
@@ -437,6 +509,7 @@ try {
   await page.waitForTimeout(800);
   ok(!(await visible(page, 'transfer-ok')), 'второй переводной стол — без окна о переводе');
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   // в браузере реклама — подделка (src/money/adsSdk.web.ts): после двух коротких первых партий её нет
@@ -603,6 +676,33 @@ try {
   await page.waitForTimeout(500);
   ok(!(await visible(page, 'resume')), 'партия прошлой версии стёрта молча: «Продолжить» нет');
   ok(await page.evaluate(() => localStorage.getItem('durak.current')) === null, 'запись прошлой версии удалена из хранилища');
+
+  console.log('«Сдаться» втроём (docs/08-rules.md, п. 8; #58)');
+  await page.getByTestId('bots-2').click();
+  await page.getByTestId('play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(400);
+  await page.getByTestId('game-menu').click();
+  ok(await visible(page, 'resign') && await visible(page, 'game-exit'), '«В меню» — окно партии: «В меню» и «Сдаться»');
+  await page.getByTestId('resign').click();
+  ok(await visible(page, 'resign-ok'), '«Сдаться» спрашивает своим окном');
+  const asked = await handCount(page);
+  await page.waitForTimeout(500);
+  ok(await handCount(page) === asked, 'пока окно открыто, боты ждут');
+  await page.screenshot({ path: `${OUT}/11-resign-ask.png` });
+  await page.getByTestId('dialog-cancel').click();
+  ok(!(await visible(page, 'resign-ok')) && !(await visible(page, 'result')), '«Играть дальше» — партия идёт');
+  await page.getByTestId('game-menu').click();
+  await page.getByTestId('resign').click();
+  await page.getByTestId('resign-ok').click();
+  await page.getByTestId('result').waitFor({ timeout: 10000 }).catch(() => {});
+  const gaveUp = await page.getByTestId('result').innerText().catch(() => '');
+  ok(/Вы сдались — остались с картами/.test(gaveUp), `сдались — итог сразу, боты доиграли без вас: ${gaveUp.split('\n')[0]}`);
+  const lastPlace = await page.getByTestId('place-3').innerText().catch(() => '');
+  ok(/вы/.test(lastPlace) && /с картами/.test(lastPlace), `в ряду мест вы — последним, «с картами»: ${lastPlace.replace(/\n/g, ' ')}`);
+  await page.screenshot({ path: `${OUT}/12-resign-result.png` });
+  await page.getByTestId('result-menu').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   console.log('«Опытный» и подсказка');
   await page.getByTestId('variant-podkidnoy').click();

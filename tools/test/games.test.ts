@@ -1,7 +1,7 @@
 // Случайные партии: инварианты движка на 2–4 местах, обоих столах (docs/specs/2026-11-v1.md,
 // критерий 1). По умолчанию 3 000 партий; DURAK_LONG=1 — 100 000.
 import { describe, expect, test } from 'bun:test';
-import { allCards, apply, legalActions, newGame, reasonOf, RULES_V1 } from '../../src/engine';
+import { allCards, apply, legalActions, newGame, queueOf, reasonOf, RULES, RULES_V1, throwerOf } from '../../src/engine';
 import type { State, Variant } from '../../src/engine';
 import { makeRng } from '../../src/bot';
 import { actorOf, shuffled } from '../sim/play';
@@ -20,6 +20,11 @@ function check(s: State) {
     expect(s.attacker).not.toBe(s.defender);
     expect(s.out).not.toContain(s.defender);
   }
+  // по очереди (п. 4.3): подкинуть или сказать «пас» может только тот, у кого право
+  if (s.rules.order === 'queue' && s.phase !== 'end' && s.table.length > 0) {
+    const t = throwerOf(s);
+    for (const seat of queueOf(s)) if (seat !== t) expect(legalActions(s, seat)).toEqual([]);
+  }
 }
 
 describe('случайные партии', () => {
@@ -29,7 +34,9 @@ describe('случайные партии', () => {
     for (let g = 0; g < GAMES; g++) {
       const seats = 2 + (g % 3);
       const variant: Variant = g % 2 ? 'perevodnoy' : 'podkidnoy';
-      let s = newGame({ rules: RULES_V1, variant, seats, first: rng.int(seats) }, shuffled(rng));
+      // очередь и «кто успел» — на каждом сочетании мест и варианта
+      const rules = Math.floor(g / 6) % 2 ? RULES : RULES_V1;
+      let s = newGame({ rules, variant, seats, first: rng.int(seats) }, shuffled(rng));
       for (let n = 0; s.phase !== 'end'; n++) {
         expect(n).toBeLessThan(2000);
         const seat = actorOf(s);

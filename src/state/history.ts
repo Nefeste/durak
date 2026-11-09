@@ -1,7 +1,7 @@
 // Законченные партии с ботами (docs/04-data-model.md, «История»): запись партии, уровни ботов, была ли подсказка
 // и разбор, когда он досчитан. Отсюда — статистика, рейтинг тренировок и разборы старых партий.
 // Хранится 200 последних; чистая часть — разбор записи (`normalizeHistory`).
-import { RULES_V1 } from '../engine';
+import { knownRules } from '../engine';
 import type { GameRecord } from '../engine';
 import { levelOf, levelsOf } from '../bot';
 import type { Level, Review } from '../bot';
@@ -29,7 +29,7 @@ export function normalizeHistory(raw: unknown): FinishedGame[] {
   const out: FinishedGame[] = [];
   for (const x of raw) {
     const g = x as Partial<FinishedGame> & { level?: unknown };
-    if (!g || !g.record || g.record.v !== 1 || g.record.rules?.id !== RULES_V1.id) continue;
+    if (!g || !g.record || g.record.v !== 1 || !knownRules(g.record.rules)) continue;
     if (typeof g.at !== 'number' || typeof g.end !== 'number' || !g.record.result || !Number.isInteger(g.record.seats)) continue;
     const bots = g.record.seats - 1;
     const one = levelOf(g.level);

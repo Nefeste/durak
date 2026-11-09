@@ -6,6 +6,9 @@ import type { Card, GameRecord, State } from '../../src/engine';
 import { chooseAction, makeRng } from '../../src/bot';
 import { handCardAt, inTable, layoutTable, noOrigins, originsOf, sortHand, tableCardAt } from '../../src/render/layout';
 import { autoPass, canUndo, seenGrid } from '../../src/game/flow';
+import { noteOf } from '../../src/game/note';
+import { dragPoint, dragStart } from '../../src/render/drag';
+import type { Note } from '../../src/game/note';
 import { botDelay, DEFAULT_SETTINGS, lessMotionOf, parseSettings } from '../../src/state/settings';
 import { restoreGame } from '../../src/state/saved';
 import { c, cs, pos } from './helpers';
@@ -95,7 +98,7 @@ describe('раскладка стола', () => {
             const { seat, action } = record.actions[i - 1];
             const prev = observe(states[i - 1], 0), next = observe(states[i], 0);
             origins = originsOf(prev, next, origins);
-            const played = action.type === 'beat' ? [action.card] : action.type === 'take' || action.type === 'pass' ? [] : action.cards;
+            const played = action.type === 'beat' ? [action.card] : action.type === 'take' || action.type === 'pass' || action.type === 'resign' ? [] : action.cards;
             const l = layoutTable(next, { ...opt, origins });
             const at = (k: number) => (k === 0 ? { x: SIZE.width / 2 } : l.opponents.find(p => p.seat === k) ?? { x: -1 });
             for (const c of played) {
@@ -146,7 +149,79 @@ describe('раскладка стола', () => {
   });
 });
 
+/** Прямоугольник карты с поворотом и масштабом — по осям экрана (с запасом на поворот). */
+function boxOf(s: { x: number; y: number; rot: number; scale: number }, cw: number, ch: number) {
+  const r = (s.rot * Math.PI) / 180, co = Math.abs(Math.cos(r)), si = Math.abs(Math.sin(r));
+  const hw = (s.scale * (cw * co + ch * si)) / 2, hh = (s.scale * (cw * si + ch * co)) / 2;
+  return { l: s.x - hw, r: s.x + hw, t: s.y - hh, b: s.y + hh };
+}
+type Box = ReturnType<typeof boxOf>;
+const meets = (a: Box, b: Box) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+
+describe('перетаскивание (игра владельца 09.11.2026)', () => {
+  test('точка на столе — по экранным координатам: вид под пальцем её не сдвигает', () => {
+    const d = dragStart({ locationX: 120, locationY: 700, pageX: 128, pageY: 760 });
+    // палец над кнопкой «Бито»: на Android locationX/Y здесь — от кнопки (малые), pageX/Y — те же экранные
+    const over = { locationX: 12, locationY: 9, pageX: 170, pageY: 690 };
+    expect(dragPoint(d, over)).toEqual({ dx: 42, dy: -70, x: 162, y: 630 });
+    expect(dragPoint(d, { pageX: 128, pageY: 760 })).toEqual({ dx: 0, dy: 0, x: 120, y: 700 });
+  });
+});
+
+describe('колода и сброс в углах сукна (игра владельца 09.11.2026)', () => {
+  // экраны 360 × 740 и 412 × 915 без отступа и с кнопками телефона снизу (48): высота стола — экран без полос (64)
+  const screens = [[360, 740 - 64], [360, 740 - 64 - 48], [412, 915 - 64], [412, 915 - 64 - 48]];
+  for (const [width, height] of screens) {
+    for (const seats of [2, 3, 4]) {
+      test(`${width} × ${height}, мест ${seats}: до шести пар не задевают колоду с козырем, сброс и друг друга`, () => {
+        const hands = ['6♠ 7♠ 8♠ 9♠', '6♥ 7♥', '6♣ 7♣', '6♦ 7♦'].slice(0, seats);
+        const o0 = observe(pos({ hands, trump: 'Т♦', talon: '10♦ В♦ Д♦ К♦' }), 0);
+        const free = Array.from({ length: 36 }, (_, k) => k).filter(k => !o0.hand.includes(k) && k !== o0.trump);
+        for (let n = 1; n <= 6; n++) {
+          const table: [Card, Card | null][] = Array.from({ length: n }, (_, i) => [free[2 * i], free[2 * i + 1]]);
+          const discard = free.slice(12, 20);
+          const o = { ...o0, table, discard, talonSize: 10 };
+          const l = layoutTable(o, { ...opt, width, height });
+          const corner = l.sprites.filter(x => x.key.startsWith('t-') || x.key === `c${o.trump}` || discard.includes(x.card ?? -1) || (x.card === null && x.key.startsWith('c')));
+          const pairs = table.map(([a, d]) => [a, d!].map(k => l.sprites.find(x => x.key === `c${k}`)!));
+          const felt = { l: l.table.x, r: l.table.x + l.table.w, t: l.table.y, b: l.table.y + l.table.h };
+          for (const [i, pair] of pairs.entries()) {
+            for (const card of pair) {
+              const b = boxOf(card, l.cw, l.ch);
+              expect(b.l >= felt.l && b.r <= felt.r && b.t >= felt.t && b.b <= felt.b).toBe(true);
+              for (const k of corner) expect(meets(b, boxOf(k, l.cw, l.ch))).toBe(false);
+              for (const [j, other] of pairs.entries()) if (j !== i) for (const q of other) expect(meets(b, boxOf(q, l.cw, l.ch))).toBe(false);
+            }
+          }
+          // угловые стопки — внутри борта, капсула «колода N» (96 dp) — между колодой и сбросом
+          for (const k of corner) {
+            const b = boxOf(k, l.cw, l.ch);
+            expect(b.l >= felt.l && b.r <= felt.r && b.t >= felt.t).toBe(true);
+          }
+          expect(l.talonLabel.x + 96).toBeLessThan(l.discard.x - l.cw * 0.6);
+          // карты стола читаются: не меньше 0,85 обычной, а в самом тесном случае (360 dp, кнопки телефона, вчетвером,
+          // два ряда пар) — 0,65; до трёх пар — всегда в полный размер
+          const least = Math.min(...pairs.flat().map(x => x.scale));
+          expect(least).toBeGreaterThanOrEqual(n <= 3 ? 1 : height + 64 + 48 === 740 ? 0.65 : 0.85);
+        }
+      });
+    }
+  }
+});
+
 describe('ход партии на экране', () => {
+  test('строка «Подсказки» гаснет со следующим действием за столом — своим, соперника и отменой (игра владельца 09.11.2026)', () => {
+    const { record } = playGame(5, 2, 'podkidnoy');
+    const at = (n: number): GameRecord => ({ ...record, actions: record.actions.slice(0, n) });
+    const asked = at(3);
+    const n: Note<GameRecord> = { text: 'Подсказка: Беру', at: asked };
+    expect(noteOf(n, asked)).toBe('Подсказка: Беру');
+    expect(noteOf(n, at(4))).toBeNull(); // любое действие — новая запись
+    expect(noteOf(n, at(3))).toBeNull(); // и отмена до той же длины — тоже новая запись
+    expect(noteOf(null, asked)).toBeNull();
+    // онлайн метка — номер хода «партия:ход»
+    expect(noteOf({ text: 'так нельзя', at: '1:7' }, '1:8')).toBeNull();
+  });
   test('«бито» само: всё покрыто, а подкинуть нечего', () => {
     const s = pos({ hands: ['6♠ 7♣', '7♠ 8♥'], trump: 'Т♦', talon: '6♦' });
     const a = apply(s, 0, { type: 'attack', cards: [c('6♠')] });

@@ -1,7 +1,8 @@
 // Законные действия места и причина запрета для любого другого (docs/08-rules.md, пп. 4, 6).
 import { beats, rankOf, suitOf } from './cards';
 import type { Card } from './cards';
-import { active, nextActive } from './deal';
+import { active, inPlay, nextActive } from './deal';
+import { orderOf } from './types';
 import type { Action, Reason, State } from './types';
 
 /** Атакующие: все, кроме отбивающегося, у кого есть карты (п. 4). */
@@ -10,6 +11,26 @@ export function attackersOf(s: State): number[] {
   for (let seat = 0; seat < s.seats; seat++) if (seat !== s.defender && active(s, seat)) out.push(seat);
   return out;
 }
+
+/** Атакующие в порядке права (п. 4.3): ходящий, затем по часовой стрелке, без отбивающегося. */
+export function queueOf(s: State): number[] {
+  const out: number[] = [];
+  for (let k = 0; k < s.seats; k++) {
+    const seat = (s.attacker + k) % s.seats;
+    if (seat !== s.defender && active(s, seat)) out.push(seat);
+  }
+  return out;
+}
+
+/** У кого право подкинуть или сказать «пас» за столом «по очереди» (п. 4.3): первый атакующий по кругу, кто ещё
+ *  не сказал «пас». `-1` — у стола «кто успел», вне отбоя или все сказали «пас». */
+export function throwerOf(s: State): number {
+  if (orderOf(s.rules) !== 'queue' || s.phase === 'end' || s.table.length === 0) return -1;
+  for (const seat of queueOf(s)) if (!s.passed[seat]) return seat;
+  return -1;
+}
+
+const waits = (s: State, seat: number) => orderOf(s.rules) === 'queue' && throwerOf(s) !== seat;
 
 /** Достоинства на столе — среди карт атаки и карт защиты (п. 4.3). */
 export function tableRanks(s: State): Set<number> {
@@ -35,6 +56,8 @@ function mayThrow(s: State, seat: number): boolean {
 /** Почему действие нельзя; `null` — можно. */
 export function reasonOf(s: State, seat: number, a: Action): Reason | null {
   if (s.phase === 'end') return 'gameOver';
+  // сдаться — в любой момент, пока место в партии, даже без карт и не в свой ход (п. 8.1)
+  if (a.type === 'resign') return inPlay(s, seat) ? null : 'notYourMove';
   if (!active(s, seat)) return 'notYourMove';
   const isDef = seat === s.defender;
   switch (a.type) {
@@ -51,6 +74,7 @@ export function reasonOf(s: State, seat: number, a: Action): Reason | null {
       if (isDef || s.table.length === 0) return 'notYourMove';
       if ((a.type === 'give') !== (s.phase === 'giving')) return 'notYourMove';
       if (s.passed[seat]) return 'alreadyPassed';
+      if (waits(s, seat)) return 'waitTurn';
       if (a.cards.length !== 1) return 'needCards';
       if (!holds(s, seat, a.cards)) return 'notInHand';
       if (!mayThrow(s, seat)) return 'waitFirstCover';
@@ -92,6 +116,7 @@ export function reasonOf(s: State, seat: number, a: Action): Reason | null {
     case 'pass': {
       if (isDef || s.table.length === 0) return 'notYourMove';
       if (s.passed[seat]) return 'alreadyPassed';
+      if (waits(s, seat)) return 'waitTurn';
       return null;
     }
   }

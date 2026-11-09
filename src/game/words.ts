@@ -16,6 +16,7 @@ export function actionText(a: Action, done = false): string {
     case 'transfer': return T.game.adviceTransfer(list(a.cards));
     case 'take': return T.game.adviceTake;
     case 'pass': return done ? T.game.adviceDone : T.game.advicePass;
+    case 'resign': return T.game.adviceResign;
   }
 }
 

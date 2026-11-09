@@ -2,7 +2,7 @@
 // восстановление переигрыванием. Битая или чужая запись не роняет игру: её нет. Хранилище — save.ts.
 // Уровни — по местам ботов (`levels`); партию прошлых версий с одним `level` не переносим (решение владельца
 // 09.11.2026): её просто нет, меню без «Продолжить партию».
-import { replay, RULES_V1 } from '../engine';
+import { replay, knownRules } from '../engine';
 import type { Action, GameRecord, Result, State } from '../engine';
 import { levelsOf } from '../bot';
 import type { Level } from '../bot';
@@ -18,7 +18,7 @@ export interface SavedGame {
 const isAction = (a: unknown): a is Action => {
   if (!a || typeof a !== 'object') return false;
   const t = (a as { type?: unknown }).type;
-  return ['attack', 'throwIn', 'give', 'transfer', 'beat', 'take', 'pass'].includes(t as string);
+  return ['attack', 'throwIn', 'give', 'transfer', 'beat', 'take', 'pass', 'resign'].includes(t as string);
 };
 
 /** Разобрать и проверить сохранение: та же версия свода, законные действия до конца записи.
@@ -27,7 +27,7 @@ export function restoreGame(raw: unknown): { saved: SavedGame; state: State } | 
   try {
     const s = raw as SavedGame;
     if (!s || typeof s !== 'object' || !s.record || s.record.v !== 1) return null;
-    if (s.record.rules?.id !== RULES_V1.id) return null;
+    if (!knownRules(s.record.rules)) return null;
     const levels = levelsOf(s.levels, s.record.seats - 1);
     if (!levels) return null;
     if (!Array.isArray(s.record.actions) || !s.record.actions.every(x => x && Number.isInteger(x.seat) && isAction(x.action))) return null;

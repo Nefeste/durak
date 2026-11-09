@@ -7,7 +7,7 @@ import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
-import { suitOf } from '../engine';
+import { suitOf, throwerSeen } from '../engine';
 import type { Card, Observation } from '../engine';
 import { T } from '../i18n';
 import { TableCanvas } from '../render/TableCanvas';
@@ -23,7 +23,7 @@ import type { MarkKind, ReviewMarks } from './review';
 const OUT: Record<MarkKind, number> = { best: 3, played: 8 };
 const LABEL_W = 96, LABEL_H = 22;
 const NOOP = () => {};
-const TOUCH = { onCard: NOOP, onTableCard: NOOP, onDrop: NOOP };
+const TOUCH = { onCard: NOOP, onTableCard: NOOP, onDrop: () => false };
 
 function Frame({ s, l, kind }: { s: Sprite; l: Layout; kind: MarkKind }) {
   const pad = OUT[kind];
@@ -84,12 +84,12 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
       {layout ? others.map(p => (
         <SeatPlate key={p.seat} testID={`review-opp-${p.seat}`} name={T.game.bot(p.seat)}
           lines={[o.out.includes(p.seat) ? T.game.out : T.game.cards(o.handSizes[p.seat])]}
-          role={o.phase === 'end' ? null : o.attacker === p.seat ? T.game.attacking : o.defender === p.seat ? T.game.defending : null}
-          active={o.phase !== 'end' && (o.attacker === p.seat || o.defender === p.seat)}
+          role={o.phase === 'end' ? null : o.attacker === p.seat ? T.game.attacking : o.defender === p.seat ? T.game.defending : throwerSeen(o) === p.seat ? T.game.throwing : null}
+          active={o.phase !== 'end' && (o.attacker === p.seat || o.defender === p.seat || throwerSeen(o) === p.seat)}
           left={p.x - oppW / 2} width={oppW} top={layout.plate.top} height={layout.plate.height} />
       )) : null}
       {layout ? (
-        <Text pointerEvents="none" style={[styles.talon, { left: layout.talon.x - 40, top: o.talonSize > 0 ? layout.talon.y + layout.ch * 0.62 : layout.talon.y - 10 }]}>
+        <Text pointerEvents="none" style={[styles.talon, o.talonSize > 0 ? { left: layout.talonLabel.x, top: layout.talonLabel.y - 9 } : { left: layout.table.x + SPACE.s, top: layout.talon.y - 9 }]}>
           {o.talonSize > 0 ? T.game.talon(o.talonSize) : T.game.trumpIs(T.suits[suitOf(o.trump)])}
         </Text>
       ) : null}
@@ -121,7 +121,7 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
 
 const styles = StyleSheet.create({
   area: { flex: 1 },
-  talon: { position: 'absolute', width: 80, textAlign: 'center', color: C.dim, fontSize: TYPE.caption },
+  talon: { position: 'absolute', width: 96, color: C.dim, fontSize: TYPE.caption },
   // «Сыграно» — штрих светлым, «Лучше» — сплошное золото: различимы формой, не только цветом
   played: { position: 'absolute', borderWidth: 2, borderStyle: 'dashed', borderColor: C.text },
   best: { position: 'absolute', borderWidth: 3, borderColor: C.accent },
