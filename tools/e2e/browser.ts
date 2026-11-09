@@ -170,10 +170,13 @@ try {
     // (scrollIntoViewIfNeeded не прокручивает, если кнопка видна, пусть и под ними; scrollTo в RN-web — свой)
     await ph.getByTestId('menu').evaluate(el => { el.scrollTop = el.scrollHeight; });
     await ph.waitForTimeout(200);
+    const bar = await ph.getByTestId('play-bar').boundingBox();
     for (const id of ['store-open', 'settings-open']) {
       const b = await ph.getByTestId(id).boundingBox();
-      ok(!!b && b.y + b.height <= H - INSET, `меню: «${id}» над кнопками телефона`, JSON.stringify(b));
+      ok(!!b && !!bar && b.y + b.height <= bar.y, `меню: «${id}» над полосой «Играть»`, `${JSON.stringify(b)} / ${JSON.stringify(bar)}`);
     }
+    const pb = await ph.getByTestId('play').boundingBox();
+    ok(!!pb && pb.y + pb.height <= H - INSET, 'меню: «Играть» над кнопками телефона', JSON.stringify(pb));
     await ph.screenshot({ path: `${OUT}/00-menu-inset.png` });
     await ph.getByTestId('settings-open').click();
     await ph.getByTestId('settings').waitFor({ timeout: 5000 });
@@ -550,6 +553,22 @@ try {
   await page.getByTestId('bots-3').click();
   ok(await visible(page, 'level-3-value'), 'три бота — три строки');
   await page.screenshot({ path: `${OUT}/10-levels-mixed.png` });
+  // 360 × 740, три бота с разными уровнями: «Играть» — полосой внизу, на экране без прокрутки (аудит 09.11.2026, находка 7)
+  await page.setViewportSize({ width: 360, height: 740 });
+  await page.waitForTimeout(300);
+  {
+    const pb = await page.getByTestId('play').boundingBox();
+    ok(!!pb && pb.y >= 0 && pb.y + pb.height <= 740, '360 × 740, три бота: «Играть» на экране без прокрутки', JSON.stringify(pb));
+    await page.getByTestId('menu').evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await page.waitForTimeout(200);
+    const bar = await page.getByTestId('play-bar').boundingBox();
+    const last = await page.getByTestId('settings-open').boundingBox();
+    ok(!!bar && !!last && last.y + last.height <= bar.y, 'меню прокручено до конца: нижний ряд над полосой «Играть», а не под ней', `${JSON.stringify(last)} / ${JSON.stringify(bar)}`);
+    await page.screenshot({ path: `${OUT}/10b-menu-360-bar.png` });
+    await page.getByTestId('menu').evaluate(el => { el.scrollTop = 0; });
+  }
+  await page.setViewportSize({ width: 412, height: 915 });
+  await page.waitForTimeout(300);
   await page.getByTestId('bots-2').click();
   await page.reload();
   await page.getByTestId('menu').waitFor({ timeout: 20000 });

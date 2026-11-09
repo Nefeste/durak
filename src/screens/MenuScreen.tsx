@@ -1,6 +1,7 @@
 // Главный экран: стол, число соперников и уровень — «Играть»; «Продолжить партию», если она
 // сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки». С двумя-тремя ботами — «Разные уровни»: строка
-// «Бот N ‹ Любитель ›» у каждого бота (docs/09-game-design.md, «Боты за столом»).
+// «Бот N ‹ Любитель ›» у каждого бота (docs/09-game-design.md, «Боты за столом»). «Играть» — закреплённой полосой внизу
+// над кнопками телефона, меню прокручивается над ней (аудит 09.11.2026, находка 7; решение владельца 09.11.2026).
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useInsets } from '../ui/insets';
@@ -8,6 +9,7 @@ import type { Variant } from '../engine';
 import { LEVELS, LOCKED_LEVEL } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
+import { BottomBar } from '../ui/BottomBar';
 import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
 import { Stepper } from '../ui/Stepper';
@@ -31,6 +33,8 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна.
   // На какой строке он показан: 0 — общий уровень, N — бот N; `null` — нигде
   const [lockedAt, setLockedAt] = useState<number | null>(null);
+  /** Высота полосы «Играть»: нижнее поле прокрутки, чтобы последний ряд вставал над полосой. */
+  const [bar, setBar] = useState(0);
   const onLocked = lockedAt !== null;
   const mixed = choice.mixed && choice.bots > 1;
   /** Строка уровня: 0 — общая на всех ботов, N — бота N. */
@@ -45,53 +49,57 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
     );
   };
   return (
-    // прокрутка: на невысоком экране или с крупным шрифтом нижний ряд не уходит под кнопки телефона (0.5.1)
-    <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.xl, paddingBottom: insets.bottom + SPACE.l }]} testID="menu">
-      {/* «Правила» — в углу над названием: видно с первого экрана и не ломает сетку кнопок */}
-      <View style={[styles.corner, { top: insets.top + SPACE.s }]}><Button small label={T.rules.menu} kind="ghost" onPress={onRules} testID="rules-open" /></View>
-      {/* фирменная шапка (specs/2026-11-art-premium.md §3): веер карт, название с разрядкой, золотая линия с мастью */}
-      <View style={styles.head}>
-        <Emblem width={64} testID="emblem" />
-        <Text style={styles.title} maxFontSizeMultiplier={1.3}>{T.app.name}</Text>
-        <Ornament />
-        <Text style={styles.tagline} maxFontSizeMultiplier={1.3}>{T.app.tagline}</Text>
-      </View>
-      <Glass style={styles.panel}>
-        <Text style={styles.label}>{T.menu.variant}</Text>
-        <Chips id="variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={choice.variant} label={v => T.variant[v]} onChange={variant => onChange({ ...choice, variant })} />
-        <Text style={styles.label}>{T.menu.opponents}</Text>
-        <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => { setLockedAt(null); onChange({ ...choice, bots }); }} />
-        <Text style={styles.label}>{T.menu.level}</Text>
-        {/* «Разные уровни» — над строками: включили, и строки ботов появляются ниже, а переключатель остаётся под пальцем */}
-        {choice.bots > 1 ? (
-          <Toggle id="levels-mixed" title={T.menu.mixed} value={mixed}
-            onChange={on => { setLockedAt(null); onChange({ ...choice, mixed: on, levels: on ? choice.levels.map(() => choice.level) : choice.levels }); }} />
-        ) : null}
-        {mixed ? Array.from({ length: choice.bots }, (_, i) => (
-          <View key={i} style={stack ? styles.botColumn : styles.botRow} testID={`level-row-${i + 1}`}>
-            <Text style={stack ? styles.label : styles.botName}>{T.game.bot(i + 1)}</Text>
-            <View style={stack ? null : styles.botStep}>{levelRow(i + 1)}</View>
+    <View style={styles.root}>
+      {/* прокрутка: на невысоком экране или с крупным шрифтом нижний ряд не уходит под полосу «Играть» и кнопки телефона */}
+      <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.xl, paddingBottom: (bar || insets.bottom) + SPACE.l }]} testID="menu">
+        {/* «Правила» — в углу над названием: видно с первого экрана и не ломает сетку кнопок */}
+        <View style={[styles.corner, { top: insets.top + SPACE.s }]}><Button small label={T.rules.menu} kind="ghost" onPress={onRules} testID="rules-open" /></View>
+        {/* фирменная шапка (specs/2026-11-art-premium.md §3): веер карт, название с разрядкой, золотая линия с мастью */}
+        <View style={styles.head}>
+          <Emblem width={64} testID="emblem" />
+          <Text style={styles.title} maxFontSizeMultiplier={1.3}>{T.app.name}</Text>
+          <Ornament />
+          <Text style={styles.tagline} maxFontSizeMultiplier={1.3}>{T.app.tagline}</Text>
+        </View>
+        <Glass style={styles.panel}>
+          <Text style={styles.label}>{T.menu.variant}</Text>
+          <Chips id="variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={choice.variant} label={v => T.variant[v]} onChange={variant => onChange({ ...choice, variant })} />
+          <Text style={styles.label}>{T.menu.opponents}</Text>
+          <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => { setLockedAt(null); onChange({ ...choice, bots }); }} />
+          <Text style={styles.label}>{T.menu.level}</Text>
+          {/* «Разные уровни» — над строками: включили, и строки ботов появляются ниже, а переключатель остаётся под пальцем */}
+          {choice.bots > 1 ? (
+            <Toggle id="levels-mixed" title={T.menu.mixed} value={mixed}
+              onChange={on => { setLockedAt(null); onChange({ ...choice, mixed: on, levels: on ? choice.levels.map(() => choice.level) : choice.levels }); }} />
+          ) : null}
+          {mixed ? Array.from({ length: choice.bots }, (_, i) => (
+            <View key={i} style={stack ? styles.botColumn : styles.botRow} testID={`level-row-${i + 1}`}>
+              <Text style={stack ? styles.label : styles.botName}>{T.game.bot(i + 1)}</Text>
+              <View style={stack ? null : styles.botStep}>{levelRow(i + 1)}</View>
+            </View>
+          )) : levelRow(0)}
+          {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
+        </Glass>
+        <View style={styles.actions}>
+          {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
+          <View style={styles.row}>
+            <View style={styles.cell}><Button label={T.menu.friends} kind="ghost" onPress={onFriends} testID="friends-open" /></View>
+            <View style={styles.cell}><Button label={T.menu.quick} kind="ghost" onPress={onQuick} testID="quick-open" /></View>
           </View>
-        )) : levelRow(0)}
-        {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
-      </Glass>
-      <View style={styles.actions}>
-        {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
+          <View style={styles.row}>
+            <View style={styles.cell}><Button label={T.menu.puzzle} kind="ghost" onPress={onPuzzle} testID="puzzle-open" /></View>
+            <View style={styles.cell}><Button label={T.menu.stats} kind="ghost" onPress={onStats} testID="stats-open" /></View>
+          </View>
+          <View style={styles.row}>
+            <View style={styles.cell}><Button label={T.menu.store} kind="ghost" onPress={onStore} testID="store-open" /></View>
+            <View style={styles.cell}><Button label={T.menu.settings} kind="ghost" onPress={onSettings} testID="settings-open" /></View>
+          </View>
+        </View>
+      </ScrollView>
+      <BottomBar bottom={insets.bottom} onHeight={setBar} testID="play-bar">
         <Button label={T.menu.play} onPress={onPlay} disabled={onLocked} testID="play" />
-        <View style={styles.row}>
-          <View style={styles.cell}><Button label={T.menu.friends} kind="ghost" onPress={onFriends} testID="friends-open" /></View>
-          <View style={styles.cell}><Button label={T.menu.quick} kind="ghost" onPress={onQuick} testID="quick-open" /></View>
-        </View>
-        <View style={styles.row}>
-          <View style={styles.cell}><Button label={T.menu.puzzle} kind="ghost" onPress={onPuzzle} testID="puzzle-open" /></View>
-          <View style={styles.cell}><Button label={T.menu.stats} kind="ghost" onPress={onStats} testID="stats-open" /></View>
-        </View>
-        <View style={styles.row}>
-          <View style={styles.cell}><Button label={T.menu.store} kind="ghost" onPress={onStore} testID="store-open" /></View>
-          <View style={styles.cell}><Button label={T.menu.settings} kind="ghost" onPress={onSettings} testID="settings-open" /></View>
-        </View>
-      </View>
-    </ScrollView>
+      </BottomBar>
+    </View>
   );
 }
 
