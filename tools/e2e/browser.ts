@@ -476,8 +476,21 @@ try {
   await page.getByTestId('stats-open').click();
   await page.getByTestId('stats').waitFor({ timeout: 5000 });
   ok(await visible(page, 'stats-pro'), 'с «Про» — подробная статистика');
-  ok(/Козырей приходило/.test(await page.getByTestId('stats-trumps').innerText()), 'козыри вам и боту');
+  // графики (решение владельца 09.11.2026): у каждого — те же числа текстом
+  const gamesN = Number((await page.getByTestId('stats-games').innerText()).match(/\d+/)![0]);
+  const places = await page.locator('[aria-label^="Итог партий"]').first().getAttribute('aria-label').catch(() => null) ?? '';
+  const placeSum = [...places.matchAll(/— (\d+)/g)].reduce((a, m) => a + Number(m[1]), 0);
+  ok(await visible(page, 'stats-places') && placeSum === gamesN, `«Итог» — полоса мест, числа частей в подписи дают все партии: ${places}`);
+  const formRow = await page.getByTestId('stats-form-row').innerText().catch(() => '');
+  const formSum = [...formRow.matchAll(/— (\d+)/g)].reduce((a, m) => a + Number(m[1]), 0);
+  ok(formSum === Math.min(20, gamesN), `форма последних партий — строкой: ${formRow}`);
   ok(/Рейтинг тренировок/.test(await page.getByTestId('stats-elo').innerText()), 'рейтинг тренировок');
+  const vs = await page.locator('[data-testid^="stats-vs-"]').first().getAttribute('aria-label').catch(() => null) ?? '';
+  ok(/вы вышли раньше — \d+, бот раньше — \d+/.test(vs), `против уровней — полосы с числами: ${vs}`);
+  ok(/\d,\d/.test(await page.getByTestId('stats-avg-bouts').innerText().catch(() => '')), 'как вы играете — отбоев за партию числом');
+  ok(/Козырей приходило/.test(await page.getByTestId('stats-trumps').innerText()), 'козыри вам и боту');
+  ok(/Эта неделя/.test(await page.getByTestId('stats-table').innerText().catch(() => '')), 'по столам и неделям — таблица');
+  await page.screenshot({ path: `${OUT}/06-stats-pro.png` });
   await page.locator('[data-testid^="stats-review-"]').first().click();
   await page.getByTestId('review').waitFor({ timeout: 5000 });
   ok(!(await visible(page, 'review-locked')), 'с «Про» — разбор любой партии');
@@ -557,7 +570,10 @@ try {
   await page.getByTestId('stats-open').click();
   await page.getByTestId('stats').waitFor({ timeout: 5000 });
   const statsText = await page.getByTestId('stats').innerText().catch(() => '');
-  ok(/Разные уровни: 1 партия/.test(statsText), 'статистика: стол с разными уровнями — своей строкой', statsText);
+  const mixedRow = await page.locator('[aria-label^="Разные уровни:"]').first().getAttribute('aria-label').catch(() => null) ?? '';
+  ok(/Разные уровни: 1 партия/.test(mixedRow), 'статистика: стол с разными уровнями — своей строкой таблицы', mixedRow);
+  const vsNovice = await page.getByTestId('stats-vs-novice').getAttribute('aria-label').catch(() => null) ?? '';
+  ok(/Новичок: вы вышли раньше/.test(vsNovice), `против уровней: бот стола с разными уровнями — под своим уровнем: ${vsNovice}`);
   ok(/Новичок, Средний/.test(statsText), 'последние партии: уровни ботов по местам');
   await page.getByTestId('stats-back').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });

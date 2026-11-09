@@ -4,12 +4,24 @@
 import type { Reason, Variant } from '../engine';
 import type { Level } from '../bot';
 import type { MainProductId, Unavailable } from '../money/types';
+import type { Place } from '../state/stats';
 import { pluralRu } from './plural';
 
 const LEVEL_NAME: Record<Level, string> = {
   novice: 'Новичок', beginner: 'Начинающий', amateur: 'Любитель', average: 'Средний',
   experienced: 'Сильный', master: 'Опытный',
 };
+
+/** Уровни в творительном и родительном падеже — для «между Средним и Сильным», «ниже Новичка». */
+const LEVEL_WITH: Record<Level, string> = {
+  novice: 'Новичком', beginner: 'Начинающим', amateur: 'Любителем', average: 'Средним', experienced: 'Сильным', master: 'Опытным',
+};
+const LEVEL_OF: Record<Level, string> = {
+  novice: 'Новичка', beginner: 'Начинающего', amateur: 'Любителя', average: 'Среднего', experienced: 'Сильного', master: 'Опытного',
+};
+
+/** Число с одним знаком после запятой, по-русски: 3,7. */
+const dec = (x: number): string => x.toFixed(1).replace('.', ',');
 
 const REASON: Record<Reason, string> = {
   gameOver: 'Партия кончилась',
@@ -441,22 +453,68 @@ export const T = {
     title: 'Статистика',
     menu: 'Статистика',
     back: 'Назад',
+    summary: 'Итог',
     games: (n: number) => `Партий с ботами: ${n}`,
     kept: (n: number) => `Остались с картами: ${n}`,
     first: (n: number) => `Вышли первым: ${n}`,
     draws: (n: number) => `Ничьих: ${n}`,
     streak: (n: number) => `Сегодня без «остались с картами» подряд: ${n}`,
     puzzles: (n: number) => `Задач дня решено: ${n}`,
-    pro: 'Подробно — в «Про»: по столам, числу игроков и уровням, козыри и рейтинг тренировок',
+    pro: 'Подробно — в «Про»: форма последних 20 партий, рейтинг тренировок, против каждого уровня, как вы играете, по столам и неделям',
+    /** места в партии — от лучшего к худшему (docs/09-game-design.md, «Статистика») */
+    place: { first: 'Вышли первым', out: 'Вышли позже', draw: 'Ничья', fool: 'Остались с картами' } as Record<Place, string>,
+    placesSpoken: (c: Record<Place, number>) =>
+      `Итог партий: вышли первым — ${c.first}, вышли позже — ${c.out}, ничья — ${c.draw}, остались с картами — ${c.fool}`,
+    form: (n: number) => (n === 1 ? 'Последняя партия' : `Последние ${n} ${pluralRu(n, 'партия', 'партии', 'партий')}`),
+    formRow: (c: Record<Place, number>) => `Первым — ${c.first} · позже — ${c.out} · ничья — ${c.draw} · с картами — ${c.fool}`,
+    formNote: 'Слева — давние, справа — последняя.',
+    eloTitle: 'Рейтинг тренировок',
+    eloDelta: (d: number) => (d > 0 ? `+${d} за последнюю партию` : d < 0 ? `−${-d} за последнюю партию` : 'Без перемен за последнюю партию'),
+    eloHow: (n: number) =>
+      `В счёте — ${n} ${pluralRu(n, 'партия', 'партии', 'партий')} один на один без подсказки. У уровней постоянные числа: от Новичка 700 до Опытного 1700, начало — 1200.`,
+    eloNone: 'Рейтинг появится после первой партии один на один без подсказки.',
+    eloLine: (n: number) => `Линия — ${n} ${pluralRu(n, 'последняя партия', 'последние партии', 'последних партий')} в счёте`,
+    between: (below: Level | null, above: Level | null, elo: Record<Level, number>) =>
+      below && above ? `Между ${LEVEL_WITH[below]} (${elo[below]}) и ${LEVEL_WITH[above]} (${elo[above]})`
+        : above ? `Ниже ${LEVEL_OF[above]} (${elo[above]})` : below ? `Выше ${LEVEL_OF[below]} (${elo[below]})` : '',
+    eloSpoken: (elo: number, delta: string, between: string, line: readonly number[]) =>
+      `Рейтинг тренировок ${elo}. ${delta}. ${between}. По партиям: ${line.join(', ')}`,
+    vsTitle: 'Против уровней',
+    vsBefore: 'Вы вышли раньше',
+    vsAfter: 'Бот вышел раньше',
+    vsShare: (before: number, all: number) => `${all ? Math.round((100 * before) / all) : 0} %`,
+    vsHow: 'Каждый бот за столом — отдельно: кто из вас раньше остался без карт. Стол с разными уровнями тоже: каждый бот — под своим уровнем. Справа — доля встреч, где раньше вышли вы.',
+    vsTogether: (n: number) => `Вышли в одном отбое или ничья — ${n} ${pluralRu(n, 'раз', 'раза', 'раз')}, в полосах их нет.`,
+    vsSpoken: (name: string, before: number, after: number, together: number) =>
+      `${name}: вы вышли раньше — ${before}, бот раньше — ${after}, вместе — ${together}`,
+    playTitle: 'Как вы играете',
+    avg: {
+      bouts: 'Отбоев за партию',
+      takes: 'Брали карты за партию',
+      transfers: 'Переводов за переводную партию',
+      errors: 'Ошибок за разобранную партию',
+      inaccuracies: 'Неточностей за разобранную партию',
+      trumpsLeft: 'Козырей в руке, когда остались с картами',
+    },
+    over: (n: number) => `по ${n} ${pluralRu(n, 'партии', 'партиям', 'партиям')}`,
+    trend: (recent: number, earlier: number) => `Последние 10 — ${dec(recent)} · раньше — ${dec(earlier)}`,
+    value: (x: number) => dec(x),
+    hinted: (n: number) => `Партий с подсказкой: ${n}`,
+    trumps: (you: number, bot: number) => `Козырей приходило за партию: вам — ${dec(you)}, боту — ${dec(bot)}`,
+    trumpsNote: 'Колода честная: в долгую козыри приходят всем поровну.',
+    tableTitle: 'По столам и неделям',
     variant: 'По столам',
     seats: 'По числу игроков',
     seatsRow: (n: number) => `${n} за столом`,
-    level: 'По уровням',
+    level: 'По уровню стола',
     mixed: 'Разные уровни',
-    row: (name: string, games: number, kept: number) => `${name}: ${games} ${pluralRu(games, 'партия', 'партии', 'партий')}, с картами — ${kept}`,
-    trumps: (you: number, bot: number) => `Козырей приходило за партию: вам — ${you.toFixed(1)}, боту — ${bot.toFixed(1)}`,
-    trumpsNote: 'Колода честная: в долгую козыри приходят всем поровну.',
-    elo: (elo: number, n: number) => `Рейтинг тренировок: ${elo} (${n} ${pluralRu(n, 'партия', 'партии', 'партий')} один на один без подсказки)`,
+    weeks: 'По неделям',
+    /** колонки таблицы «По столам и неделям» */
+    cols: ['Партий', 'Первым', 'С картами'] as const,
+    thisWeek: 'Эта неделя',
+    weekRow: (day: number, month: number) => `С ${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}`,
+    row: (name: string, games: number, first: number, kept: number) =>
+      `${name}: ${games} ${pluralRu(games, 'партия', 'партии', 'партий')}, первым — ${first}, с картами — ${kept}`,
     recent: 'Последние партии',
     recentRow: (date: string, variant: string, level: string, result: string) => `${date} · ${variant} · ${level} — ${result}`,
     open: 'Разбор',
