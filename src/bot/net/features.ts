@@ -1,12 +1,13 @@
 // Признаки наблюдения для сети (docs/specs/2026-11-neural.md, «Вход»). Вход — только наблюдение места (ADR 0005).
-// Два шага: `pack` — наблюдение в 56 байт «сырой записи» (её же пишет самоигра для обучения), `encode` — сырая запись
+// Два шага: `pack` — наблюдение в 64 байта «сырой записи» (её же пишет самоигра для обучения), `encode` — сырая запись
 // во вход сети. `encode` повторяет tools/gpu/features.py бит в бит: сверка — tools/gpu/vectors/features.jsonl.gz
 // (tools/test/net.test.ts здесь и selftest.py там).
-import { DECK_SIZE, RANKS, rankOf, suitOf } from '../../engine';
+import { DECK_SIZE, RANKS, rankOf, suitOf, throwerSeen } from '../../engine';
 import type { Observation } from '../../engine';
 
-/** Версия признаков: меняется вместе с весами — сеть с другой версией не читается. */
-export const FEATURES_VERSION = 1;
+/** Версия признаков: меняется вместе с весами — сеть с другой версией не читается. 2 — с очередью атакующих (#57) и
+ *  сдавшимися (#58); сеть версии 1 переводится в 2 без изменений оценки (`tools/gpu/upgrade.py`). */
+export const FEATURES_VERSION = 2;
 
 /** Где карта для этого места (байты 0…35 сырой записи, по номеру карты). */
 export const ZONE = {
@@ -23,16 +24,20 @@ export const ZONE = {
   ownKnown: 10,
 } as const;
 
-export const RAW_SIZE = 56;
+export const RAW_SIZE = 64;
 /** Смещения скаляров сырой записи. */
 export const RAW = {
   seats: 36, variant: 37, order: 38, trumpSuit: 39, talon: 40, bout: 41, limit: 42, giving: 43, table: 44,
   hands: 45, attacker: 49, defender: 50, starter: 51, passed: 52, out: 53, firstTransfer: 54,
+  /** Чья очередь подкидывать (`throwerSeen`): 0 — ничья, иначе относительное место + 1. */
+  thrower: 55,
+  /** Сдавшиеся — биты по относительным местам. */
+  resigned: 56,
 } as const;
 
 const PLANES = 11;
 const CARDS = PLANES * DECK_SIZE;
-const PER_SEAT = 15;
+const PER_SEAT = 17;
 const SCALARS = 18;
 /** Размер входа сети. */
 export const INPUTS = CARDS + SCALARS + 4 * PER_SEAT;
@@ -40,7 +45,7 @@ export const INPUTS = CARDS + SCALARS + 4 * PER_SEAT;
 /** Как подкидывают за столом (поле `order` свода — с durak-rules-v2, #57); у записей без поля — «кто успел». */
 const queued = (o: Observation): boolean => (o.rules as { order?: string }).order === 'queue';
 
-/** Наблюдение места → 56 байт. Места — относительно своего: 0 — своё, 1 — следующее по часовой стрелке. */
+/** Наблюдение места → 64 байта (57–63 — запас, нули). Места — относительно своего: 0 — своё, 1 — следующее по часовой стрелке. */
 export function pack(o: Observation, out: Uint8Array = new Uint8Array(RAW_SIZE)): Uint8Array {
   out.fill(0);
   const rel = (seat: number) => (seat - o.seat + o.seats) % o.seats;
@@ -65,12 +70,13 @@ export function pack(o: Observation, out: Uint8Array = new Uint8Array(RAW_SIZE))
   out[RAW.limit] = o.boutLimit;
   out[RAW.giving] = o.phase === 'giving' ? 1 : 0;
   out[RAW.table] = o.table.length;
-  let passed = 0, gone = 0;
+  let passed = 0, gone = 0, quit = 0;
   for (let seat = 0; seat < o.seats; seat++) {
     const r = rel(seat);
     out[RAW.hands + r] = o.handSizes[seat];
     if (o.passed[seat]) passed |= 1 << r;
     if (o.out.includes(seat)) gone |= 1 << r;
+    if ((o.resigned ?? []).includes(seat)) quit |= 1 << r;
   }
   out[RAW.attacker] = rel(o.attacker);
   out[RAW.defender] = rel(o.defender);
@@ -78,6 +84,9 @@ export function pack(o: Observation, out: Uint8Array = new Uint8Array(RAW_SIZE))
   out[RAW.passed] = passed;
   out[RAW.out] = gone;
   out[RAW.firstTransfer] = o.rules.firstBoutTransfer ? 1 : 0;
+  const thrower = throwerSeen(o);
+  out[RAW.thrower] = thrower < 0 ? 0 : rel(thrower) + 1;
+  out[RAW.resigned] = quit;
   return out;
 }
 
@@ -86,7 +95,7 @@ const TALON_STEPS = [1, 3, 6, 12, 18];
 
 /** Сырая запись → вход сети. Плоскости по 36 карт: 0 — своя рука, 1 — своя, которую видели соперники, 2 — атака
  *  непокрытая, 3 — атака покрытая, 4 — защита, 5 — сброс, 6–8 — взятые в открытую соперниками 1–3, 9 — открытый козырь
- *  под колодой, 10 — невидимая. Дальше — 18 общих чисел и по 15 на каждое из четырёх мест. Масти — от козыря: козырь — 0, остальные по возрастанию номера — 1, 2, 3
+ *  под колодой, 10 — невидимая. Дальше — 18 общих чисел и по 17 на каждое из четырёх мест. Масти — от козыря: козырь — 0, остальные по возрастанию номера — 1, 2, 3
  *  (так сеть не учит одно и то же четыре раза). */
 export function encode(raw: Uint8Array, out: Float32Array = new Float32Array(INPUTS)): Float32Array {
   out.fill(0);
@@ -131,6 +140,8 @@ export function encode(raw: Uint8Array, out: Float32Array = new Float32Array(INP
     out[o + 12] = raw[RAW.starter] === r ? 1 : 0;
     out[o + 13] = (raw[RAW.passed] >> r) & 1;
     out[o + 14] = (raw[RAW.out] >> r) & 1;
+    out[o + 15] = raw[RAW.thrower] === r + 1 ? 1 : 0;
+    out[o + 16] = (raw[RAW.resigned] >> r) & 1;
   }
   return out;
 }

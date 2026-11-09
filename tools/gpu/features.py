@@ -1,24 +1,24 @@
 """Признаки наблюдения для сети — то же, что src/bot/net/features.ts (`encode`), бит в бит (docs/specs/2026-11-neural.md, «Вход»).
 
-Вход — «сырая запись» наблюдения места, 56 байт: её пишет самоигра в Bun (`pack` в features.ts). Здесь — только
+Вход — «сырая запись» наблюдения места, 64 байта: её пишет самоигра в Bun (`pack` в features.ts). Здесь — только
 `encode` над пачкой записей numpy и перестановка некозырных мастей для обучения. Сверка с TypeScript —
 tools/gpu/vectors/features.jsonl.gz (selftest.py здесь, tools/test/net.test.ts там).
 """
 import numpy as np
 
-VERSION = 1
-RAW_SIZE = 56
+VERSION = 2
+RAW_SIZE = 64
 DECK = 36
 RANKS = 9
 PLANES = 11
 CARDS = PLANES * DECK
 SCALARS = 18
-PER_SEAT = 15
+PER_SEAT = 17
 INPUTS = CARDS + SCALARS + 4 * PER_SEAT
 
 # смещения скаляров сырой записи (RAW в features.ts)
 SEATS, VARIANT, ORDER, TRUMP, TALON, BOUT, LIMIT, GIVING, TABLE = 36, 37, 38, 39, 40, 41, 42, 43, 44
-HANDS, ATTACKER, DEFENDER, STARTER, PASSED, OUT, FIRST_TRANSFER = 45, 49, 50, 51, 52, 53, 54
+HANDS, ATTACKER, DEFENDER, STARTER, PASSED, OUT, FIRST_TRANSFER, THROWER, RESIGNED = 45, 49, 50, 51, 52, 53, 54, 55, 56
 # зоны карт (ZONE в features.ts)
 UNSEEN, OWN, OPENLY1, TRUMP_BOTTOM, OWN_KNOWN = 0, 1, 6, 9, 10
 HAND_STEPS = (1, 2, 3, 4, 6, 8, 12)
@@ -34,7 +34,7 @@ def _div(a, d):
 
 
 def encode(raw, perm=None):
-    """raw — (N, 56) uint8; perm — (N, 3): перестановка некозырных мастей 1…3 (None — без перестановки). → (N, 474) float32."""
+    """raw — (N, 64) uint8; perm — (N, 3): перестановка некозырных мастей 1…3 (None — без перестановки). → (N, 474) float32."""
     raw = np.asarray(raw, dtype=np.uint8)
     n = raw.shape[0]
     out = np.zeros((n, INPUTS), np.float32)
@@ -87,6 +87,8 @@ def encode(raw, perm=None):
         cols[:, 12] = raw[:, STARTER] == r
         cols[:, 13] = (raw[:, PASSED] >> r) & 1
         cols[:, 14] = (raw[:, OUT] >> r) & 1
+        cols[:, 15] = raw[:, THROWER] == r + 1
+        cols[:, 16] = (raw[:, RESIGNED] >> r) & 1
         out[:, o:o + PER_SEAT] = np.where(present[:, None], cols, 0)
     return out
 
@@ -97,7 +99,7 @@ def random_perm(n, rng):
 
 
 def read_shard(path):
-    """Файл самоигры (selftest.ts): 'DKS1', n, 56, 0 — затем n × 56 байт записей и n float32 целей."""
+    """Файл самоигры (selfplay.ts): 'DKS1', n, 64, 0 — затем n × 64 байта записей и n float32 целей."""
     data = np.fromfile(path, dtype=np.uint8)
     head = data[:16].view('<u4')
     if head[0] != 0x31534B44 or head[2] != RAW_SIZE:

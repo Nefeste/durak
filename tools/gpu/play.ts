@@ -1,5 +1,5 @@
 // Общее для самоигры и арены сети (tools/gpu/README.md): свод, раздача, партия до конца.
-import { apply, dealOf, firstOf, newGame, observe, RULES_V1 } from '../../src/engine';
+import { apply, dealOf, firstOf, newGame, observe, RULES } from '../../src/engine';
 import type { RuleSet, State, Variant } from '../../src/engine';
 import type { Rng } from '../../src/bot';
 import { actorOf } from '../../src/bot/sim';
@@ -9,10 +9,9 @@ export { loadNet, playerOf } from '../sim/players';
 export type { Player } from '../sim/players';
 export { shuffled } from '../sim/play';
 
-/** Свод для обучения — нынешний свод игры: с очередью атакующих (#57) — `RULES` движка, если он есть. */
+/** Свод для арены и эталона — нынешний свод игры: по очереди (#57). */
 export async function trainingRules(): Promise<RuleSet> {
-  const engine = (await import('../../src/engine')) as unknown as { RULES?: RuleSet };
-  return engine.RULES ?? RULES_V1;
+  return RULES;
 }
 
 export function startOf(deck: number[], seats: number, variant: Variant, rules: RuleSet): State {
