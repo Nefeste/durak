@@ -3,7 +3,7 @@
 // tools/art/icon.ts (паспорт assets/LICENSES.md); плагин окна заставки — перед expo-splash-screen.
 import { describe, expect, test } from 'bun:test';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import app from '../../app.json';
 import pkg from '../../package.json';
 import lock from '../../package-lock.json';
@@ -30,4 +30,18 @@ describe('сборка', () => {
     expect(w).toBeGreaterThanOrEqual(0);
     expect(w).toBeLessThan(s);
   });
+});
+
+// Страница игры на сайте собирается из store/site/ (Nefeste/gornitsagames, tools/games.py): снимков от 3 до 8,
+// каждый — файл из store/. Девятый снимок однажды остановил обновление сайта (09.11.2026).
+describe('страница на сайте', () => {
+  for (const lang of ['ru', 'en']) {
+    test(`page.${lang}.md: от 3 до 8 снимков, файлы на месте`, () => {
+      const md = readFileSync(`store/site/page.${lang}.md`, 'utf8');
+      const files = [...md.matchAll(/^ {2}- file: (\S+)$/gm)].map(m => m[1]);
+      expect(files.length).toBeGreaterThanOrEqual(3);
+      expect(files.length).toBeLessThanOrEqual(8);
+      for (const f of files) expect(existsSync(`store/${f}`)).toBe(true);
+    });
+  }
 });

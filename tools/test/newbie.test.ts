@@ -72,3 +72,16 @@ describe('настройки новичка', () => {
     expect(taughtBefore(s, [{ variant: 'perevodnoy' }])).toMatchObject({ newbie: false, transferTold: true });
   });
 });
+
+describe('стол в меню (спецификация 1.0, §3)', () => {
+  test('первый запуск — подкидной вдвоём против «Начинающего»', () => {
+    expect(DEFAULT_SETTINGS.choice).toEqual({ variant: 'podkidnoy', bots: 1, level: 'beginner' });
+    expect(parseSettings(null).choice).toEqual(DEFAULT_SETTINGS.choice);
+  });
+  test('выбор игрока запоминается, мусор — по умолчанию по полю', () => {
+    const kept = { variant: 'perevodnoy', bots: 3, level: 'master' };
+    expect(parseSettings(JSON.stringify({ choice: kept })).choice).toEqual(kept as never);
+    expect(parseSettings(JSON.stringify({ choice: { variant: 'x', bots: 9, level: 'god' } })).choice).toEqual(DEFAULT_SETTINGS.choice);
+    expect(parseSettings(JSON.stringify({ choice: 'oops' })).choice).toEqual(DEFAULT_SETTINGS.choice);
+  });
+});
