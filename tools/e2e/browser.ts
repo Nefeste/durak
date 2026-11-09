@@ -120,6 +120,8 @@ try {
   await page.goto(`${web.url}?fast=1`);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   ok(await page.getByText('Козырь').first().isVisible(), 'главный экран: название «Козырь»');
+  // первая партия — подкидной вдвоём против «Начинающего» (спецификация 1.0, §3)
+  ok(await page.getByTestId('level-value').innerText() === 'Начинающий', 'первый запуск: уровень «Начинающий»', await page.getByTestId('level-value').innerText());
   await page.screenshot({ path: `${OUT}/01-menu.png` });
 
   console.log('Правила');
@@ -234,7 +236,7 @@ try {
   ok(await handCount(page) === 6, 'на руке шесть карт', await handCount(page));
   ok(await visible(page, 'opp-1'), 'соперник с подписью «бот»', await page.getByTestId('opp-1').innerText().catch(() => ''));
   const seat = await page.getByTestId('opp-1').innerText().catch(() => '');
-  ok(/^Бот 1 · Средний/.test(seat.trim()), `место соперника — «Бот 1 · Средний»: ${seat.split('\n')[0]}`, seat);
+  ok(/^Бот 1 · Начинающий/.test(seat.trim()), `место соперника — «Бот 1 · Начинающий» (первая партия, спецификация §3): ${seat.split('\n')[0]}`, seat);
   // вдвоём бот всегда ходит или отбивается — его плашка с золотой кромкой
   ok(await page.getByTestId('opp-1').getAttribute('aria-selected').catch(() => null) === 'true', 'плашка ходящего соперника выделена');
   // первая партия: строка над рукой учит первые три отбоя (docs/09-game-design.md, «Первая партия»)
@@ -475,7 +477,10 @@ try {
   await page.getByTestId('puzzle-back').click();
   await page.getByTestId('puzzle-back').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
-  // уровень — одной строкой «‹ Средний ›» (аудит, находка 12); седьмой шаг закрыт
+  // уровень — одной строкой «‹ Средний ›» (аудит, находка 12); седьмой шаг закрыт; выбор запоминается
+  await setLevel(page, 'Средний');
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
   ok(await page.getByTestId('level-value').innerText() === 'Средний', 'уровень одной строкой: «Средний»', await page.getByTestId('level-value').innerText());
   await page.getByTestId('level-prev').click();
   ok(await page.getByTestId('level-value').innerText() === 'Любитель', '«‹» — уровень слабее: «Любитель»');

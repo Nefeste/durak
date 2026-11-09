@@ -1,6 +1,9 @@
 // Настройки игрока (docs/09-game-design.md, «Настройки»). Чистые функции: разбор сохранённой строки
 // и что действует, если «Меньше движения» игрок не трогал, — как в системе телефона (ADR устава
 // 0023, правило 6; по образцу Nefeste/shelter src/state/settings.ts). Читает и пишет — src/state/store.ts.
+import { LEVELS } from '../bot';
+import type { Level } from '../bot';
+import type { Variant } from '../engine';
 
 export type BotSpeed = 'normal' | 'fast';
 export type HandOrder = 'suit' | 'rank';
@@ -24,15 +27,25 @@ export interface Settings {
   newbie: boolean;
   /** Окно «Что такое перевод» уже показано — перед переводным столом оно бывает один раз. */
   transferTold: boolean;
+  /** Стол в меню: вариант, число ботов, уровень. Запоминается; первая партия — подкидной вдвоём против
+   *  «Начинающего» (спецификация 1.0, §3; docs/09-game-design.md, «Первая партия»). */
+  choice: { variant: Variant; bots: number; level: Level };
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, memoryAid: false, personalAds: true,
-  newbie: true, transferTold: false,
+  newbie: true, transferTold: false, choice: { variant: 'podkidnoy', bots: 1, level: 'beginner' },
 };
 
 const pick = <T extends string>(v: unknown, allowed: readonly T[], dflt: T): T => (allowed.includes(v as T) ? (v as T) : dflt);
 const flag = (v: unknown, dflt: boolean): boolean => (typeof v === 'boolean' ? v : dflt);
+
+function choiceOf(v: unknown, d: Settings['choice']): Settings['choice'] {
+  if (!v || typeof v !== 'object') return d;
+  const c = v as Record<string, unknown>;
+  const bots = typeof c.bots === 'number' && [1, 2, 3].includes(c.bots) ? c.bots : d.bots;
+  return { variant: pick(c.variant, ['podkidnoy', 'perevodnoy'] as const, d.variant), bots, level: pick(c.level, LEVELS, d.level) };
+}
 
 /** Сохранённая строка → настройки; мусор и пусто — по умолчанию, по полю. */
 export function parseSettings(raw: string | null): Settings {
@@ -53,6 +66,7 @@ export function parseSettings(raw: string | null): Settings {
     personalAds: flag(v.personalAds, d.personalAds),
     newbie: flag(v.newbie, d.newbie),
     transferTold: flag(v.transferTold, d.transferTold),
+    choice: choiceOf(v.choice, d.choice),
   };
   if (typeof v.lessMotion === 'boolean') s.lessMotion = v.lessMotion;
   return s;
