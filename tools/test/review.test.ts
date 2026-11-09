@@ -26,12 +26,12 @@ function botGame(seed: number, a = 'amateur', b = 'average'): GameRecord {
 }
 
 describe('уровни (#15)', () => {
-  test('шесть уровней, седьмой — закрытое место «Нейросеть», сильнейший — «Мастер»', () => {
+  test('шесть уровней, седьмой — закрытое место «Мастер · скоро» (нейросеть), сильнейший открытый — «Опытный» (#45)', () => {
     expect(LEVELS).toEqual(['novice', 'beginner', 'amateur', 'average', 'experienced', 'master']);
     expect(LOCKED_LEVEL).toBe('neural');
     expect(TOP).toBe('master');
   });
-  test('старый «Сильный» читается как «Мастер»: сохранения, история, база сервера', () => {
+  test('старый уровень `strong` (до 0.5.0) читается как `master` («Опытный»): сохранения, история, база сервера', () => {
     expect(levelOf('strong')).toBe('master');
     expect(levelOf('neural')).toBeNull();
     expect(levelOf('nobody')).toBeNull();

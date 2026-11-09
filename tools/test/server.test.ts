@@ -255,7 +255,7 @@ describe('сервер', () => {
     const me = await joinByCode(e, a, t.code!);
     await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 1, level: 'novice' });
     await e.call('POST', `/v1/tables/${t.id}/bot`, a, { seat: 2, level: 'master' });
-    // хозяин пересел на место 2 (бот «Мастер» ушёл), прежнее место 0 — за ботом стола
+    // хозяин пересел на место 2 (бот «Опытный» ушёл), прежнее место 0 — за ботом стола
     const moved = (await e.call('POST', '/v1/tables/join', a, { code: t.code, seed: me.seed, commit: me.commit, seat: 2 })).body.table as TableView;
     expect(moved.you).toBe(2);
     expect(moved.host).toBe(2);

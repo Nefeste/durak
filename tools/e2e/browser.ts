@@ -2,7 +2,7 @@
  * Браузерный прогон этапов Б и В: меню → «Правила» с картинками → партия с ботом на холсте Skia настоящими касаниями до итога →
  * «Ещё партию» → сохранение: пара ходов, «В меню», перезагрузка страницы, «Продолжить партию» →
  * отмена своего хода → настройки («Меньше движения», четырёхцветная колода, «Помощь памяти») →
- * переводной с двумя ботами до итога → «Мастер» и «Подсказка» до итога → магазин: «Без рекламы» в тестовом
+ * переводной с двумя ботами до итога → «Опытный» и «Подсказка» до итога → магазин: «Без рекламы» в тестовом
  * магазине, перезагрузка, «Восстановить покупки» (этап Е) → быстрый «Замер» (долгое нажатие на версию в настройках). Сначала — правки 0.5.1 по игре владельца на телефоне:
  * экран 412 × 780 с отступом снизу 48 (`?inset=48`, как кнопки «Назад / Домой / Недавние»): нижние кнопки меню
  * и стола над ним; стол и карты одного размера в свой ход и в чужой; «колода N»; «Помощь памяти» выключена. Карты руки — прозрачные «кнопки» поверх холста: касание
@@ -64,7 +64,7 @@ async function checkReviewTable(p: Page) {
 mkdirSync(OUT, { recursive: true });
 /** Уровень стрелками «‹ ›» до подписи `name`. */
 async function setLevel(p: Page, name: string) {
-  const order = ['Новичок', 'Начинающий', 'Любитель', 'Средний', 'Опытный', 'Мастер', 'Нейросеть · скоро'];
+  const order = ['Новичок', 'Начинающий', 'Любитель', 'Средний', 'Сильный', 'Опытный', 'Мастер · скоро'];
   for (let k = 0; k < 8; k++) {
     const now = (await p.getByTestId('level-value').innerText()).trim();
     if (now === name) return;
@@ -511,21 +511,21 @@ try {
   await page.getByTestId('level-prev').click();
   ok(await page.getByTestId('level-value').innerText() === 'Любитель', '«‹» — уровень слабее: «Любитель»');
   ok(!(await visible(page, 'locked-note')), 'седьмой уровень закрыт');
-  await setLevel(page, 'Нейросеть · скоро');
-  ok(await visible(page, 'locked-note'), '«Нейросеть · скоро»: последний шаг объясняет, выбрать нельзя');
+  await setLevel(page, 'Мастер · скоро');
+  ok(await visible(page, 'locked-note'), '«Мастер · скоро»: последний шаг объясняет, выбрать нельзя');
   ok(await page.getByTestId('level-next').isDisabled(), 'дальше седьмого шага стрелки нет');
   ok(await page.getByTestId('play').isDisabled(), 'на закрытом уровне «Играть» недоступна');
   await page.screenshot({ path: `${OUT}/08-level-locked.png` });
 
-  console.log('«Мастер» и подсказка');
+  console.log('«Опытный» и подсказка');
   await page.getByTestId('variant-podkidnoy').click();
   await page.getByTestId('bots-1').click();
-  await setLevel(page, 'Мастер');
-  ok(!(await visible(page, 'locked-note')) && await page.getByTestId('play').isEnabled(), '«‹» с закрытого — «Мастер», можно играть');
+  await setLevel(page, 'Опытный');
+  ok(!(await visible(page, 'locked-note')) && await page.getByTestId('play').isEnabled(), '«‹» с закрытого — «Опытный», можно играть');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
   await page.waitForTimeout(300);
-  ok(/Мастер/.test(await page.getByTestId('game').innerText().catch(() => '')), 'за столом «Мастер»');
+  ok(/Опытный/.test(await page.getByTestId('game').innerText().catch(() => '')), 'за столом «Опытный»');
   // подсказка — когда есть свой ход
   let advised = '';
   for (let tries = 0; tries < 40 && !advised; tries++) {
@@ -538,10 +538,10 @@ try {
       }
     } else await page.waitForTimeout(200);
   }
-  ok(/Ходите|Подкиньте|Побейте|Переведите|Берите|Пас|Бито/.test(advised), `подсказка «Мастера»: ${advised}`, advised);
+  ok(/Ходите|Подкиньте|Побейте|Переведите|Берите|Пас|Бито/.test(advised), `подсказка «Опытного»: ${advised}`, advised);
   await page.screenshot({ path: `${OUT}/06-advice.png` });
-  const third = await playOut(page, 'против «Мастера»');
-  ok(third.ended, 'партия с «Мастером» дошла до итога');
+  const third = await playOut(page, 'против «Опытного»');
+  ok(third.ended, 'партия с «Опытным» дошла до итога');
 
   console.log('«Замер» (быстрый)');
   await page.goto(`${web.url}?fast=1&bench=quick`);
@@ -560,8 +560,8 @@ try {
   await page.getByTestId('bench-run').click();
   await page.getByTestId('bench-copy').waitFor({ timeout: 120000 }).catch(() => {});
   const bench = await page.getByTestId('bench-result').innerText().catch(() => '');
-  ok(['Раздача вчетвером', '«Беру» с 12 картами', '36 карт в полёте', '«Мастер» думает'].every(t => bench.includes(t)) && /решение: 1 поз\./.test(bench),
-    '«Замер»: четыре сцены и время решения «Мастера»', bench);
+  ok(['Раздача вчетвером', '«Беру» с 12 картами', '36 карт в полёте', '«Опытный» думает'].every(t => bench.includes(t)) && /решение: 1 поз\./.test(bench),
+    '«Замер»: четыре сцены и время решения «Опытного»', bench);
   ok(/UI: кадров [1-9]/.test(bench) && /JS: кадров [1-9]/.test(bench), '«Замер»: кадры обоих потоков сосчитаны', bench);
   console.log(bench.split('\n').map(l => `      ${l}`).join('\n'));
   await page.screenshot({ path: `${OUT}/09-bench.png` });

@@ -234,7 +234,7 @@ async function main() {
       await f.getByTestId('game').waitFor({ timeout: 10_000 });
       await caption(p, 'Тасовка, раздача — и первым ходит младший козырь');
       await p.waitForTimeout(2200);
-      const lines = ['Карту — касанием или перетаскиванием', 'Ход нельзя — игра скажет почему', 'Подсказка: что сделал бы «Мастер»', 'Бот видит только свои карты и стол'];
+      const lines = ['Карту — касанием или перетаскиванием', 'Ход нельзя — игра скажет почему', 'Подсказка: что сделал бы «Опытный»', 'Бот видит только свои карты и стол'];
       for (let k = 0; k < lines.length && await mine(p, f); k++) {
         await caption(p, lines[k]);
         if (k === 1) { if (await illegal(p, f)) await p.waitForTimeout(2200); }

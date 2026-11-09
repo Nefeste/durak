@@ -142,7 +142,7 @@ try {
     await p.waitForTimeout(120);
   }
   await shot(p, '02-why');
-  // 10. подсказка «Мастера» строкой: свой ход и «Подсказка»
+  // 10. подсказка «Опытного» строкой: свой ход и «Подсказка»
   for (let i = 0; i < 200 && !(await visible(p, 'result')); i++) {
     if (await visible(p, 'advise')) {
       await p.getByTestId('advise').click();

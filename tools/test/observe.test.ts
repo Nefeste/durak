@@ -46,7 +46,7 @@ describe('наблюдение', () => {
       for (let n = 0; n < 25 && s.phase !== 'end'; n++) {
         const seat = actorOf(s);
         const t = twin(s, seat, g * 1000 + n);
-        // поиск по раскладам дорогой: «Опытный» — на каждой двадцатой позиции, «Сильный» и «Мастер» — на
+        // поиск по раскладам дорогой: `experienced` — на каждой двадцатой позиции, `master` (и старый `strong`) — на
         // каждой восьмидесятой; уровни по правилам — на всех
         const k = g * 25 + n;
         for (const level of LEVELS.filter(l => RULE_LEVELS.includes(l) || (l === 'experienced' ? k % 20 === 0 : k % 80 === 0))) {

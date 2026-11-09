@@ -147,7 +147,7 @@ export function GameScreen({ variant, bots, level, restored, onExit, onStore }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, record, lvl, settings.botSpeed, paused, holding]);
 
-  // «Подсказка»: что сделал бы «Мастер» — кусками, пока игрок ждёт (docs/09-game-design.md)
+  // «Подсказка»: что сделал бы «Опытный» — кусками, пока игрок ждёт (docs/09-game-design.md)
   const [advising, setAdvising] = useState(false);
   const adviseJob = useRef<ThinkJob<Advice> | null>(null);
   useEffect(() => () => adviseJob.current?.cancel(), [state]);
