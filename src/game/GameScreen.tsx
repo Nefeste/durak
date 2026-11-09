@@ -9,8 +9,8 @@ import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
-import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, RULES_V1 } from '../engine';
-import type { Action, Card, GameRecord, Observation, Result, State, Variant } from '../engine';
+import { apply, dealOf, deckFrom, firstOf, legalActions, newGame, nextFirst, observe, reasonOf, replay, rulesWith, throwerOf } from '../engine';
+import type { Action, Card, GameRecord, Observation, Result, State, ThrowOrder, Variant } from '../engine';
 import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
 import { reviewGame } from './review';
 import type { Advice, Level, Review } from '../bot';
@@ -63,13 +63,13 @@ function seededBytes(seed: number): Uint8Array {
 const AUTO_PASS = fast ? 80 : 1500;
 
 /** Новая запись партии: колода из 32 случайных байт телефона, первый ход — по своду (п. 3). */
-function newRecord(variant: Variant, seats: number, history: (Result | null)[], deal = 0): GameRecord {
+function newRecord(variant: Variant, seats: number, history: (Result | null)[], deal = 0, order: ThrowOrder = getSettings().throwOrder): GameRecord {
   const deck = deckFrom(fixedSeed === null ? Crypto.getRandomBytes(32) : seededBytes(fixedSeed + deal * 7919));
   const { hands, trump } = dealOf(deck, seats);
   const after = nextFirst(history, seats);
   const lowest = firstOf(hands, trump);
   return {
-    v: 1, rules: RULES_V1, variant, seats, deck, actions: [], result: null,
+    v: 1, rules: rulesWith(order), variant, seats, deck, actions: [], result: null,
     first: after ?? lowest.seat, firstWhy: after !== null ? 'afterFool' : lowest.why,
   };
 }
@@ -275,11 +275,14 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   };
 
   const tip = settings.newbie ? newbieTip(state, YOU) : null;
+  /** Чья очередь подкидывать (п. 4.3): у стола «кто успел» — никого. */
+  const thrower = throwerOf(state);
   const hint = state.phase === 'end' ? '' : picked ? (transfer ? T.game.pickTargetOrTransfer : T.game.pickTarget) : tip ? T.game.newbie[tip] : iDefend
     ? (variant === 'perevodnoy' ? T.game.hintDefendTransfer : T.game.hintDefend)
     : mine.some(a => a.type === 'attack') ? T.game.hintAttack
     : state.phase === 'giving' && canPass ? T.game.hintGive
-    : canPass ? (allCovered && autoPass(state, YOU) ? T.game.hintAutoDone : T.game.hintThrow) : T.game.hintWait;
+    : canPass ? (allCovered && autoPass(state, YOU) ? T.game.hintAutoDone : T.game.hintThrow)
+    : thrower >= 0 && thrower !== YOU && state.defender !== YOU ? T.game.hintQueue(T.game.bot(thrower)) : T.game.hintWait;
 
   const name = (seat: number) => T.level[lvlAt(seat)];
   const resultText = (r: Result) => r.draw || r.fool === null ? T.result.draw
@@ -314,8 +317,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {layout ? layout.opponents.map(p => (
           <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={T.game.bot(p.seat)}
             lines={[name(p.seat), shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])]}
-            role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : null}
-            active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat)}
+            role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : thrower === p.seat ? T.game.throwing : null}
+            active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat || thrower === p.seat)}
             left={p.x - plate.w / 2} width={plate.w} top={layout.plate.top} height={layout.plate.height} />
         )) : null}
         {layout && shown.talonSize > 0 ? (

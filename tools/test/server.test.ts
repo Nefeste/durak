@@ -2,7 +2,7 @@
 // генератор. Главное — ADR 0008: ни один ответ и ни одно сообщение WebSocket не несёт чужой руки и
 // порядка колоды; вид места совпадает с `observe` той же позиции, пересобранной из доказательства.
 import { describe, expect, test } from 'bun:test';
-import { apply, checkDeck, newGame, observe, RULES_V1, serverDeck } from '../../src/engine';
+import { apply, checkDeck, newGame, observe, RULES, RULES_V1, serverDeck } from '../../src/engine';
 import type { Action, Observation, State } from '../../src/engine';
 import { chooseAction, legalFor, makeRng } from '../../src/bot';
 import { ONLINE, PROTOCOL } from '../../src/state/protocol';
@@ -14,12 +14,14 @@ import { heldView } from '../../src/game/hold';
 
 const V = '0.2.0';
 
-function setup(seed = 7) {
+/** `knows` — телефон с очередью атакующих: шлёт `x-durak-rules` (ADR 0013); без него — старая версия игры. */
+function setup(seed = 7, knows = false) {
   const clock = new FakeClock();
   const rng = makeRng(seed);
   const app = createApp({ db: ':memory:', clock, random: n => Uint8Array.from({ length: n }, () => rng.int(256)) });
   const call = async (method: string, path: string, key?: string, body?: unknown) => {
     const headers: Record<string, string> = { 'x-durak-version': V };
+    if (knows) headers['x-durak-rules'] = RULES.id;
     if (key) headers.authorization = `Bearer ${key}`;
     if (body !== undefined) headers['content-type'] = 'application/json';
     const res = await app.http.handle(new Request(`http://durak.test${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }), '10.0.0.1');
@@ -158,6 +160,67 @@ describe('сервер', () => {
     expect(end.table.length).toBeGreaterThan(0);
   });
 
+  test('очередь атакующих (ADR 0013): стол «по очереди» втроём до конца; старой версии за него нельзя, её стол — «кто успел»', async () => {
+    const e = setup(23, true);
+    const keys = [await e.player('Миша'), await e.player('Саша')];
+    const created = await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: 'average', order: 'queue' });
+    expect(created.status).toBe(201);
+    const t0 = created.body.table as TableView;
+    expect([t0.rules, t0.order]).toEqual([RULES.id, 'queue']);
+    expect(((await e.call('GET', `/v1/tables/code/${t0.code}`, keys[0])).body as CodeInfo).order).toBe('queue');
+    expect((await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: null, order: 'turns' })).body.error).toBe('bad-body');
+    // старая версия игры (без заголовка) за стол с очередью не садится: она не знает правила
+    const info = await e.call('GET', `/v1/tables/code/${t0.code}`, keys[1]);
+    const res = await e.app.http.handle(new Request('http://durak.test/v1/tables/join', {
+      method: 'POST', headers: { 'x-durak-version': V, authorization: `Bearer ${keys[1]}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ code: t0.code, seed: e.seed16(), commit: info.body.commit }),
+    }), '10.0.0.1');
+    expect(res.status).toBe(426);
+    expect((await res.json()).error).toBe('upgrade');
+    await joinByCode(e, keys[0], t0.code!);
+    await joinByCode(e, keys[1], t0.code!);
+    expect((await e.call('POST', `/v1/tables/${t0.id}/start`, keys[0])).status).toBe(200);
+    const seen = new Map<string, Observation>();
+    const pick = makeRng(9);
+    let final: TableView | null = null;
+    let waited = 0;
+    for (let guard = 0; guard < 4000 && !final; guard++) {
+      let acted = false;
+      for (let i = 0; i < 2; i++) {
+        const t = (await e.call('GET', `/v1/tables/${t0.id}`, keys[i])).body.table as TableView;
+        noLeak(t);
+        if (t.status === 'finished') { final = t; break; }
+        const v = t.game!.view!;
+        expect(v.rules).toEqual(RULES);
+        seen.set(`${t.you}:${t.game!.n}`, v);
+        // не своя очередь — сервер отказывает с причиной движка
+        if (legalFor(v).length === 0 && v.table.length > 0 && v.seat !== v.defender && !v.passed[v.seat] && v.handSizes[v.seat] > 0) {
+          const no = await e.call('POST', `/v1/tables/${t0.id}/act`, keys[i], { game: t.game!.no, n: t.game!.n, action: { type: 'pass' } });
+          expect(no.body.reason).toBe('waitTurn');
+          waited++;
+        }
+        if (!legalFor(v).length) continue;
+        const r = await e.call('POST', `/v1/tables/${t0.id}/act`, keys[i], { game: t.game!.no, n: t.game!.n, action: chooseAction(v, 'average', pick) });
+        if (r.status === 200) acted = true;
+        else expect(r.body.error).toBe('stale');
+      }
+      if (!acted && !final) e.clock.advance(1000);
+    }
+    expect(final).not.toBeNull();
+    expect(waited).toBeGreaterThan(0);
+    const proof = final!.game!.proof as ProofView;
+    let s: State = newGame({ rules: RULES, variant: 'podkidnoy', seats: 3, first: proof.first }, proof.deck);
+    const states: State[] = [s];
+    for (const a of proof.actions) states.push(s = apply(s, a.seat, a.action));
+    expect(s.phase).toBe('end');
+    for (const [k, v] of seen) {
+      const [seat, n] = k.split(':').map(Number);
+      expect(v).toEqual(observe(states[n], seat));
+    }
+    // стол без поля `order` (старая версия) — «кто успел», свод v1
+    const plain = await e.call('POST', '/v1/tables', keys[0], { variant: 'podkidnoy', seats: 3, bots: 'average' });
+    expect([plain.body.table.rules, plain.body.table.order]).toEqual([RULES_V1.id, 'free']);
+  });
   test('пауза перед «бито»: отбой кончился картой — бот ждёт, пока все разглядят стол', async () => {
     let checked = false;
     // отбой кончается картой не в каждой партии: несколько раздач, пока не встретится такой, а следом ходит бот

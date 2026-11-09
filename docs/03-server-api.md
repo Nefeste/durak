@@ -11,6 +11,11 @@
 
 - Каждый запрос с ключом несёт `Authorization: Bearer <ключ>` и `X-Durak-Version: <версия игры>`. Версия старше
   `MIN_APP` — `426 upgrade {"need": "…"}`.
+- Телефон, который знает очередь атакующих (ADR [0013](adr/0013-throw-order.md)), шлёт ещё `X-Durak-Rules:
+  durak-rules-v2`. Без него (версии игры до очереди): стол, который он создаёт, — «кто успел» (`durak-rules-v1`, как у
+  него в своде); за стол «по очереди» он не садится — `426 upgrade {"need": QUEUE_APP}` на `join` (`server/src/core.ts`); быстрая игра с ним —
+  «кто успел» (вдвоём это та же игра). Так старая версия никогда не видит свода, которого не знает, и её проверка
+  колоды сходится.
 - Ответ с ошибкой — `{"error": "<код>", …}` и код HTTP из таблицы `ERRORS` в `protocol.ts`.
 - Онлайн — с 14 лет (ADR студии 0016): без отметки «Мне есть 14 лет» телефон не шлёт ничего, кроме `/v1/ping`.
 
@@ -30,13 +35,14 @@
 
 ### Создать и сесть
 
-1. `POST /v1/tables` `{"rid", "variant": "podkidnoy"|"perevodnoy", "seats": 2…4, "bots": "<уровень>"|null}` →
-   `201 {"table": TableView}`. Создатель — место 0. `bots` — кто сядет на свободные места; `null` — никто. Остальные
+1. `POST /v1/tables` `{"rid", "variant": "podkidnoy"|"perevodnoy", "seats": 2…4, "bots": "<уровень>"|null,
+   "order": "queue"|"free"}` → `201 {"table": TableView}`. `order` — «Подкидывать» ([`08-rules.md`](08-rules.md),
+   п. 4.3); нет поля — `free`, другое значение — `400 bad-body`. Создатель — место 0. `bots` — кто сядет на свободные места; `null` — никто. Остальные
    места сразу **за ботами** уровня `bots` (`seats[i].bot`): хозяин видит их и до начала меняет уровень каждому, человек
    может сесть на место бота — бот уходит. Повтор с тем же `rid` возвращает тот же стол.
 2. Сесть — в два шага, и **создатель тоже**: телефон записывает отпечаток колоды до того, как отдаёт своё зерно.
-   - `GET /v1/tables/code/<КОД>` → `CodeInfo` `{"id", "host", "variant", "seats", "taken", "status", "commit", "mine",
-     "places"}`; `places[i]` — кто на месте: `{"name", "bot": null, "host", "you"}` — человек, `{"name": "", "bot":
+   - `GET /v1/tables/code/<КОД>` → `CodeInfo` `{"id", "host", "variant", "seats", "order", "taken", "status", "commit",
+     "mine", "places"}`; `places[i]` — кто на месте: `{"name", "bot": null, "host", "you"}` — человек, `{"name": "", "bot":
      "<уровень>"}` — бот стола, `null` — свободно. По ним телефон показывает схему мест: создатель внизу, «слева»,
      «напротив», «справа» (`src/game/seats.ts`);
    - `POST /v1/tables/join` `{"code", "seed": "<16 байт hex>", "commit", "seat"?}` → `{"table": TableView}`. `seat` —
@@ -65,7 +71,7 @@
 ```json
 {
   "id": "t_9x…", "kind": "friend", "code": "K7M2QX", "status": "playing", "variant": "perevodnoy",
-  "rules": "durak-rules-v1", "host": 0, "bots": "average", "you": 1, "version": 42,
+  "rules": "durak-rules-v2", "order": "queue", "host": 0, "bots": "average", "you": 1, "version": 42,
   "seats": [
     { "name": "Миша", "tag": "AB12CD", "bot": null, "botFor": false, "online": true, "cards": 6, "out": false },
     { "name": "Саша", "tag": "CD34EF", "bot": null, "botFor": false, "online": true, "cards": 5, "out": false },
@@ -79,6 +85,8 @@
 }
 ```
 
+- `rules` и `order` — свод стола: «по очереди» — `durak-rules-v2`/`queue`, «кто успел» — `durak-rules-v1`/`free`.
+  Сервер до очереди поля `order` не присылал — тогда «кто успел».
 - `view` — **ровно** `observe(позиция, you)` движка: своя рука, сколько карт у каждого, взятое в открытую, козырь,
   сколько в колоде, стол, сброс, кто ходит и отбивается, кто сказал «пас», номер отбоя, вышедшие, итог. **Чужих рук
   и порядка колоды здесь нет никогда** (ADR 0008; тест `tools/test/server.test.ts` пересобирает позицию из
@@ -115,7 +123,8 @@
 - `409 stale {"table"}` — действие с этим `n` уже было (кто-то подкинул раньше) или `game` не та: свежий вид,
   недоделанное действие отменяется.
 - `409 not-your-turn {"reason": "notYourMove"}` и `400 illegal {"reason": "<причина движка>"}` — та же причина,
-  что движок даёт экрану (`T.reason`).
+  что движок даёт экрану (`T.reason`); у стола «по очереди» атакующий не в свою очередь — `illegal {"reason":
+  "waitTurn"}`.
 - Повтор с тем же `n` и тем же действием — тот же ответ, без второго применения.
 
 ### Часы, «бито» само, боты

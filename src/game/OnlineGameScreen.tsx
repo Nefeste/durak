@@ -7,7 +7,7 @@ import type { LayoutChangeEvent } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
-import { legalActions, stateFrom } from '../engine';
+import { legalActions, stateFrom, throwerSeen } from '../engine';
 import type { Action, Card, Result } from '../engine';
 import type { Level } from '../bot';
 import { layout as fill, unseen } from '../bot/legal';
@@ -90,6 +90,8 @@ function Lobby({ table, t, onExit }: { table: OnlineTable; t: TableView; onExit:
       {/* прокрутка: вчетвером со строками уровней ботов сбор стола выше экрана телефона */}
       <ScrollView style={styles.lobbyRoot} contentContainerStyle={[styles.lobby, { paddingTop: insets.top + SPACE.l, paddingBottom: (starts ? bar : insets.bottom) + SPACE.l }]} testID="lobby">
         <Header title={T.online.lobbyTitle(T.variant[t.variant])} back={T.online.back} onBack={leave} backTestID="lobby-back" />
+        {/* «Подкидывать» стола (ADR 0013): втроём и вчетвером */}
+        {t.seats.length > 2 ? <Text style={styles.dim} testID="lobby-rules">{T.online.orderOf(t.order ?? 'free')}</Text> : null}
         {t.kind === 'friend' && t.code ? (
           <View style={styles.panel}>
             <Text style={styles.dim}>{T.online.code}</Text>
@@ -263,8 +265,8 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
                 ...(s?.bot ? [T.level[s.bot]] : s?.botFor ? [T.online.botPlays] : s && !s.online ? [T.online.offline] : []),
                 shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat]),
               ]}
-              role={!view || view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : null}
-              active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat)}
+              role={!view || view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : throwerSeen(view) === p.seat ? T.game.throwing : null}
+              active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat || throwerSeen(view) === p.seat)}
               left={p.x - oppW / 2} width={oppW} top={lay.plate.top} height={lay.plate.height} />
           );
         }) : null}

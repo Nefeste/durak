@@ -457,6 +457,8 @@ try {
   await page.waitForTimeout(300);
   ok(await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null) === 'true', 'выбор «Меньше движения» пережил перезагрузку',
     await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null));
+  // «Подкидывать» (п. 4.3, #57): по умолчанию — по очереди; стол втроём ниже играет по очереди до итога
+  ok(await page.getByTestId('throw-queue').getAttribute('aria-selected').catch(() => null) === 'true', 'настройка «Подкидывать»: по умолчанию «По очереди»');
   await page.getByTestId('settings-back').click();
 
   console.log('Переводной, два бота, четырёхцветная колода, без полёта');

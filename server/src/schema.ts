@@ -60,4 +60,6 @@ export const MIGRATIONS: string[] = [
   );
   CREATE TABLE reports (at INTEGER NOT NULL, body TEXT NOT NULL);
   `,
+  // 2: настройка стола «Подкидывать» (docs/08-rules.md, п. 4.3; ADR 0013). Столы до неё играли «кто успел».
+  `ALTER TABLE tables ADD COLUMN throw_order TEXT NOT NULL DEFAULT 'free';`,
 ];

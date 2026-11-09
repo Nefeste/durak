@@ -1,6 +1,7 @@
 // Наблюдение места — граница между правдой и игроком (docs/02-architecture.md, ADR 0005, 0008).
 // Единственный вход для ботов, подсказки, экрана партии и вида места на сервере.
 import type { Card } from './cards';
+import { orderOf } from './types';
 import type { Phase, Result, RuleSet, State, Variant } from './types';
 
 export interface Observation {
@@ -71,4 +72,15 @@ export function stateFrom(o: Observation, hidden: Card[][], talon: Card[]): Stat
     boutLimit: o.boutLimit, bout: o.bout, out: [...o.out], phase: o.phase,
     result: o.result ? { ...o.result, order: [...o.result.order] } : null,
   };
+}
+
+/** Чья очередь подкидывать по наблюдению (как `throwerOf` позиции): для плашек и строки подсказки. */
+export function throwerSeen(o: Observation): number {
+  if (orderOf(o.rules) !== 'queue' || o.phase === 'end' || o.table.length === 0) return -1;
+  for (let k = 0; k < o.seats; k++) {
+    const seat = (o.attacker + k) % o.seats;
+    if (seat === o.defender || o.out.includes(seat) || o.handSizes[seat] === 0) continue;
+    if (!o.passed[seat]) return seat;
+  }
+  return -1;
 }

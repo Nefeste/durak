@@ -1,4 +1,4 @@
-// Золотые тесты свода durak-rules-v1: по тесту на пункт docs/08-rules.md, включая «выборы» сверки.
+// Золотые тесты свода durak-rules-v2 (и «кто успел» — прежнего v1): по тесту на пункт docs/08-rules.md, включая «выборы» сверки.
 // Меняется правило — меняются документ, движок и этот файл в одном коммите.
 import { describe, expect, test } from 'bun:test';
 import { apply, dealOf, firstOf, legalActions, newGame, nextFirst, reasonOf, RULES_V1 } from '../../src/engine';
@@ -87,18 +87,98 @@ describe('4. Отбой: атака и защита', () => {
     expect(why(s, 0, { type: 'throwIn', cards: cs('9♥') })).toBe('rankNotOnTable');
   });
   test('п. 4.3: остальные атакующие вступают, когда покрыта первая карта; ходящий — в любой момент', () => {
-    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣'], trump: 'Т♥', talon: '7♦' });
+    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣'], trump: 'Т♥', talon: '7♦', rules: { order: 'free' } });
     s = attack(s, 0, '6♠');
     expect(why(s, 2, { type: 'throwIn', cards: cs('6♦') })).toBe('waitFirstCover');
     expect(why(s, 0, { type: 'throwIn', cards: cs('6♣') })).toBeNull();
     s = beat(s, 1, '7♠', '6♠');
     expect(why(s, 2, { type: 'throwIn', cards: cs('6♦') })).toBeNull();
   });
-  test('п. 4.3 выбор: очереди нет — сосед подкидывает раньше ходящего, если успел', () => {
-    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣'], trump: 'Т♥', talon: '7♦' });
+  test('п. 4.3 «кто успел»: очереди нет — сосед подкидывает раньше ходящего, если успел', () => {
+    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣'], trump: 'Т♥', talon: '7♦', rules: { order: 'free' } });
     s = beat(attack(s, 0, '6♠'), 1, '7♠', '6♠');
     s = throwIn(s, 2, '6♦');
     expect(s.table.map(([a]) => a)).toEqual(cs('6♠ 6♦'));
+  });
+  test('п. 4.3 очередь: право у ходящего; «пас» передаёт его следующему по часовой стрелке', () => {
+    // 4 места: ходит 0, отбивается 1, за ним 2 и 3
+    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣', '6♥ 7♣ К♦'], trump: 'Т♥', talon: '7♦ 8♦' });
+    s = attack(s, 0, '6♠');
+    // до первой покрытой — только ходящий; второй атакующий ждёт очереди
+    expect(why(s, 2, { type: 'pass' })).toBe('waitTurn');
+    expect(why(s, 0, { type: 'throwIn', cards: cs('6♣') })).toBeNull();
+    s = beat(s, 1, '7♠', '6♠');
+    // покрыта первая — но право по-прежнему у ходящего
+    expect(why(s, 2, { type: 'throwIn', cards: cs('6♦') })).toBe('waitTurn');
+    expect(why(s, 3, { type: 'throwIn', cards: cs('6♥') })).toBe('waitTurn');
+    expect(legalActions(s, 2)).toEqual([]);
+    s = pass(s, 0);
+    // право у 2 (слева от отбивающегося), 3 ещё ждёт
+    expect(why(s, 3, { type: 'throwIn', cards: cs('6♥') })).toBe('waitTurn');
+    expect(why(s, 0, { type: 'throwIn', cards: cs('6♣') })).toBe('alreadyPassed');
+    s = pass(s, 2);
+    expect(why(s, 3, { type: 'throwIn', cards: cs('6♥') })).toBeNull();
+    s = pass(s, 3);
+    // все по кругу сказали «пас» — бито, ходит отбивавшийся
+    expect(s.table.length).toBe(0);
+    expect([s.attacker, s.defender]).toEqual([1, 2]);
+  });
+  test('п. 4.3 очередь: любая новая карта начинает круг заново — право снова у ходящего', () => {
+    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣', '6♥ 7♣ К♦'], trump: 'Т♥', talon: '7♦ 8♦' });
+    s = beat(attack(s, 0, '6♠'), 1, '7♠', '6♠');
+    s = pass(s, 0);
+    s = throwIn(s, 2, '6♦');
+    // подкинутая карта стёрла «пасы»: право у ходящего
+    expect(s.passed).toEqual([false, false, false, false]);
+    expect(why(s, 2, { type: 'pass' })).toBe('waitTurn');
+    expect(why(s, 0, { type: 'pass' })).toBeNull();
+    // покрытие — тоже новая карта: 7 ♣ у 3 появится в праве только после «паса» 0 и 2
+    s = pass(pass(s, 0), 2);
+    s = beat(s, 1, 'В♦', '6♦');
+    expect(why(s, 3, { type: 'throwIn', cards: cs('7♣') })).toBe('waitTurn');
+    expect(why(s, 0, { type: 'pass' })).toBeNull();
+  });
+  test('п. 4.3 очередь: вдогонку после «беру» — тем же кругом', () => {
+    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣'], trump: 'Т♥', talon: '7♦ 8♦' });
+    s = throwIn(beat(attack(s, 0, '6♠'), 1, '7♠', '6♠'), 0, '6♣');
+    s = act(s, 1, { type: 'take' });
+    expect(why(s, 2, { type: 'give', cards: cs('6♦') })).toBe('waitTurn');
+    s = pass(s, 0);
+    expect(why(s, 2, { type: 'give', cards: cs('6♦') })).toBeNull();
+    s = act(s, 2, { type: 'give', cards: cs('6♦') });
+    expect(why(s, 0, { type: 'pass' })).toBeNull();
+    s = pass(pass(s, 0), 2);
+    expect(s.hands[1].length).toBe(3 + 4);
+  });
+  test('п. 4.3 очередь: атакующий без карт в круг не входит', () => {
+    let s = pos({ hands: ['6♠', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣'], trump: 'Т♥', talon: '', talonEmpty: true });
+    s = beat(attack(s, 0, '6♠'), 1, '7♠', '6♠');
+    // у ходящего карт нет — право сразу у 2
+    expect(why(s, 2, { type: 'throwIn', cards: cs('6♦') })).toBeNull();
+  });
+  test('п. 6.4 и 4.3 очередь: после перевода круг начинается с переведшего', () => {
+    let s = pos({ hands: ['6♠ 8♥ 9♥', '6♣ 8♣ В♦ 10♥', '6♦ 9♣ Д♣ 8♠', '7♣ К♦ Д♠'], trump: 'Т♥', talon: '7♥ 8♦', variant: 'perevodnoy' });
+    s = act(attack(s, 0, '6♠'), 1, { type: 'transfer', cards: cs('6♣') });
+    expect([s.attacker, s.defender]).toEqual([1, 2]);
+    s = beat(s, 2, '8♠', '6♠');
+    expect(why(s, 0, { type: 'pass' })).toBe('waitTurn');
+    expect(why(s, 3, { type: 'pass' })).toBe('waitTurn');
+    s = pass(s, 1);
+    expect(why(s, 0, { type: 'pass' })).toBe('waitTurn');
+    expect(why(s, 3, { type: 'pass' })).toBeNull();
+  });
+  test('вдвоём очередь и «кто успел» — одно и то же', () => {
+    const base = { hands: ['6♠ 6♣ 9♥', '7♠ 8♦ В♦'], trump: 'Т♥', talon: '7♦ 10♦' };
+    for (const order of ['queue', 'free'] as const) {
+      let s = pos({ ...base, rules: { order } });
+      s = beat(attack(s, 0, '6♠'), 1, '7♠', '6♠');
+      expect(legalActions(s, 0).map(a => a.type)).toEqual(['throwIn', 'pass']);
+    }
+  });
+  test('записи durak-rules-v1 без поля `order` играются «кто успел»', () => {
+    let s = pos({ hands: ['6♠ 6♣ 8♥', '7♠ 8♠ В♦ 10♥', '6♦ 9♣ Д♣'], trump: 'Т♥', talon: '7♦', rules: { ...RULES_V1, order: undefined } });
+    s = beat(attack(s, 0, '6♠'), 1, '7♠', '6♠');
+    expect(why(s, 2, { type: 'throwIn', cards: cs('6♦') })).toBeNull();
   });
   test('п. 4.4: в отбое не больше шести карт атаки', () => {
     let s = pos({ hands: ['6♠ 6♣ 6♦ 8♦ 9♦ 8♣ 9♠', '8♠ 9♣ 7♦ 10♦ В♦ 10♣ Д♣ К♣'], trump: 'Т♥', talon: '7♣' });
@@ -164,7 +244,7 @@ describe('4. Отбой: атака и защита', () => {
     expect(s.discard.sort((a, b) => a - b)).toEqual(cs('6♠ 7♠').sort((a, b) => a - b));
   });
   test('п. 4.6: «пас» снимается, когда стол меняется', () => {
-    let s = pos({ hands: ['6♠ 7♣ В♣', '7♠ 8♣ В♦', '10♠ К♣ Д♦'], trump: 'Т♥', talon: '7♦ 10♦ Д♠' });
+    let s = pos({ hands: ['6♠ 7♣ В♣', '7♠ 8♣ В♦', '10♠ К♣ Д♦'], trump: 'Т♥', talon: '7♦ 10♦ Д♠', rules: { order: 'free' } });
     s = attack(s, 0, '6♠');
     s = pass(s, 2);
     s = beat(s, 1, '7♠', '6♠');
@@ -293,7 +373,7 @@ describe('7. Конец партии', () => {
     s.out = [];
     s = attack(s, 2, '10♠');
     s = act(s, 0, { type: 'take' });
-    s = pass(pass(s, 1), 2);
+    s = pass(pass(s, 2), 1);
     expect([s.attacker, s.defender]).toEqual([1, 2]);
   });
 });

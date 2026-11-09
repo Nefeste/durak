@@ -1,7 +1,7 @@
 // Бот видит только своё (ADR 0005): позиции с одним наблюдением и разными скрытыми картами дают
 // каждому уровню одно и то же действие (docs/specs/2026-11-v1.md, критерий 2).
 import { describe, expect, test } from 'bun:test';
-import { apply, legalActions, newGame, observe, RULES_V1 } from '../../src/engine';
+import { apply, legalActions, newGame, observe, RULES, RULES_V1 } from '../../src/engine';
 import type { State } from '../../src/engine';
 import { chooseAction, LEVELS, makeRng, RULE_LEVELS, unseen } from '../../src/bot';
 import { layout } from '../../src/bot/legal';
@@ -26,7 +26,7 @@ describe('наблюдение', () => {
     const rng = makeRng(3);
     let differ = 0;
     for (let g = 0; g < 200; g++) {
-      let s = newGame({ rules: RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2 + (g % 3), first: 0 }, shuffled(rng));
+      let s = newGame({ rules: Math.floor(g / 6) % 2 ? RULES : RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2 + (g % 3), first: 0 }, shuffled(rng));
       for (let n = 0; n < 15 && s.phase !== 'end'; n++) {
         const seat = actorOf(s);
         const t = twin(s, seat, g * 100 + n);
@@ -42,7 +42,7 @@ describe('наблюдение', () => {
   test('каждый уровень делает одно и то же действие в позиции и в её двойнике', () => {
     const rng = makeRng(11);
     for (let g = 0; g < 150; g++) {
-      let s = newGame({ rules: RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2 + (g % 3), first: 0 }, shuffled(rng));
+      let s = newGame({ rules: Math.floor(g / 6) % 2 ? RULES : RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2 + (g % 3), first: 0 }, shuffled(rng));
       for (let n = 0; n < 25 && s.phase !== 'end'; n++) {
         const seat = actorOf(s);
         const t = twin(s, seat, g * 1000 + n);

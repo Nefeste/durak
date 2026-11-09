@@ -1,7 +1,7 @@
 // из nardy: src/state/protocol.ts @ 1d2bdff — версии, коды, ключ, ник, ошибки; столы, вид места и
 // события — свои (docs/03-server-api.md): 2–4 места, сервер отдаёт вид места, случайность — колода.
 // Общий файл телефона и сервера: без React и без часов.
-import type { Action, Card, Observation, Result, Variant } from '../engine';
+import type { Action, Card, Observation, Result, RuleSet, ThrowOrder, Variant } from '../engine';
 import type { Level } from '../bot';
 import { HOLD } from '../game/hold';
 
@@ -120,7 +120,10 @@ export interface TableView {
   code: string | null;
   status: TableStatus;
   variant: Variant;
-  rules: 'durak-rules-v1';
+  /** Версия свода стола: «кто успел» — `durak-rules-v1`, «по очереди» — `durak-rules-v2` (ADR 0013). */
+  rules: RuleSet['id'];
+  /** «Подкидывать» (docs/08-rules.md, п. 4.3). У сервера до очереди поля нет — тогда «кто успел». */
+  order?: ThrowOrder;
   host: number;
   /** Уровень ботов на свободные места; `null` — не сажать. */
   bots: Level | null;
@@ -136,6 +139,8 @@ export interface CodeInfo {
   host: string;
   variant: Variant;
   seats: number;
+  /** «Подкидывать»; у сервера до очереди поля нет — «кто успел». */
+  order?: ThrowOrder;
   taken: number;
   status: TableStatus;
   commit: string;

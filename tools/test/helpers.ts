@@ -1,5 +1,5 @@
 // Позиции для золотых тестов: руки и колода записью людей (`'6♠ 7♠'`).
-import { cards, limitOf, parseCard, RULES_V1 } from '../../src/engine';
+import { cards, limitOf, parseCard, RULES } from '../../src/engine';
 import type { RuleSet, State, Variant } from '../../src/engine';
 
 export interface Pos {
@@ -17,7 +17,7 @@ export interface Pos {
 }
 
 export function pos(p: Pos): State {
-  const rules = { ...RULES_V1, ...p.rules };
+  const rules = { ...RULES, ...p.rules };
   const hands = p.hands.map(cards);
   const seats = hands.length;
   const attacker = p.attacker ?? 0;

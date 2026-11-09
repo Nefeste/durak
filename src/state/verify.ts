@@ -2,8 +2,8 @@
 // пересобирает колоду из раскрытого зерна сервера и зёрен мест, сверяет отпечаток, который записал
 // ДО того, как отдал своё зерно, своё зерно на своём месте и каждое наблюдение, которое видел за
 // партию, с позицией, переигранной из записи. Чистая функция — без React и сети.
-import { apply, commitOf, newGame, observe, RULES_V1, serverDeck } from '../engine';
-import type { Observation, State, Variant } from '../engine';
+import { apply, commitOf, newGame, observe, rulesWith, serverDeck } from '../engine';
+import type { Observation, State, ThrowOrder, Variant } from '../engine';
 import type { ProofView } from './protocol';
 
 export interface DeckCheck {
@@ -14,14 +14,15 @@ export interface DeckCheck {
   why: null | 'commit' | 'seed' | 'deck' | 'replay' | 'view';
 }
 
-export function verifyGame(p: ProofView, my: { seat: number; seed: string; commit: string; variant: Variant; seats: number }, seen: Observation[]): DeckCheck {
+/** `my.order` — «Подкидывать» стола (у сервера до очереди его нет — «кто успел», `durak-rules-v1`). */
+export function verifyGame(p: ProofView, my: { seat: number; seed: string; commit: string; variant: Variant; seats: number; order?: ThrowOrder }, seen: Observation[]): DeckCheck {
   if (p.commit !== my.commit || commitOf(p.seed) !== my.commit) return { ok: false, cards: 0, why: 'commit' };
   if (p.seeds[my.seat] !== my.seed) return { ok: false, cards: 0, why: 'seed' };
   const deck = serverDeck(p.seed, p.seeds);
   if (deck.join() !== p.deck.join()) return { ok: false, cards: 0, why: 'deck' };
   const states: State[] = [];
   try {
-    let s = newGame({ rules: RULES_V1, variant: my.variant, seats: my.seats, first: p.first }, deck);
+    let s = newGame({ rules: rulesWith(my.order ?? 'free'), variant: my.variant, seats: my.seats, first: p.first }, deck);
     states.push(s);
     for (const a of p.actions) states.push(s = apply(s, a.seat, a.action));
   } catch {
