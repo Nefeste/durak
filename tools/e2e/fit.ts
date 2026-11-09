@@ -27,6 +27,19 @@ export type Misfit = { text: string; why: string };
  *  не доходит, поэтому — список по testID). */
 export const FONT_CAPS: Record<string, number> = { 'game-title': 1.15, 'online-title': 1.15 };
 
+/** Ждёт, пока раскладка перестанет меняться: высоты всех прокручиваемых областей одинаковы два замера подряд через 500 мс. */
+async function settle(page: Page, limit = 6000) {
+  const sig = () => page.evaluate(() => [...document.querySelectorAll<HTMLElement>('*')]
+    .filter(e => e.scrollHeight > e.clientHeight + 1).map(e => e.scrollHeight).join(','));
+  let last = await sig();
+  for (let t = 0; t < limit; t += 500) {
+    await page.waitForTimeout(500);
+    const now = await sig();
+    if (now === last) return;
+    last = now;
+  }
+}
+
 /** Все обрезанные надписи на странице при шрифте ×`scale`: шрифт каждой надписи растёт на месте, раскладка, которая
  *  меряет себя сама (`onLayout`), успевает подстроиться, потом проверка, и шрифт возвращается. */
 export async function misfits(page: Page, scale: number): Promise<Misfit[]> {
@@ -43,8 +56,11 @@ export async function misfits(page: Page, scale: number): Promise<Misfit[]> {
         if (lh !== 'normal') e.style.lineHeight = `${parseFloat(lh) * kk}px`;
       });
     }, [scale, FONT_CAPS] as [number, Record<string, number>]);
-    // подписи картинок «Правил» меряют себя через onLayout: на тяжёлом экране под нагрузкой 400 мс не хватало
+    // подписи картинок «Правил» меряют себя через onLayout: на тяжёлом экране под нагрузкой (другие прогоны в том же
+    // контейнере) и секунды не хватало. Ждём, пока раскладка успокоится: высоты прокрутки не меняются полсекунды
+    // (не дольше 6 с) — проверка та же, только не раньше, чем экран дорисован
     await page.waitForTimeout(1000);
+    await settle(page);
   }
   const out = await page.evaluate(() => {
     const texts = [...document.querySelectorAll<HTMLElement>('[dir="auto"]')].filter(e => e.tagName !== 'INPUT' && e.tagName !== 'TEXTAREA');
@@ -344,7 +360,8 @@ async function online(browser: Browser, url: string, phone: { width: number; hei
   }
   await check(a, phone, 'онлайн: с друзьями');
   await a.getByTestId('f-seats-4').click();
-  await a.getByTestId('f-bots-beginner').click().catch(() => {});
+  // самое длинное название уровня — «Начинающий»: с «Среднего» два шага «‹»
+  for (let i = 0; i < 2; i++) await a.getByTestId('f-level-prev').click().catch(() => {});
   await check(a, phone, 'онлайн: с друзьями, вчетвером');
   await a.getByTestId('create').click();
   await a.getByTestId('lobby').waitFor({ timeout: 10_000 });
