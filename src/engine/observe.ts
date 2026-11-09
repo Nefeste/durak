@@ -1,6 +1,8 @@
 // Наблюдение места — граница между правдой и игроком (docs/02-architecture.md, ADR 0005, 0008).
 // Единственный вход для ботов, подсказки, экрана партии и вида места на сервере.
 import type { Card } from './cards';
+import { copyResult } from './deal';
+import { orderOf } from './types';
 import type { Phase, Result, RuleSet, State, Variant } from './types';
 
 export interface Observation {
@@ -27,6 +29,9 @@ export interface Observation {
   boutLimit: number;
   bout: number;
   out: number[];
+  /** Сдавшиеся (п. 8); поля нет, пока никто не сдался, — так наблюдение то же, что у версий игры до сдачи. Их карт
+   *  в наблюдении нет. */
+  resigned?: number[];
   phase: Phase;
   result: Result | null;
 }
@@ -51,8 +56,9 @@ export function observe(s: State, seat: number): Observation {
     boutLimit: s.boutLimit,
     bout: s.bout,
     out: [...s.out],
+    ...(s.resigned.length ? { resigned: [...s.resigned] } : {}),
     phase: s.phase,
-    result: s.result ? { ...s.result, order: [...s.result.order] } : null,
+    result: s.result ? copyResult(s.result) : null,
   };
 }
 
@@ -68,7 +74,18 @@ export function stateFrom(o: Observation, hidden: Card[][], talon: Card[]): Stat
     table: o.table.map(([a, d]) => [a, d] as [Card, Card | null]),
     discard: [...o.discard], openly: o.openly.map(x => [...x]),
     starter: o.starter, attacker: o.attacker, defender: o.defender, passed: [...o.passed],
-    boutLimit: o.boutLimit, bout: o.bout, out: [...o.out], phase: o.phase,
-    result: o.result ? { ...o.result, order: [...o.result.order] } : null,
+    boutLimit: o.boutLimit, bout: o.bout, out: [...o.out], resigned: [...(o.resigned ?? [])], buried: [], phase: o.phase,
+    result: o.result ? copyResult(o.result) : null,
   };
+}
+
+/** Чья очередь подкидывать по наблюдению (как `throwerOf` позиции): для плашек и строки подсказки. */
+export function throwerSeen(o: Observation): number {
+  if (orderOf(o.rules) !== 'queue' || o.phase === 'end' || o.table.length === 0) return -1;
+  for (let k = 0; k < o.seats; k++) {
+    const seat = (o.attacker + k) % o.seats;
+    if (seat === o.defender || o.out.includes(seat) || (o.resigned ?? []).includes(seat) || o.handSizes[seat] === 0) continue;
+    if (!o.passed[seat]) return seat;
+  }
+  return -1;
 }

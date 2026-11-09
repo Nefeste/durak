@@ -386,6 +386,7 @@ try {
   await page.waitForTimeout(300);
   const handBefore = await handCount(page);
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
   await page.waitForTimeout(300);
   ok(await visible(page, 'resume'), 'в меню — «Продолжить партию»');
@@ -399,6 +400,7 @@ try {
   ok(await handCount(page) === handBefore, `партия продолжилась с той же рукой: ${handBefore}`, await handCount(page));
   // отмена: боты с обычной паузой (0,5–0,9 с) — успеваем отменить свой ход до их ответа
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.goto(web.url);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   await page.waitForTimeout(400);
@@ -457,6 +459,8 @@ try {
   await page.waitForTimeout(300);
   ok(await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null) === 'true', 'выбор «Меньше движения» пережил перезагрузку',
     await page.getByTestId('motion-on').getAttribute('aria-selected').catch(() => null));
+  // «Подкидывать» (п. 4.3, #57): по умолчанию — по очереди; стол втроём ниже играет по очереди до итога
+  ok(await page.getByTestId('throw-queue').getAttribute('aria-selected').catch(() => null) === 'true', 'настройка «Подкидывать»: по умолчанию «По очереди»');
   await page.getByTestId('settings-back').click();
 
   console.log('Переводной, два бота, четырёхцветная колода, без полёта');
@@ -505,6 +509,7 @@ try {
   await page.waitForTimeout(800);
   ok(!(await visible(page, 'transfer-ok')), 'второй переводной стол — без окна о переводе');
   await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   // в браузере реклама — подделка (src/money/adsSdk.web.ts): после двух коротких первых партий её нет
@@ -671,6 +676,33 @@ try {
   await page.waitForTimeout(500);
   ok(!(await visible(page, 'resume')), 'партия прошлой версии стёрта молча: «Продолжить» нет');
   ok(await page.evaluate(() => localStorage.getItem('durak.current')) === null, 'запись прошлой версии удалена из хранилища');
+
+  console.log('«Сдаться» втроём (docs/08-rules.md, п. 8; #58)');
+  await page.getByTestId('bots-2').click();
+  await page.getByTestId('play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(400);
+  await page.getByTestId('game-menu').click();
+  ok(await visible(page, 'resign') && await visible(page, 'game-exit'), '«В меню» — окно партии: «В меню» и «Сдаться»');
+  await page.getByTestId('resign').click();
+  ok(await visible(page, 'resign-ok'), '«Сдаться» спрашивает своим окном');
+  const asked = await handCount(page);
+  await page.waitForTimeout(500);
+  ok(await handCount(page) === asked, 'пока окно открыто, боты ждут');
+  await page.screenshot({ path: `${OUT}/11-resign-ask.png` });
+  await page.getByTestId('dialog-cancel').click();
+  ok(!(await visible(page, 'resign-ok')) && !(await visible(page, 'result')), '«Играть дальше» — партия идёт');
+  await page.getByTestId('game-menu').click();
+  await page.getByTestId('resign').click();
+  await page.getByTestId('resign-ok').click();
+  await page.getByTestId('result').waitFor({ timeout: 10000 }).catch(() => {});
+  const gaveUp = await page.getByTestId('result').innerText().catch(() => '');
+  ok(/Вы сдались — остались с картами/.test(gaveUp), `сдались — итог сразу, боты доиграли без вас: ${gaveUp.split('\n')[0]}`);
+  const lastPlace = await page.getByTestId('place-3').innerText().catch(() => '');
+  ok(/вы/.test(lastPlace) && /с картами/.test(lastPlace), `в ряду мест вы — последним, «с картами»: ${lastPlace.replace(/\n/g, ' ')}`);
+  await page.screenshot({ path: `${OUT}/12-resign-result.png` });
+  await page.getByTestId('result-menu').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   console.log('«Опытный» и подсказка');
   await page.getByTestId('variant-podkidnoy').click();

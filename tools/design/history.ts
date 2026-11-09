@@ -4,7 +4,7 @@
 // раскладов, чтобы быстро). Детерминированно по `seed`.
 //
 //   bun tools/design/history.ts [партий] [now, мс] > history.json
-import { dealOf, firstOf, observe, RULES_V1 } from '../../src/engine';
+import { dealOf, firstOf, observe, RULES } from '../../src/engine';
 import type { GameRecord, Variant } from '../../src/engine';
 import { chooseAction, LEVELS, makeRng, reviewThink, RULE_LEVELS, thinkSync } from '../../src/bot';
 import type { Level } from '../../src/bot';
@@ -33,7 +33,7 @@ export function fakeHistory(count: number, now: number, seed = 7, reviews = 6): 
     const p = playGame(deck, seats, f.seat, variant, (s, seat) => chooseAction(observe(s, seat), lv(seat), rng));
     const end = now - (count - 1 - i) * ((27 * DAY) / count) - 3600_000;
     const record: GameRecord = {
-      v: 1, rules: RULES_V1, variant, seats, first: f.seat, firstWhy: f.why, deck,
+      v: 1, rules: RULES, variant, seats, first: f.seat, firstWhy: f.why, deck,
       actions: p.actions.map((x, k) => ({ ...x, at: end - 300_000 + k * 1000 })), result: p.final.result,
     };
     const review = i >= count - reviews ? thinkSync(reviewThink(movesOf(record, 0), 0, 16, 2000)) : null;

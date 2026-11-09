@@ -3,7 +3,7 @@
 // 0023, правило 6; по образцу Nefeste/shelter src/state/settings.ts). Читает и пишет — src/state/store.ts.
 import { levelOf } from '../bot';
 import type { Level } from '../bot';
-import type { Variant } from '../engine';
+import type { ThrowOrder, Variant } from '../engine';
 
 export type BotSpeed = 'normal' | 'fast';
 export type HandOrder = 'suit' | 'rank';
@@ -15,6 +15,9 @@ export interface Settings {
   lessMotion?: boolean;
   botSpeed: BotSpeed;
   handOrder: HandOrder;
+  /** «Подкидывать» (docs/08-rules.md, п. 4.3; решение владельца #57): по очереди — по умолчанию, или кто успел.
+   *  Для новых партий с ботами и новых столов с друзьями; пишется в каждую партию (`rules.order`, ADR 0013). */
+  throwOrder: ThrowOrder;
   /** Четырёхцветная колода: ♠ чёрные, ♣ зелёные, ♥ красные, ♦ синие. */
   fourColor: boolean;
   /** «Помощь памяти (для учёбы)»: взятые в открытую карты соперников лицом и таблица вышедших —
@@ -43,7 +46,7 @@ export function botLevels(c: Choice): Level[] {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', fourColor: false, memoryAid: false, personalAds: true,
+  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', throwOrder: 'queue', fourColor: false, memoryAid: false, personalAds: true,
   newbie: true, transferTold: false, choice: { variant: 'podkidnoy', bots: 1, level: 'beginner', mixed: false, levels: ['beginner', 'beginner', 'beginner'] },
 };
 
@@ -74,6 +77,8 @@ export function parseSettings(raw: string | null): Settings {
     vibration: flag(v.vibration, d.vibration),
     botSpeed: pick(v.botSpeed, ['normal', 'fast'] as const, d.botSpeed),
     handOrder: pick(v.handOrder, ['suit', 'rank'] as const, d.handOrder),
+    // до очереди атакующих (после 0.9.0) настройки не было — по очереди, как теперь по умолчанию
+    throwOrder: pick(v.throwOrder, ['queue', 'free'] as const, d.throwOrder),
     fourColor: flag(v.fourColor, d.fourColor),
     // до 0.5.1 настройка звалась `seenCards` и включала только таблицу
     memoryAid: flag(v.memoryAid ?? v.seenCards, d.memoryAid),

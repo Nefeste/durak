@@ -53,7 +53,10 @@ export function nextFirst(previous: (Result | null)[], seats: number): number | 
 }
 
 /** Есть ли у места карты и не вышло ли оно. */
-export const active = (s: State, seat: number): boolean => !s.out.includes(seat) && s.hands[seat].length > 0;
+export const active = (s: State, seat: number): boolean => !s.out.includes(seat) && !s.resigned.includes(seat) && s.hands[seat].length > 0;
+
+/** В партии ли место: не вышло и не сдалось (карт может не быть, пока колода не пуста). */
+export const inPlay = (s: Pick<State, 'out' | 'resigned'>, seat: number): boolean => !s.out.includes(seat) && !s.resigned.includes(seat);
 
 /** Следующее по часовой стрелке место с картами, не считая `from`. */
 export function nextActive(s: State, from: number): number {
@@ -79,11 +82,13 @@ export function newGame(setup: Setup, deck: Card[]): State {
     table: [], discard: [], openly: Array.from({ length: seats }, () => []),
     starter: first, attacker: first, defender: (first + 1) % seats,
     passed: Array.from({ length: seats }, () => false),
-    boutLimit: 0, bout: 0, out: [], phase: 'bout', result: null,
+    boutLimit: 0, bout: 0, out: [], resigned: [], buried: [], phase: 'bout', result: null,
   };
   s.boutLimit = limitOf(rules, 0, s.hands[s.defender].length);
   return s;
 }
+
+export const copyResult = (r: Result): Result => (r.resigned ? { ...r, order: [...r.order], resigned: [...r.resigned] } : { ...r, order: [...r.order] });
 
 /** Глубокая копия позиции (движок не меняет переданную). */
 export function cloneState(s: State): State {
@@ -96,11 +101,13 @@ export function cloneState(s: State): State {
     openly: s.openly.map(o => [...o]),
     passed: [...s.passed],
     out: [...s.out],
-    result: s.result ? { ...s.result, order: [...s.result.order] } : null,
+    resigned: [...s.resigned],
+    buried: [...s.buried],
+    result: s.result ? copyResult(s.result) : null,
   };
 }
 
 /** Все карты позиции — для проверки, что ни одна не пропала и не появилась. */
 export function allCards(s: State): Card[] {
-  return [...s.hands.flat(), ...s.talon, ...s.table.flatMap(([a, d]) => (d === null ? [a] : [a, d])), ...s.discard];
+  return [...s.hands.flat(), ...s.talon, ...s.table.flatMap(([a, d]) => (d === null ? [a] : [a, d])), ...s.discard, ...s.buried];
 }

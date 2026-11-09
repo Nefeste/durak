@@ -1,7 +1,7 @@
 // Чистая логика стола для экрана: что можно сделать выбранной картой и кто из ботов ходит
 // (docs/02-architecture.md, «Как ходят действия»). Без React — проверяется тестами.
-import { deckFrom, dealOf, firstOf, legalActions, newGame, nextFirst, RULES_V1 } from '../engine';
-import type { Action, Card, Result, State, Variant } from '../engine';
+import { deckFrom, dealOf, firstOf, legalActions, newGame, nextFirst, rulesWith } from '../engine';
+import type { Action, Card, Result, State, ThrowOrder, Variant } from '../engine';
 import type { Level } from '../bot';
 
 export const YOU = 0;
@@ -10,7 +10,7 @@ export const YOU = 0;
 export function actionsWith(s: State, seat: number, c: Card): Action[] {
   return legalActions(s, seat).filter(a => {
     if (a.type === 'beat') return a.card === c;
-    if (a.type === 'take' || a.type === 'pass') return false;
+    if (a.type === 'take' || a.type === 'pass' || a.type === 'resign') return false;
     return a.cards.length === 1 && a.cards[0] === c;
   });
 }
@@ -45,9 +45,9 @@ export function botTurn(s: State, levels: readonly Level[]): { seat: number; lev
 }
 
 /** Новая партия против ботов: колода из 32 случайных байт (с ботами — без отпечатка, ADR 0004). */
-export function startGame(bytes: Uint8Array, seats: number, variant: Variant, history: (Result | null)[]): State {
+export function startGame(bytes: Uint8Array, seats: number, variant: Variant, history: (Result | null)[], order: ThrowOrder = 'queue'): State {
   const deck = deckFrom(bytes);
   const { hands, trump } = dealOf(deck, seats);
   const first = nextFirst(history, seats) ?? firstOf(hands, trump).seat;
-  return newGame({ rules: RULES_V1, variant, seats, first }, deck);
+  return newGame({ rules: rulesWith(order), variant, seats, first }, deck);
 }

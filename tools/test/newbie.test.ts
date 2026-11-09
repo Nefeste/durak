@@ -39,7 +39,9 @@ describe('подсказки новичка', () => {
   test('втроём не ходящий атакующий — «Пас»', () => {
     const t = pos({ hands: ['7♣ 8♦ 6♥', '7♠ 9♠ К♦', 'В♠ В♦ Д♦'], trump: 'Т♥', bout: 0, attacker: 1, defender: 2, talon: '6♦' });
     const a = apply(apply(t, 1, { type: 'attack', cards: [c('7♠')] }), 2, { type: 'beat', card: c('В♠'), on: c('7♠') });
-    expect(newbieTip(a, YOU)).toBe('throw');
+    // по очереди: сначала право у ходящего — строка обычная, пока он не скажет «пас»
+    expect(newbieTip(a, YOU)).toBeNull();
+    expect(newbieTip(apply(a, 1, { type: 'pass' }), YOU)).toBe('throw');
   });
   test('переводной: можно перевести — «бейте, переводите или „Беру“»', () => {
     const s = apply(two(1, 1, 'perevodnoy'), 1, { type: 'attack', cards: [c('9♠')] });
