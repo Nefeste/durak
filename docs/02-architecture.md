@@ -243,7 +243,10 @@ SDK из зависимостей убран, чтобы APK не нёс его 
   `src/game/PuzzleScreen.tsx`, набор `src/game/puzzleSet.ts` — генерирует `tools/puzzles/collect.ts`; попытки —
   `src/state/puzzles.ts`.
 - Статистика — чистая `src/state/stats.ts` (`computeStats`, козыри `trumpsDealt`, Эло тренировок) и
-  `src/screens/StatsScreen.tsx`.
+  `src/screens/StatsScreen.tsx`. С 09.11.2026 (решение владельца — подробно и инфографикой): одно переигрывание
+  записи (`replayed`) → `GameFacts` партии → `Stats`; графики — `react-native-svg`, как у «Нард», в
+  `src/ui/charts/` (`Segmented`, `FormStrip`, `Sparkline`, `Ladder`, `Diverging`, `Legend`, `Well`, чистая
+  `geometry.ts`), цвета — `CHART` в `src/ui/theme.ts`; проверки — `tools/test/charts.test.ts`.
 - «Про» в продаже: `PRO_ON_SALE = true`; права читают только `StoreScreen`, `StatsScreen` и `ReviewScreen` (тест).
 
 
