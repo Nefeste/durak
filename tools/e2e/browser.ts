@@ -317,6 +317,81 @@ try {
     await ctx.close();
   }
 
+  console.log('Живой стол: реплики, «думает…», значки, порядок руки (игра владельца 09.11.2026)');
+  {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
+    const ph = await ctx.newPage();
+    ph.on('pageerror', e => errors.push(String(e)));
+    // какие реплики появлялись: место и текст
+    await ph.addInitScript(() => {
+      const w = globalThis as unknown as { __said: string[] };
+      w.__said = [];
+      new MutationObserver(() => {
+        for (const el of document.querySelectorAll('[data-testid^="say-"], [data-testid^="thinks-"]')) {
+          const k = `${el.getAttribute('data-testid')}:${el.textContent}`;
+          if (w.__said[w.__said.length - 1] !== k && !w.__said.slice(-4).includes(k)) w.__said.push(k);
+        }
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+    await ph.goto(`${web.url}?seed=11`); // без ?fast: бот думает как на телефоне — видно «думает…»
+    await ph.getByTestId('menu').waitFor({ timeout: 20000 });
+    await ph.getByTestId('play').click();
+    await ph.getByTestId('game').waitFor({ timeout: 10000 });
+    for (let i = 0; i < 50 && !(await visible(ph, 'advise')); i++) await ph.waitForTimeout(100);
+    await ph.waitForTimeout(1600);
+    // значок роли вместо слова: вдвоём бот всегда ходит или отбивается
+    const icon = await ph.locator('[data-testid^="opp-1-role-"]').count();
+    ok(icon === 1, 'на плашке бота — значок роли (стрелка или щит)', icon);
+    ok(!/ходит|отбивается/.test(await ph.getByTestId('opp-1').innerText()), 'слова «ходит» и «отбивается» на плашке не пишутся');
+    const label = await ph.locator('[data-testid^="opp-1-role-"]').getAttribute('aria-label').catch(() => null);
+    ok(label === 'ходит' || label === 'отбивается', `у значка — слово для чтения с экрана: «${label}»`, label);
+    // кнопка порядка руки: касание меняет порядок карт, второе — возвращает
+    const order = async () => {
+      const ids = await ph.locator('[data-testid^="hand-"]').evaluateAll(els => els.map(e => [e.getAttribute('data-testid'), e.getBoundingClientRect().x] as [string, number]));
+      return ids.sort((a, b) => a[1] - b[1]).map(x => x[0]).join(' ');
+    };
+    const sortBox = await ph.getByTestId('hand-order').boundingBox();
+    ok(!!sortBox && sortBox.width >= 40 && sortBox.height >= 40, `кнопка порядка руки у руки: ${sortBox ? `${Math.round(sortBox.width)}×${Math.round(sortBox.height)}` : 'нет'}`, JSON.stringify(sortBox));
+    const o1 = await order();
+    await ph.getByTestId('hand-order').click();
+    await ph.waitForTimeout(400);
+    const o2 = await order();
+    ok(o1 !== o2 && o1.split(' ').sort().join() === o2.split(' ').sort().join(), 'касание кнопки — рука в другом порядке, карты те же', `${o1} | ${o2}`);
+    await ph.screenshot({ path: `${OUT}/02-hand-order.png` });
+    await ph.getByTestId('hand-order').click();
+    await ph.waitForTimeout(400);
+    ok(await order() === o1, 'второе касание — прежний порядок');
+    // играем: свои карты касанием, «бито» и «беру» кнопками; реплики бота и «думает…»
+    for (let i = 0; i < 40; i++) {
+      const said = await ph.evaluate(() => (globalThis as unknown as { __said: string[] }).__said);
+      if (said.some(x => /^say-1:(Беру|Бито|Пас)/.test(x)) && said.some(x => x.startsWith('thinks-1')) && said.some(x => x.startsWith('say-0'))) break;
+      if (await visible(ph, 'result')) break;
+      const cards = ph.locator('[data-testid^="hand-"]');
+      const n = await cards.count();
+      let moved = false;
+      for (let k = 0; k < n && !moved; k++) {
+        if (await visible(ph, 'held')) break;
+        await cards.nth(k).click({ timeout: 1000, force: true }).catch(() => {});
+        await ph.waitForTimeout(30);
+        if (/Какую карту бить|Коснитесь карты/.test(await ph.getByTestId('hint').innerText().catch(() => ''))) {
+          await ph.getByTestId('table').locator('[data-testid^="table-"]').first().click({ force: true }).catch(() => {});
+        }
+        moved = (await handCount(ph).catch(() => n)) < n;
+      }
+      if (!moved) {
+        if (await visible(ph, 'pass')) await ph.getByTestId('pass').click().catch(() => {});
+        else if (await visible(ph, 'take')) await ph.getByTestId('take').click().catch(() => {});
+      }
+      if (i === 3) await ph.screenshot({ path: `${OUT}/02-live.png` });
+      await ph.waitForTimeout(400);
+    }
+    const said = await ph.evaluate(() => (globalThis as unknown as { __said: string[] }).__said);
+    ok(said.some(x => /^say-1:(Беру|Бито|Пас|Подкидываю|Перевожу)$/.test(x)), `реплика бота над его веером: ${said.filter(x => x.startsWith('say-1')).slice(0, 4).join(', ')}`, said.join(' | '));
+    ok(said.some(x => x === 'thinks-1:думает…'), '«думает…» у бота, пока он решает', said.join(' | '));
+    ok(said.some(x => /^say-0:/.test(x)), `своя реплика над рукой: ${said.filter(x => x.startsWith('say-0')).slice(0, 3).join(', ')}`, said.join(' | '));
+    await ctx.close();
+  }
+
   console.log('Подкидной, один бот');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });

@@ -15,7 +15,7 @@ import { layoutTable, PLATE, plateOf, plateHeight } from '../render/layout';
 import type { Layout, Sprite } from '../render/layout';
 import { useSettings } from '../state/store';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
-import { plateLines, SeatPlate } from './SeatPlate';
+import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { reviewLayout } from './review';
 import type { MarkKind, ReviewMarks } from './review';
 
@@ -51,9 +51,9 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
   };
   const layout = useMemo(() => (size
-    ? reviewLayout(layoutTable(o, { ...size, order: settings.handOrder, picked: null, targets: [], showOpenly: settings.memoryAid, plate: plateH }),
+    ? reviewLayout(layoutTable(o, { ...size, order: settings.handOrder, picked: null, targets: [], showOpenly: settings.memoryAid, straight: settings.straightHand, plate: plateH }),
       marks.hand.filter(m => m.kinds.includes('best')).map(m => m.card), marks.hand.map(m => m.card))
-    : null), [o, marks, size, settings.handOrder, settings.memoryAid, plateH]);
+    : null), [o, marks, size, settings.handOrder, settings.memoryAid, settings.straightHand, plateH]);
 
   const sprite = (c: Card) => layout?.sprites.find(s => s.key === `c${c}`);
   // подписи над картами руки: по одной на ход, над серединой его карт и выше всех отмеченных карт (приподнятая
@@ -84,7 +84,7 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
       {layout ? others.map(p => (
         <SeatPlate key={p.seat} testID={`review-opp-${p.seat}`} name={T.game.bot(p.seat)}
           lines={[o.out.includes(p.seat) ? T.game.out : T.game.cards(o.handSizes[p.seat])]}
-          role={o.phase === 'end' ? null : o.attacker === p.seat ? T.game.attacking : o.defender === p.seat ? T.game.defending : throwerSeen(o) === p.seat ? T.game.throwing : null}
+          role={roleOf(o, p.seat, throwerSeen(o))}
           active={o.phase !== 'end' && (o.attacker === p.seat || o.defender === p.seat || throwerSeen(o) === p.seat)}
           left={p.x - oppW / 2} width={oppW} top={layout.plate.top} height={layout.plate.height} />
       )) : null}

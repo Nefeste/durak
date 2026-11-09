@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test';
 import { apply, deckFrom, dealOf, firstOf, legalActions, newGame, observe, replay, RULES_V1 } from '../../src/engine';
 import type { Card, GameRecord, State } from '../../src/engine';
 import { chooseAction, makeRng } from '../../src/bot';
-import { handCardAt, inTable, layoutTable, noOrigins, originsOf, sortHand, tableCardAt } from '../../src/render/layout';
+import { handCardAt, inTable, jitterOf, layoutTable, noOrigins, ORDER_BUTTON, originsOf, sortHand, tableCardAt } from '../../src/render/layout';
 import { autoPass, canUndo, seenGrid } from '../../src/game/flow';
 import { noteOf } from '../../src/game/note';
 import { dragPoint, dragStart } from '../../src/render/drag';
@@ -132,6 +132,28 @@ describe('раскладка стола', () => {
     const hand = cs('Т♠ 6♥ 7♠ 6♦ К♥');
     expect(sortHand(hand, 3, 'suit')).toEqual(cs('7♠ Т♠ 6♦ 6♥ К♥'));
     expect(sortHand(hand, 3, 'rank')).toEqual(cs('6♦ 7♠ Т♠ 6♥ К♥'));
+  });
+  test('рука вразброс — по номеру карты, всегда одинаково; «Ровная рука» — по линейке; кнопка порядка не на картах', () => {
+    const s = pos({ hands: ['6♠ 7♠ 8♠ 9♠ 10♠ В♠', '6♥ 7♥ 8♥ 9♥ 10♥ В♥'], trump: 'Т♦', talon: '6♦ 7♦' });
+    const o = observe(s, 0);
+    const mine = (l: ReturnType<typeof layoutTable>) => l.sprites.filter(x => x.card !== null && o.hand.includes(x.card));
+    const a = mine(layoutTable(o, opt)), b = mine(layoutTable(o, opt));
+    expect(a).toEqual(b);
+    const flat = mine(layoutTable(o, { ...opt, straight: true }));
+    for (let k = 0; k < 36; k++) {
+      const j = jitterOf(k);
+      expect(jitterOf(k)).toEqual(j);
+      expect(Math.abs(j.rot)).toBeLessThanOrEqual(1.5);
+      expect(Math.abs(j.dx)).toBeLessThanOrEqual(2);
+      expect(Math.abs(j.dy)).toBeLessThanOrEqual(2);
+    }
+    expect(a.some((x, i) => x.rot !== flat[i].rot)).toBe(true);
+    flat.forEach((x, i) => { const j = jitterOf(x.card!); expect(a[i].x - x.x).toBeCloseTo(j.dx); expect(a[i].rot - x.rot).toBeCloseTo(j.rot); });
+    for (const width of [360, 412]) {
+      const l = layoutTable({ ...o, hand: Array.from({ length: 18 }, (_, k) => k) }, { ...opt, width, orderButton: true });
+      const left = Math.min(...l.sprites.filter(x => x.y > l.handTop).map(x => x.x - l.cw / 2 - 2));
+      expect(l.orderButton!.x + ORDER_BUTTON / 2).toBeLessThanOrEqual(left);
+    }
   });
   test('касание и бросок: карта руки под пальцем, карта атаки, стол', () => {
     const s = pos({ hands: ['6♠ 7♠ 8♠ 9♠ 10♠ В♠', '6♥ 7♥ 8♥ 9♥ 10♥ В♥'], trump: 'Т♦', talon: '6♦ 7♦', attacker: 1, defender: 0 });
