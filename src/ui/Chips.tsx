@@ -11,7 +11,8 @@ export function Chips<V extends string | number>({ items, value, label, onChange
     <View style={styles.chips}>
       {items.map(v => (
         <Pressable key={String(v)} testID={`${id}-${v}`} accessibilityRole="button" accessibilityState={{ selected: v === value }} aria-selected={v === value}
-          onPress={() => onChange(v)} style={({ pressed }) => [styles.chip, v === value && styles.chipOn, pressed && styles.pressed]}>
+          // зона касания 48 при высоте 40: поле в 4 точки во все стороны, соседи в ряду и рядах — через 8 (аудит 09.11.2026)
+          onPress={() => onChange(v)} hitSlop={4} style={({ pressed }) => [styles.chip, v === value && styles.chipOn, pressed && styles.pressed]}>
           <Text style={[styles.chipText, v === value && styles.chipTextOn]}>{label(v)}</Text>
         </Pressable>
       ))}
