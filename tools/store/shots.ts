@@ -65,7 +65,8 @@ const tableCards = (p: Page) => p.getByTestId('table').locator('[data-testid^="t
 async function shotTable(p: Page, name: string) {
   for (let i = 0; i < 20; i++) {
     if (!(await until(p, async () => (await tableCards(p)) >= 2))) break;
-    await p.waitForTimeout(250);
+    // реплика («Беру», «Бито») на миг встаёт на место подсказки и гаснет 200 мс — снимаем, когда она ушла
+    await p.waitForTimeout(1300);
     if ((await tableCards(p)) >= 2) {
       await p.screenshot({ path: join(SHOTS, `${name}.png`) });
       console.log(`  ${name}.png`);
@@ -188,7 +189,9 @@ try {
   await p.getByTestId('seen').click();
   await shot(p, '05-seen');
   await p.getByTestId('seen-close').click();
+  // партия ещё идёт — «В меню» открывает окно партии; кончилась — уходит сразу
   await p.getByTestId('game-menu').click();
+  if (await p.getByTestId('game-exit').waitFor({ timeout: 1500 }).then(() => true, () => false)) await p.getByTestId('game-exit').click();
   await p.getByTestId('menu').waitFor({ timeout: 5000 });
 
   // 6. главный экран

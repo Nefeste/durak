@@ -1,6 +1,6 @@
 /**
  * Проход по виду (specs/2026-11-art-premium.md §7): весь путь игрока в браузере — меню → правила → партия с ботом
- * до итога → итог → разбор → настройки → статистика → магазин → «С друзьями» → переводной вчетвером (стол в игре,
+ * до итога → итог → разбор → настройки → «Рубашки» → статистика → магазин → «С друзьями» → переводной вчетвером (стол в игре,
  * подсказка) → задача дня; телефон 412 × 915, плотность 2. Снимок каждого экрана — в папку; ошибки консоли и
  * страницы собираются и печатаются в конце — их должно быть ноль (код выхода 1, если нет). Снимки «до — после»
  * для листа стиля и отчёта о проходах (docs/reports/2026-11-09-art-passes.md).
@@ -63,8 +63,10 @@ async function midGame(p: Page, name: string) {
   for (let i = 0; i < 100 && !(await visible(p, 'result')); i++) {
     const pairs = await p.getByTestId('table').locator('[data-testid^="table-"]').count();
     // пары считаются по картам атаки; покрытая есть, когда подсказка — про подкидывание или «бито», а не про отбой
-    const covered = /Подкиньте|Подкидывать|«Пас»|Бито/.test(await p.getByTestId('hint').innerText().catch(() => ''));
-    if (pairs >= 2 && covered && await hand(p).count() >= 5) { await shot(p, name, 900); return; }
+    const covered = /Подкиньте|Подкидывать|«Пас»|пас|Бито/i.test(await p.getByTestId('hint').innerText().catch(() => ''));
+    // с подсказкой про подкидывание — лучший кадр; после 30 шагов хватит и двух пар с четырьмя картами в руке
+    const cards = await hand(p).count();
+    if (pairs >= 2 && ((covered && cards >= 5) || (i >= 30 && cards >= 4))) { await shot(p, name, 900); return; }
     await step(p);
     await p.waitForTimeout(120);
   }
@@ -123,6 +125,17 @@ try {
   await page.getByTestId('settings-open').click();
   await page.getByTestId('settings').waitFor({ timeout: 5000 });
   await shot(page, '10-settings');
+  // «Рубашки» (третий круг вида): экран выбора, платная под замком, выбранная бесплатная — и стол в ней ниже
+  await page.getByTestId('backs-open').scrollIntoViewIfNeeded();
+  await page.getByTestId('backs-open').click();
+  await page.getByTestId('backs').waitFor({ timeout: 5000 });
+  await shot(page, '10a-backs', 900);
+  await page.getByTestId('back-frost').click();
+  await shot(page, '10b-backs-paid', 600);
+  await page.getByTestId('back-indigo').click();
+  await shot(page, '10c-backs-chosen', 600);
+  await page.getByTestId('backs-back').click();
+  await page.getByTestId('settings').waitFor({ timeout: 5000 });
   await page.getByTestId('settings-back').click();
   await page.getByTestId('stats-open').click();
   await page.waitForTimeout(600);
@@ -156,8 +169,9 @@ try {
     await page.waitForTimeout(2500);
     await shot(page, '18-hint');
   }
-  await page.getByTestId('game-menu').click();
-  await page.getByTestId('game-exit').click();
+  // партия могла кончиться, пока искали кадр: тогда «В меню» уходит сразу, без окна партии
+  await page.getByTestId(await visible(page, 'result') ? 'result-menu' : 'game-menu').click();
+  if (await page.getByTestId('game-exit').waitFor({ timeout: 1500 }).then(() => true, () => false)) await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
 
   await page.getByTestId('puzzle-open').click().catch(() => {});

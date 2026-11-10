@@ -554,8 +554,8 @@ try {
     for (let k = 0; k < n; k++) {
       await page.locator('[data-testid^="hand-"]').nth(k).click({ force: true }).catch(() => {});
       if (await handCount(page) < n) {
-        if (await visible(page, 'undo')) {
-          await page.getByTestId('undo').click();
+        // бот мог ответить между «кнопка видна» и касанием — тогда кнопки уже нет: не ждём её 30 с, пробуем следующим ходом
+        if (await visible(page, 'undo') && await page.getByTestId('undo').click({ timeout: 1500 }).then(() => true, () => false)) {
           await page.waitForTimeout(100);
           ok(await handCount(page) === n, '«Отменить» вернул карту в руку до ответа бота', await handCount(page));
           undone = true;
@@ -612,7 +612,10 @@ try {
   // перед первым переводным столом — окно «Что такое перевод», один раз; пока оно открыто, боты ждут
   await page.getByTestId('transfer-ok').waitFor({ timeout: 5000 }).catch(() => {});
   ok(await visible(page, 'transfer-ok'), 'первый переводной стол: окно «Что такое перевод»');
+  // холст картинки и стол появляются, когда загрузился шрифт индексов: ждём их, а не считаем сразу
+  await page.getByTestId('transfer-picture').locator('canvas').waitFor({ timeout: 5000 }).catch(() => {});
   ok(await page.getByTestId('transfer-picture').locator('canvas').count() === 1, 'в окне — картинка перевода из карт');
+  for (let i = 0; i < 30 && await handCount(page) === 0; i++) await page.waitForTimeout(100);
   const dealt = await handCount(page);
   await page.waitForTimeout(600);
   ok(await handCount(page) === dealt && await page.getByTestId('table').locator('[data-testid^="table-"]').count() === 0, 'пока окно открыто, боты не ходят');
@@ -894,6 +897,138 @@ try {
   await page.screenshot({ path: `${OUT}/06-advice.png` });
   const third = await playOut(page, 'против «Опытного»');
   ok(third.ended, 'партия с «Опытным» дошла до итога');
+
+  console.log('Рубашки и примерка за рекламу');
+  // примерка — не чаще, чем через 4 минуты после любой рекламы: сценарий играет быстрее, поэтому счётчик времени
+  // последнего показа обнуляется, как если бы игрок вернулся позже; прошлая незаконченная партия не нужна
+  await page.evaluate(() => {
+    const a = JSON.parse(localStorage.getItem('durak.ads') ?? '{}') as { lastShown?: number };
+    a.lastShown = 0;
+    localStorage.setItem('durak.ads', JSON.stringify(a));
+    localStorage.removeItem('durak.current');
+  });
+  await page.goto(`${web.url}?fast=1`);
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  const backAtTable = () => page.evaluate(() => (globalThis as unknown as { __kozyrBack?: string }).__kozyrBack ?? '');
+  const backState = () => page.getByTestId('back-state').innerText();
+  const chosenTile = (id: string) => page.getByTestId(`back-${id}`).getAttribute('aria-selected');
+  const openBacks = async () => {
+    await page.getByTestId('settings-open').click();
+    await page.getByTestId('settings').waitFor({ timeout: 5000 });
+    await page.getByTestId('backs-open').scrollIntoViewIfNeeded();
+    await page.getByTestId('backs-open').click();
+    await page.getByTestId('backs').waitFor({ timeout: 5000 });
+    await page.waitForTimeout(400);
+  };
+  const toMenu = async () => {
+    await page.getByTestId('backs-back').click();
+    await page.getByTestId('settings').waitFor({ timeout: 5000 });
+    await page.getByTestId('settings-back').click();
+    await page.getByTestId('menu').waitFor({ timeout: 5000 });
+  };
+  const newGame = async () => {
+    await page.getByTestId('play').click();
+    await page.getByTestId('game').waitFor({ timeout: 10000 });
+    if (await page.getByTestId('transfer-ok').waitFor({ timeout: 800 }).then(() => true, () => false)) await page.getByTestId('transfer-ok').click();
+    await page.waitForTimeout(600);
+  };
+  const leaveGame = async () => {
+    await page.getByTestId('game-menu').click();
+    if (await page.getByTestId('game-exit').waitFor({ timeout: 1500 }).then(() => true, () => false)) await page.getByTestId('game-exit').click();
+    await page.getByTestId('menu').waitFor({ timeout: 5000 });
+  };
+  await openBacks();
+  ok(await page.getByTestId('back-name').innerText() === 'Бордо' && await backState() === 'Выбрана', 'по умолчанию выбрана прежняя рубашка — «Бордо»', await backState());
+  ok(await page.locator('[data-testid^="back-"][role="button"]').count() >= 10, 'на экране десять рубашек');
+  await page.getByTestId('back-indigo').click();
+  ok(await backState() === 'Выбрана' && await chosenTile('indigo') === 'true', 'бесплатная рубашка выбирается касанием: «Индиго»', await backState());
+  await page.getByTestId('back-frost').click();
+  ok(/Платная/.test(await backState()) && await visible(page, 'back-buy') && await visible(page, 'back-try'), 'платная «Иней»: «Купить» и «Примерить за рекламу»', await backState());
+  ok(await chosenTile('indigo') === 'true' && await chosenTile('frost') !== 'true', 'просмотр платной рубашки её не выбирает');
+  await page.screenshot({ path: `${OUT}/10-backs.png` });
+  const adsBefore = await page.evaluate(() => (globalThis as unknown as { __kozyrAds?: { shown: string[] } }).__kozyrAds?.shown.length ?? 0);
+  await page.getByTestId('back-try').click();
+  await page.getByTestId('backs-msg').waitFor({ timeout: 5000 }).catch(() => {});
+  const adsAfter = await page.evaluate(() => (globalThis as unknown as { __kozyrAds?: { shown: string[] } }).__kozyrAds?.shown ?? []);
+  ok(adsAfter.length === adsBefore + 1 && adsAfter[adsAfter.length - 1] === 'rewarded', 'примерка — после рекламы за вознаграждение', adsAfter.join(','));
+  ok(/Готово: «Иней»/.test(await page.getByTestId('backs-msg').innerText()) && await visible(page, 'back-trying'), 'примерка «Инея» ждёт следующую партию', await page.getByTestId('backs-msg').innerText().catch(() => ''));
+  ok(!(await visible(page, 'back-try')), 'пока примерка ждёт партию, вторую взять нельзя');
+  ok(await chosenTile('indigo') === 'true', 'примерка не меняет выбранную рубашку');
+  await toMenu();
+  await newGame();
+  ok(await backAtTable() === 'frost', 'следующая партия — в примеренной рубашке', await backAtTable());
+  await page.screenshot({ path: `${OUT}/11-table-try-on.png` });
+  // примерка тратится, а партия сохраняется с первым ходом (своим или бота): дождаться его, в свой ход — положить карту
+  const savedGame = () => page.evaluate(() => localStorage.getItem('durak.current') !== null);
+  const begin = async () => {
+    const onTable = () => page.getByTestId('table').locator('[data-testid^="table-"]').count();
+    for (let i = 0; i < 40 && await onTable() === 0 && await handCount(page) === 6; i++) {
+      const n = await handCount(page);
+      for (let k = 0; k < n && await handCount(page) === n && await onTable() === 0; k++) await page.locator('[data-testid^="hand-"]').nth(k).click({ force: true }).catch(() => {});
+      await page.waitForTimeout(300);
+    }
+    await page.waitForTimeout(300);
+  };
+  await begin();
+  ok(await savedGame(), 'партия в примеренной рубашке началась и сохранена');
+  // партия, продолженная после перезагрузки, остаётся в примеренной рубашке
+  await leaveGame();
+  await page.goto(`${web.url}?fast=1`);
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(400);
+  await page.getByTestId('resume').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  await page.waitForTimeout(600);
+  ok(await backAtTable() === 'frost', 'продолженная после перезагрузки партия — в той же примеренной рубашке', await backAtTable());
+  await leaveGame();
+  await newGame();
+  ok(await backAtTable() === 'indigo', 'примерка — на одну партию: следующая — снова в выбранной «Индиго»', await backAtTable());
+  await begin();
+  await leaveGame();
+  // четырёхцветная колода и купленная рубашка
+  const setFour = async (on: boolean) => {
+    await page.getByTestId('settings-open').click();
+    await page.getByTestId('settings').waitFor({ timeout: 5000 });
+    await page.getByTestId('four').scrollIntoViewIfNeeded();
+    if ((await page.getByTestId('four').getAttribute('aria-checked') === 'true') !== on) await page.getByTestId('four').click();
+    const now = await page.getByTestId('four').getAttribute('aria-checked') === 'true';
+    await page.getByTestId('settings-back').click();
+    return now;
+  };
+  const wasFour = await page.evaluate(() => (JSON.parse(localStorage.getItem('durak.settings') ?? '{}') as { fourColor?: boolean }).fourColor === true);
+  ok(await setFour(true), 'четырёхцветная колода включена');
+  await openBacks();
+  ok(!(await visible(page, 'back-trying')), 'после чужой партии примерки больше нет');
+  await page.getByTestId('back-frost').click();
+  await page.getByTestId('back-buy').click();
+  await page.getByTestId('backs-msg').waitFor({ timeout: 5000 }).catch(() => {});
+  ok(/«Иней» — ваша/.test(await page.getByTestId('backs-msg').innerText().catch(() => '')) && await backState() === 'Выбрана' && await chosenTile('frost') === 'true', 'купленная рубашка сразу выбрана', await backState());
+  await page.getByTestId('back-amber').click();
+  ok(/Платная/.test(await backState()), 'остальные платные — по-прежнему платные', await backState());
+  await toMenu();
+  await newGame();
+  ok(await backAtTable() === 'frost' && await handCount(page) === 6, 'четырёхцветная колода и купленная рубашка: стол сдан, рубашка — «Иней»', `${await backAtTable()} ${await handCount(page)}`);
+  await page.screenshot({ path: `${OUT}/12-table-four-color-back.png` });
+  await leaveGame();
+  await page.reload();
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  await openBacks();
+  ok(await chosenTile('frost') === 'true', 'выбор и покупка рубашки пережили перезагрузку');
+  await page.getByTestId('backs-all').click();
+  await page.getByTestId('backs-msg').waitFor({ timeout: 5000 }).catch(() => {});
+  await page.getByTestId('back-amber').click();
+  ok(await backState() === 'Выбрана' && !(await visible(page, 'backs-all')), '«Все рубашки»: любая платная выбирается касанием, кнопки покупки больше нет', await backState());
+  await page.getByTestId('back-classic').click();
+  await toMenu();
+  await setFour(wasFour);
+  await page.getByTestId('store-open').click();
+  await page.getByTestId('store').waitFor({ timeout: 5000 });
+  await page.getByTestId('store-backs').scrollIntoViewIfNeeded();
+  await page.getByTestId('store-backs').click();
+  await page.getByTestId('backs').waitFor({ timeout: 5000 });
+  await page.getByTestId('backs-back').click();
+  ok(await visible(page, 'store'), '«Рубашки» открываются и из магазина, «Назад» возвращает в магазин');
+  await page.getByTestId('store-back').click();
 
   console.log('«Замер» (быстрый)');
   await page.goto(`${web.url}?fast=1&bench=quick`);

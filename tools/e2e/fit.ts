@@ -311,6 +311,16 @@ async function offline(browser: Browser, url: string, phone: { width: number; he
   await p.getByTestId('store-open').click();
   await p.getByTestId('store').waitFor({ timeout: 5000 });
   await check(p, phone, 'магазин');
+  // «Рубашки»: платная под замком — самое длинное состояние, две кнопки и подпись примерки
+  await p.getByTestId('store-backs').scrollIntoViewIfNeeded();
+  await p.getByTestId('store-backs').click();
+  await p.getByTestId('backs').waitFor({ timeout: 5000 });
+  await p.waitForTimeout(500);
+  await check(p, phone, 'рубашки');
+  await p.getByTestId('back-weave').click();
+  await check(p, phone, 'рубашки: платная');
+  await p.getByTestId('backs-back').click();
+  await p.getByTestId('store').waitFor({ timeout: 5000 });
   await p.getByTestId('store-back').click();
   await p.getByTestId('stats-open').click();
   await p.getByTestId('stats').waitFor({ timeout: 5000 });
