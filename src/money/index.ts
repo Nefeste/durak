@@ -5,12 +5,13 @@
 import { Linking } from 'react-native';
 import { logError } from '../state/crashlog';
 import { getSettings } from '../state/store';
-import { afterGame, afterShown, canShowInterstitial, getAdCounters, loadAdCounters, updateAdCounters } from './ads';
+import { afterGame, afterShown, canShowInterstitial, getAdCounters, loadAdCounters, offerNoAds, updateAdCounters } from './ads';
 import { adsSdk } from './adsSdk';
 import { billing, STORE } from './billing';
 import { isAdsOff, loadRights, setRights, unlockReview, withOwned } from './rights';
 import { getRate, loadRate, markAsked, shouldAskRating } from './review';
 import { pay, review } from './rustore';
+import { ON_SALE } from './types';
 import type { Availability, BuyResult, ProductId, Unavailable } from './types';
 
 export { billing, STORE } from './billing';
@@ -96,7 +97,17 @@ export function leavingEnd(game: { wonVsBot: boolean }): void {
     return;
   }
   if (adsBroken || !canShowInterstitial(getAdCounters(), now, isAdsOff()) || !adsSdk.interstitialReady()) return;
-  adsSdk.showInterstitial(() => { void updateAdCounters(c => afterShown(c, Date.now(), 'interstitial')); });
+  adsSdk.showInterstitial(() => { adSeen = true; void updateAdCounters(c => afterShown(c, Date.now(), 'interstitial')); });
+}
+
+/** Полноэкранная показана в этот запуск, а строки «Без рекламы» после неё ещё не было. */
+let adSeen = false;
+let noAdsFor: number | null = null;
+/** Строка «Без рекламы — разовая покупка навсегда» на итоге партии `at` (`offerNoAds`, #59). */
+export function noAdsLineFor(at: number): boolean {
+  const show = offerNoAds({ adSeen, adsOff: isAdsOff(), canBuy: STORE === 'rustore' && ON_SALE.includes('no_ads'), shownFor: noAdsFor, at });
+  if (show && noAdsFor === null) noAdsFor = at;
+  return show;
 }
 
 /** Загрузить рекламу за вознаграждение (экран итога и разбор); `onReady` — когда готова. */

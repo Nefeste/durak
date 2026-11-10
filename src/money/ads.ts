@@ -72,6 +72,16 @@ export function afterShown(c: AdCounters, now: number, kind: 'interstitial' | 'r
     : { ...c, lastShown: now, day, today, shown: { ...c.shown, rewarded: c.shown.rewarded + 1 } };
 }
 
+/**
+ * Строка «Без рекламы — разовая покупка навсегда» на итоге (решение владельца #59, вариант 1): после показанной
+ * полноэкранной, не чаще раза за запуск, если «Без рекламы» можно купить и её ещё нет. `shownFor` — партия, на итоге
+ * которой строка уже стоит в этот запуск (та же партия — строка остаётся, другая — нет).
+ */
+export function offerNoAds(o: { adSeen: boolean; adsOff: boolean; canBuy: boolean; shownFor: number | null; at: number }): boolean {
+  if (o.shownFor !== null) return o.shownFor === o.at;
+  return o.adSeen && !o.adsOff && o.canBuy;
+}
+
 /** Сохранённое — поверх пустых счётчиков; битое не проходит. */
 export function normalizeCounters(raw: unknown): AdCounters {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
