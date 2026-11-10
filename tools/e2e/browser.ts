@@ -521,9 +521,13 @@ try {
     await page.waitForTimeout(40);
     if (await handCount(page) < before) break;
   }
+  // руку считать, когда стол стоит: открытое меню партии ставит ботов на паузу, а пауза стола (`held`) показывает руку
+  // до добора. Раньше считали через 300 мс после своего хода — бот в «быстро» успевал ответить, отбой кончался, и рука
+  // добиралась до 6 уже после подсчёта, но до выхода: «5 против 6» без всякой ошибки сохранения
+  await page.getByTestId('game-menu').click();
+  for (let i = 0; i < 40 && await visible(page, 'held'); i++) await page.waitForTimeout(100);
   await page.waitForTimeout(300);
   const handBefore = await handCount(page);
-  await page.getByTestId('game-menu').click();
   await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
   await page.waitForTimeout(300);
