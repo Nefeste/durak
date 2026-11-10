@@ -17,7 +17,7 @@ import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
 import type { ThinkJob } from './think';
 import { T } from '../i18n';
-import { gameEnded, gameStarted, leavingEnd } from '../money';
+import { gameEnded, gameStarted, leavingEnd, noAdsLineFor } from '../money';
 import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
@@ -418,7 +418,13 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
       </View>
       {state.phase === 'end' && state.result && !holding ? (
         <ResultSheet bottom={insets.bottom} title={resultText(state.result)} places={resultPlaces(state.result, seat => (seat === YOU ? { name: T.result.you } : { name: botName(seat), sub: name(seat), rival: rivals[seat] }), YOU)}
-          lines={<Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>}
+          lines={<>
+            <Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>
+            {/* после показанной межпартийной рекламы, раз за запуск — одна спокойная строка (#59, вариант 1) */}
+            {noAdsLineFor(record.actions[0]?.at ?? 0) ? (
+              <Text style={[sheetText.line, sheetText.link]} accessibilityRole="link" onPress={() => { leaveEnd(); onStore(); }} testID="result-no-ads">{T.result.noAds}</Text>
+            ) : null}
+          </>}
           main={<Button label={T.result.again} onPress={again} testID="again" />}
           rest={[
             <Button key="review" label={T.result.review} kind="ghost" onPress={() => setShowReview(true)} testID="result-review" />,
