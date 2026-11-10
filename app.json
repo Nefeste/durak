@@ -2,13 +2,13 @@
   "expo": {
     "name": "Kozyr",
     "slug": "durak",
-    "version": "0.10.1",
+    "version": "0.10.2",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B1A1E",
     "android": {
       "package": "games.gornitsa.durak",
-      "versionCode": 15,
+      "versionCode": 16,
       "allowBackup": false,
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
