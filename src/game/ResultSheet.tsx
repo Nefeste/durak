@@ -54,6 +54,8 @@ export function ResultSheet({ title, places, lines, main, rest, bottom }: {
 
 export const sheetText = StyleSheet.create({
   line: { color: C.dim, fontSize: TYPE.body, textAlign: 'center' },
+  /** строка-ссылка (в магазин): тем же размером, цветом знака — не кнопка и не окно */
+  link: { color: C.accent, textDecorationLine: 'underline' },
 });
 
 const styles = StyleSheet.create({

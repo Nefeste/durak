@@ -3,7 +3,7 @@
 // полноэкранной рекламы и их сочетания; «Про» с тремя сутками без сети; что открыто в разборе; ответы
 // RuStore Pay; что «Про» не продаётся, пока нет разбора.
 import { expect, test } from 'bun:test';
-import { AD_RULES, EMPTY_COUNTERS, afterGame, afterShown, canShowInterstitial, dayOf, normalizeCounters } from '../../src/money/ads';
+import { AD_RULES, EMPTY_COUNTERS, afterGame, afterShown, canShowInterstitial, dayOf, normalizeCounters, offerNoAds } from '../../src/money/ads';
 import type { AdCounters } from '../../src/money/ads';
 import { GRACE_MS, NO_RIGHTS, adsOff, normalizeRights, proActive, reviewAccess, withOwned } from '../../src/money/rights';
 
@@ -300,4 +300,16 @@ test('платное не открывает силу: подсказка, вы�
     .filter(f => /\.tsx?$/.test(f) && !f.startsWith('money') && /\b(isPro|isAdsOff|getRights|reviewAccess)\(/.test(readFileSync(join(src, f), 'utf8')));
   // права читают только экраны денег, разбора и статистики — не стол, не подсказка, не бот
   expect(readers.sort()).toEqual(['game/ReviewScreen.tsx', 'screens/StatsScreen.tsx', 'screens/StoreScreen.tsx']);
+});
+
+// #59, вариант 1: после показанной полноэкранной — одна строка «Без рекламы — разовая покупка навсегда», раз за запуск
+test('строка «Без рекламы» на итоге: после рекламы, раз за запуск, не у купивших', () => {
+  const base = { adSeen: true, adsOff: false, canBuy: true, shownFor: null, at: 100 };
+  expect(offerNoAds(base)).toBe(true);
+  expect(offerNoAds({ ...base, adSeen: false })).toBe(false);
+  expect(offerNoAds({ ...base, adsOff: true })).toBe(false);
+  expect(offerNoAds({ ...base, canBuy: false })).toBe(false);
+  // уже показана в этот запуск: у той же партии остаётся (перерисовка), у следующей — нет, даже после новой рекламы
+  expect(offerNoAds({ ...base, shownFor: 100 })).toBe(true);
+  expect(offerNoAds({ ...base, shownFor: 100, at: 200 })).toBe(false);
 });
