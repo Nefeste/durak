@@ -19,13 +19,13 @@ import { Dialog } from '../ui/dialog';
 import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
-import { plateLines, SeatPlate } from './SeatPlate';
+import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
 import { resultPlaces } from './outcome';
 import { CONTROLS_GAP, layoutTable, plateOf, plateHeight, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
-import { useLessMotion, useSettings } from '../state/store';
+import { setSettings, useLessMotion, useSettings } from '../state/store';
 import type { OnlineTable } from '../state/online';
 import type { SeatView, TableView } from '../state/protocol';
 import { net, newSeed } from '../state/onlineStore';
@@ -35,6 +35,9 @@ import { placesOf } from './seats';
 import { holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
 import { noteOf } from './note';
+import { useSpeech } from './useSpeech';
+import { MyBubble, Speech } from './TableTalk';
+import { HandOrderButton } from './HandOrderButton';
 import type { Note } from './note';
 
 export const inviteLink = (code: string) => `${net.base}/t/${code}`;
@@ -207,12 +210,13 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
 
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   const origins = useOrigins(shown);
+  const bubbles = useSpeech(shown);
   useTableCues(shown, g.no, less);
   // плашка: имя, уровень бота или «играет бот» / «нет связи», число карт, роль — каждая строкой (docs/13-art.md, §3)
   const plateH = plateHeight(plateLines(2), fontScale);
-  const lay = useMemo(() => (size && shown ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, plate: plateH }) : null),
+  const lay = useMemo(() => (size && shown ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, plate: plateH, straight: settings.straightHand, orderButton: true }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shown, origins, size, settings.handOrder, picked, plateH]);
+    [shown, origins, size, settings.handOrder, settings.straightHand, picked, plateH]);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
@@ -273,11 +277,16 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
                 ...(s?.bot ? [T.level[s.bot]] : s?.botFor ? [T.online.botPlays] : s && !s.online ? [T.online.offline] : []),
                 (shown.resigned ?? []).includes(p.seat) ? T.game.resigned : shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat]),
               ]}
-              role={!view || view.phase === 'end' ? null : view.attacker === p.seat ? T.game.attacking : view.defender === p.seat ? T.game.defending : throwerSeen(view) === p.seat ? T.game.throwing : null}
+              role={view ? roleOf(view, p.seat, throwerSeen(view)) : null}
               active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat || throwerSeen(view) === p.seat)}
               left={p.x - oppW / 2} width={oppW} top={lay.plate.top} height={lay.plate.height} />
           );
         }) : null}
+        {/* реплики людей и ботов онлайн — из наблюдения места; «думает…» онлайн нет: сервер этого не сообщает */}
+        {lay ? <Speech layout={lay} bubbles={bubbles} thinking={null} less={less} /> : null}
+        {lay?.orderButton && view && view.phase !== 'end' ? (
+          <HandOrderButton order={settings.handOrder} x={lay.orderButton.x} y={lay.orderButton.y} onChange={handOrder => setSettings({ handOrder })} />
+        ) : null}
         {lay && shown && shown.talonSize > 0 ? (
           <Text pointerEvents="none" style={[styles.talon, { left: lay.talonLabel.x, top: lay.talonLabel.y - 9 }]} testID="talon">{T.game.talon(shown.talonSize)}</Text>
         ) : null}
@@ -286,7 +295,11 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
         ) : null}
         {lay && view ? (
           <View pointerEvents="box-none" style={[styles.controls, { bottom: (size?.height ?? 0) - lay.handTop + CONTROLS_GAP }]}>
-            <Text style={styles.hint} testID="hint">{note ?? hint}</Text>
+            <View pointerEvents="none">
+              <Text style={styles.hint} testID="hint">{bubbles.some(b => b.seat === t.you) ? '' : note ?? hint}</Text>
+              {/* своя реплика — на миг вместо строки подсказки */}
+              <MyBubble bubbles={bubbles} seat={t.you} width={(size?.width ?? 0) - 16} less={less} />
+            </View>
             <View style={styles.buttons} pointerEvents="box-none">
               {transfer ? <Button label={T.game.transfer} kind="ghost" onPress={() => send(transfer)} testID="transfer" /> : null}
               {canTake ? <Button label={T.game.take} kind="ghost" onPress={() => send({ type: 'take' })} testID="take" /> : null}

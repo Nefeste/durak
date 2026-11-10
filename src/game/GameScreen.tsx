@@ -33,7 +33,7 @@ import { autoPass, canUndo, finishWithoutYou, seenGrid } from './flow';
 import { heldView, holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
 import { SeenCards } from './SeenCards';
-import { plateLines, SeatPlate } from './SeatPlate';
+import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
 import { resultPlaces } from './outcome';
 import { ReviewScreen } from './ReviewScreen';
@@ -46,6 +46,9 @@ import { RulesScreen } from '../screens/RulesScreen';
 import { RULES_PICTURES } from './rulesPictures';
 import { newbieDone, newbieTip } from './newbie';
 import { noteOf } from './note';
+import { useSpeech } from './useSpeech';
+import { MyBubble, Speech } from './TableTalk';
+import { HandOrderButton } from './HandOrderButton';
 import type { Note } from './note';
 
 const fast = typeof globalThis.location !== 'undefined' && /[?&]fast=1/.test(globalThis.location.search);
@@ -59,6 +62,8 @@ function seededBytes(seed: number): Uint8Array {
   for (let i = 0; i < out.length; i++) { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; out[i] = x & 255; }
   return out;
 }
+/** С какого раздумья бота видно «думает…», мс (docs/09-game-design.md, «Темп»). */
+const THINK_SHOW = 300;
 /** Пауза перед «бито» само, когда подкинуть нечего (docs/09-game-design.md, «Темп»). */
 const AUTO_PASS = fast ? 80 : 1500;
 
@@ -97,6 +102,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const setNote = (text: string | null, at: GameRecord = record) => setNoted(text === null ? null : { text, at });
   const [showSeen, setShowSeen] = useState(false);
   const [deal, setDeal] = useState(0);
+  const [thinking, setThinking] = useState<number | null>(null);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   // пауза перед «бито» и «беру» (src/game/hold.ts): отбой кончился картой — стол виден, пока все её не разглядят;
   // боты ждут конца паузы, касание своей карты её кончает
@@ -177,7 +183,9 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     const pause = fast ? 60 : botDelay(settings.botSpeed, rng.current.next()), from = Date.now();
     const job = thinkSliced(think(observe(state, seat), lvl, rng.current), THINK_MS[lvl]);
     job.promise.then(a => { if (live) timer = setTimeout(() => act(seat, a), Math.max(0, pause - (Date.now() - from))); }, () => {});
-    return () => { live = false; job.cancel(); if (timer) clearTimeout(timer); };
+    // «думает…» над ботом, если решает дольше THINK_SHOW (docs/09-game-design.md, «Живой стол»)
+    const shown = setTimeout(() => { if (live) setThinking(seat); }, THINK_SHOW);
+    return () => { live = false; job.cancel(); clearTimeout(shown); if (timer) clearTimeout(timer); setThinking(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, record, lvls, settings.botSpeed, paused, holding]);
 
@@ -218,10 +226,12 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const shown = hold.shown ?? view;
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   const origins = useOrigins(shown);
+  const bubbles = useSpeech(shown);
+  const saying = bubbles.some(b => b.seat === YOU);
   useTableCues(shown, deal, less);
-  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid, plate: plateHeight(plateLines(2), fontScale) }) : null),
+  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid, straight: settings.straightHand, orderButton: true, plate: plateHeight(plateLines(2), fontScale) }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shown, origins, size, settings.handOrder, settings.memoryAid, picked, fontScale]);
+    [shown, origins, size, settings.handOrder, settings.memoryAid, settings.straightHand, picked, fontScale]);
 
   const explain = (c: Card) => {
     const probe: Action = state.table.length === 0 ? { type: 'attack', cards: [c] }
@@ -331,10 +341,14 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {layout ? layout.opponents.map(p => (
           <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={T.game.bot(p.seat)}
             lines={[name(p.seat), shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])]}
-            role={state.phase === 'end' ? null : state.attacker === p.seat ? T.game.attacking : state.defender === p.seat ? T.game.defending : thrower === p.seat ? T.game.throwing : null}
+            role={roleOf(state, p.seat, thrower)}
             active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat || thrower === p.seat)}
             left={p.x - plate.w / 2} width={plate.w} top={layout.plate.top} height={layout.plate.height} />
         )) : null}
+        {layout ? <Speech layout={layout} bubbles={bubbles} thinking={state.phase === 'end' ? null : thinking} less={less} /> : null}
+        {layout?.orderButton && state.phase !== 'end' ? (
+          <HandOrderButton order={settings.handOrder} x={layout.orderButton.x} y={layout.orderButton.y} onChange={handOrder => setSettings({ handOrder })} />
+        ) : null}
         {layout && shown.talonSize > 0 ? (
           <Glass radius={RADIUS.pill} style={[styles.talonPill, { left: layout.talonLabel.x, top: layout.talonLabel.y - 13 }]}>
             <Text pointerEvents="none" style={styles.talonText} testID="talon">{T.game.talon(shown.talonSize)}</Text>
@@ -349,11 +363,13 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
           <View pointerEvents="box-none" style={[styles.controls, { bottom: (size?.height ?? 0) - layout.handTop + CONTROLS_GAP }]}>
             {/* подсказка — стеклянная капсула над рукой (13-art.md §6); пустая строка — капсулы нет, место остаётся */}
             <View style={styles.hintRow} pointerEvents="none">
-              {state.phase === 'end' || !(note ?? hint) ? <Text style={styles.hint} testID="hint">{''}</Text> : (
+              {state.phase === 'end' || !(note ?? hint) || saying ? <Text style={styles.hint} testID="hint">{''}</Text> : (
                 <Glass radius={RADIUS.pill} style={styles.hintPill}>
                   <Text style={styles.hint} testID="hint" maxFontSizeMultiplier={1.3}>{note ?? hint}</Text>
                 </Glass>
               )}
+              {/* своя реплика («Беру», «Бито», «Пас») — на миг вместо строки подсказки, над рукой */}
+              <MyBubble bubbles={bubbles} seat={YOU} width={(size?.width ?? 0) - 16} less={less} />
             </View>
             <View style={styles.buttons} pointerEvents="box-none">
               <View style={styles.helpers} pointerEvents="box-none">

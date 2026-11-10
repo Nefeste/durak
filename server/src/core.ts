@@ -24,7 +24,7 @@ export { ApiError };
 
 /** Первая версия игры с очередью атакующих (ADR 0013) — `need` в `426 upgrade` за столом «по очереди». Телефон его
  *  не показывает (только «Обновите игру»); релизный PR ставит сюда номер версии, которая выйдет с очередью. */
-export const QUEUE_APP = '0.9.1';
+export const QUEUE_APP = '0.10.0';
 
 export interface Player { id: number; name: string; tag: string | null }
 

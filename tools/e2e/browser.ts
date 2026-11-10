@@ -75,6 +75,9 @@ async function setLevel(p: Page, name: string, id = 'level') {
 const NEWBIE = /положите любую карту|Бейте старшей|Бейте, переводите|Нечем побить|Подкиньте то же достоинство/;
 const visible = (p: Page, id: string) => p.getByTestId(id).isVisible().catch(() => false);
 const handCount = (p: Page) => p.locator('[data-testid^="hand-"]').count();
+/** Лист итога уже на странице — хоть ещё выезжает и `isVisible` его не видит. Касаться руки дальше нельзя: лист
+ *  встаёт поверх неё, и «касание карты» по прежним координатам попадает в его «В меню» (так терялись партии). */
+const over = (p: Page) => p.getByTestId('result').count().then(n => n > 0).catch(() => false);
 
 /** Играть до итога: сначала карты руки по очереди (ход, подкидывание, отбой, перевод), если ни одна
  *  не легла — «пас»/«бито», иначе «беру». Возвращает, сколько раз легла своя карта. */
@@ -82,7 +85,11 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
   let played = 0;
   const t0 = Date.now();
   for (let i = 0; i < 600; i++) {
-    if (await visible(p, 'result')) { console.log(`  … ${label}: ${i} шагов, ${Math.round((Date.now() - t0) / 1000)} с`); return { ended: true, played }; }
+    if (await over(p)) {
+      await p.getByTestId('result').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+      console.log(`  … ${label}: ${i} шагов, ${Math.round((Date.now() - t0) / 1000)} с`);
+      return { ended: true, played };
+    }
     // пауза перед «бито»: стол не трогаем, пока его разглядывают (касание своей карты её кончает)
     if (await visible(p, 'held')) { await p.waitForTimeout(60); continue; }
     const before = await handCount(p);
@@ -92,7 +99,7 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
     let moved = false;
     for (let k = 0; k < n && !moved; k++) {
       // бот кончил отбой, пока мы перебирали карты, — не трогаем стол паузы (касание кончает её)
-      if (await visible(p, 'held')) break;
+      if (await visible(p, 'held') || await over(p)) break;
       await cards.nth(k).click({ timeout: 1000, force: true }).catch(() => {});
       await p.waitForTimeout(30);
       if (await visible(p, 'transfer')) await p.getByTestId('transfer').click().catch(() => {});
@@ -104,7 +111,7 @@ async function playOut(p: Page, label: string): Promise<{ ended: boolean; played
       const after = await handCount(p).catch(() => before);
       if (after < before) { moved = true; played++; }
     }
-    if (!moved) {
+    if (!moved && !(await over(p))) {
       if (await visible(p, 'pass')) await p.getByTestId('pass').click().catch(() => {});
       else if (await visible(p, 'take')) await p.getByTestId('take').click().catch(() => {});
     }
@@ -306,7 +313,10 @@ try {
     await ph.waitForTimeout(380);
     const trace = await ph.evaluate(k => (globalThis as unknown as { __trace: Record<string, [number, number][]> }).__trace[k] ?? [], `c${id}`);
     const handY = card.y - felt.y + card.height / 2;
-    const back = trace.filter(([, y]) => y > drop.y + 60);
+    // карта летит от места, где её отпустили, к своему месту на столе (оно может быть ниже точки отпускания);
+    // возврат к руке — точки заметно ниже и того и другого
+    const rest = trace[trace.length - 1] ?? [drop.x, drop.y];
+    const back = trace.filter(([, y]) => y > Math.max(drop.y, rest[1]) + 60 || y > handY - 120);
     ok(trace.length > 0 && Math.hypot(trace[0][0] - drop.x, trace[0][1] - drop.y) < 30,
       `отпущенная карта на следующем кадре там, где её отпустили: (${trace[0]?.map(Math.round).join(', ')}) у (${Math.round(drop.x)}, ${Math.round(drop.y)})`, JSON.stringify(trace.slice(0, 4)));
     ok(back.length === 0, `карта не возвращается к руке (y ≈ ${Math.round(handY)}) и не летит оттуда второй раз`, JSON.stringify(back.slice(0, 4)));
@@ -314,6 +324,83 @@ try {
     const after = await ph.getByTestId('hint').innerText().catch(() => '');
     ok(!/^Ходите/.test(after), `подсказка погасла после хода: «${after}»`, after);
     await ph.screenshot({ path: `${OUT}/02-drop.png` });
+    await ctx.close();
+  }
+
+  console.log('Живой стол: реплики, «думает…», значки, порядок руки (игра владельца 09.11.2026)');
+  {
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
+    const ph = await ctx.newPage();
+    ph.on('pageerror', e => errors.push(String(e)));
+    // какие реплики появлялись: место и текст
+    await ph.addInitScript(() => {
+      const w = globalThis as unknown as { __said: string[] };
+      w.__said = [];
+      new MutationObserver(() => {
+        for (const el of document.querySelectorAll('[data-testid^="say-"], [data-testid^="thinks-"]')) {
+          const k = `${el.getAttribute('data-testid')}:${el.textContent}`;
+          if (w.__said[w.__said.length - 1] !== k && !w.__said.slice(-4).includes(k)) w.__said.push(k);
+        }
+      }).observe(document, { childList: true, subtree: true, characterData: true });
+    });
+    // без ?fast: бот думает как на телефоне — видно «думает…». seed=12: по масти и по старшинству рука разная
+    // (при seed=11 оба порядка совпадали: 12,14,24,26,1,4 — и проверку кнопки порядка нечем было пройти)
+    await ph.goto(`${web.url}?seed=12`);
+    await ph.getByTestId('menu').waitFor({ timeout: 20000 });
+    await ph.getByTestId('play').click();
+    await ph.getByTestId('game').waitFor({ timeout: 10000 });
+    for (let i = 0; i < 50 && !(await visible(ph, 'advise')); i++) await ph.waitForTimeout(100);
+    await ph.waitForTimeout(1600);
+    // значок роли вместо слова: вдвоём бот всегда ходит или отбивается
+    const icon = await ph.locator('[data-testid^="opp-1-role-"]').count();
+    ok(icon === 1, 'на плашке бота — значок роли (стрелка или щит)', icon);
+    ok(!/ходит|отбивается/.test(await ph.getByTestId('opp-1').innerText()), 'слова «ходит» и «отбивается» на плашке не пишутся');
+    const label = await ph.locator('[data-testid^="opp-1-role-"]').getAttribute('aria-label').catch(() => null);
+    ok(label === 'ходит' || label === 'отбивается', `у значка — слово для чтения с экрана: «${label}»`, label);
+    // кнопка порядка руки: касание меняет порядок карт, второе — возвращает
+    const order = async () => {
+      const ids = await ph.locator('[data-testid^="hand-"]').evaluateAll(els => els.map(e => [e.getAttribute('data-testid'), e.getBoundingClientRect().x] as [string, number]));
+      return ids.sort((a, b) => a[1] - b[1]).map(x => x[0]).join(' ');
+    };
+    const sortBox = await ph.getByTestId('order-hand').boundingBox();
+    ok(!!sortBox && sortBox.width >= 40 && sortBox.height >= 40, `кнопка порядка руки у руки: ${sortBox ? `${Math.round(sortBox.width)}×${Math.round(sortBox.height)}` : 'нет'}`, JSON.stringify(sortBox));
+    const o1 = await order();
+    await ph.getByTestId('order-hand').click();
+    await ph.waitForTimeout(400);
+    const o2 = await order();
+    ok(o1 !== o2 && o1.split(' ').sort().join() === o2.split(' ').sort().join(), 'касание кнопки — рука в другом порядке, карты те же', `${o1} | ${o2}`);
+    await ph.screenshot({ path: `${OUT}/02-hand-order.png` });
+    await ph.getByTestId('order-hand').click();
+    await ph.waitForTimeout(400);
+    ok(await order() === o1, 'второе касание — прежний порядок');
+    // играем: свои карты касанием, «бито» и «беру» кнопками; реплики бота и «думает…»
+    for (let i = 0; i < 40; i++) {
+      const said = await ph.evaluate(() => (globalThis as unknown as { __said: string[] }).__said);
+      if (said.some(x => /^say-1:(Беру|Бито|Пас)/.test(x)) && said.some(x => x.startsWith('thinks-1')) && said.some(x => x.startsWith('say-0'))) break;
+      if (await visible(ph, 'result')) break;
+      const cards = ph.locator('[data-testid^="hand-"]');
+      const n = await cards.count();
+      let moved = false;
+      for (let k = 0; k < n && !moved; k++) {
+        if (await visible(ph, 'held')) break;
+        await cards.nth(k).click({ timeout: 1000, force: true }).catch(() => {});
+        await ph.waitForTimeout(30);
+        if (/Какую карту бить|Коснитесь карты/.test(await ph.getByTestId('hint').innerText().catch(() => ''))) {
+          await ph.getByTestId('table').locator('[data-testid^="table-"]').first().click({ force: true }).catch(() => {});
+        }
+        moved = (await handCount(ph).catch(() => n)) < n;
+      }
+      if (!moved) {
+        if (await visible(ph, 'pass')) await ph.getByTestId('pass').click().catch(() => {});
+        else if (await visible(ph, 'take')) await ph.getByTestId('take').click().catch(() => {});
+      }
+      if (i === 3) await ph.screenshot({ path: `${OUT}/02-live.png` });
+      await ph.waitForTimeout(400);
+    }
+    const said = await ph.evaluate(() => (globalThis as unknown as { __said: string[] }).__said);
+    ok(said.some(x => /^say-1:(Беру|Бито|Пас|Подкидываю|Перевожу)$/.test(x)), `реплика бота над его веером: ${said.filter(x => x.startsWith('say-1')).slice(0, 4).join(', ')}`, said.join(' | '));
+    ok(said.some(x => x === 'thinks-1:думает…'), '«думает…» у бота, пока он решает', said.join(' | '));
+    ok(said.some(x => /^say-0:/.test(x)), `своя реплика над рукой: ${said.filter(x => x.startsWith('say-0')).slice(0, 3).join(', ')}`, said.join(' | '));
     await ctx.close();
   }
 

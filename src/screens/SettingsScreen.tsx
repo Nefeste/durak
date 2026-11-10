@@ -48,6 +48,7 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
         <Row title={T.settings.handOrder} note={T.settings.handOrderNote}>
           <Chips id="order" items={['suit', 'rank'] as const} value={s.handOrder} label={v => (v === 'suit' ? T.settings.bySuit : T.settings.byRank)} onChange={handOrder => setSettings({ handOrder })} />
         </Row>
+        <Toggle id="straight" title={T.settings.straightHand} note={T.settings.straightHandNote} value={s.straightHand} onChange={v => setSettings({ straightHand: v })} />
         <Row title={T.settings.throwOrder} note={T.settings.throwOrderNote}>
           <Chips id="throw" items={['queue', 'free'] as const} value={s.throwOrder} label={v => (v === 'queue' ? T.settings.throwQueue : T.settings.throwFree)} onChange={throwOrder => setSettings({ throwOrder })} />
         </Row>

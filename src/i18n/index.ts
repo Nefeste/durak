@@ -89,6 +89,8 @@ export const T = {
     bySuit: 'По мастям',
     byRank: 'По старшинству',
     handOrderNote: 'Козыри — всегда справа.',
+    straightHand: 'Ровная рука',
+    straightHandNote: 'Карты в руке — ровно по линейке. Выключено — лежат чуть вразброс, как в настоящей руке.',
     throwOrder: 'Подкидывать',
     throwQueue: 'По очереди',
     throwFree: 'Кто успел',
@@ -169,6 +171,12 @@ export const T = {
     trump: 'козырь',
     attacking: 'ходит',
     defending: 'отбивается',
+    /** реплики за столом (src/game/speech.ts, docs/09-game-design.md, «Живой стол») */
+    say: { pass: 'Пас', done: 'Бито', take: 'Беру', transfer: 'Перевожу', throw: 'Подкидываю' },
+    botThinking: 'думает…',
+    /** кнопка порядка руки у руки: голос и подпись для чтения с экрана */
+    handOrderButton: (order: string) => `Порядок руки: ${order}`,
+    handOrderHint: 'Касание меняет порядок карт в руке',
     /** очередь подкидывать (п. 4.3): у атакующего, который не ходящий */
     throwing: 'подкидывает',
     out: 'вышел',
