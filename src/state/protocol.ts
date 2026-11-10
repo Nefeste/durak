@@ -155,9 +155,12 @@ export interface CodePlace { name: string; bot: Level | null; host: boolean; you
 
 export interface QuickMe { rating: number; provisional: boolean; games: number }
 
+/** Сколько сейчас ищут быструю игру и сколько её столов играет — как в «Нардах»; у сервера до 0.11.0 этого нет. */
+export interface QuickCounts { searching: number; playing: number }
+
 export type QuickView =
-  | { status: 'idle'; me: QuickMe }
-  | { status: 'searching'; since: number; offerBot: boolean; me: QuickMe }
+  | { status: 'idle'; me: QuickMe; counts?: QuickCounts }
+  | { status: 'searching'; since: number; offerBot: boolean; me: QuickMe; counts?: QuickCounts }
   | { status: 'matched'; table: string };
 
 /** Готовые фразы (docs/09-game-design.md, «Фразы»); свободного текста нет. */

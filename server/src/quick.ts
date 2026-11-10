@@ -24,6 +24,8 @@ const WINDOW = 100, WIDEN = 10;
 export class QuickQueue {
   private readonly waiting = new Map<number, Waiting>();
   private readonly found = new Map<number, Found>();
+  /** Столов быстрой игры за игрой — пересчёт раз в секунду в `tick`, не на каждый опрос. */
+  private playing = 0;
 
   constructor(private readonly core: Core, private readonly clock: Clock) {}
 
@@ -44,10 +46,11 @@ export class QuickQueue {
     const f = this.found.get(p.id);
     if (f) return { status: 'matched', table: f.table };
     const w = this.waiting.get(p.id);
-    if (!w) return { status: 'idle', me: this.core.quickMe(p, 'podkidnoy') };
+    const counts = { searching: this.waiting.size, playing: this.playing };
+    if (!w) return { status: 'idle', me: this.core.quickMe(p, 'podkidnoy'), counts };
     const now = this.clock.now();
     w.seen = now;
-    return { status: 'searching', since: w.since, offerBot: now - w.since >= ONLINE.quickBotOfferMs, me: this.core.quickMe(p, w.variant) };
+    return { status: 'searching', since: w.since, offerBot: now - w.since >= ONLINE.quickBotOfferMs, me: this.core.quickMe(p, w.variant), counts };
   }
 
   cancel(p: Player): { ok: true } {
@@ -100,6 +103,7 @@ export class QuickQueue {
       this.found.set(a.p.id, { at: now, table: id });
       this.found.set(best.p.id, { at: now, table: id });
     }
+    this.playing = this.core.quickPlaying();
   }
 
   get size() { return this.waiting.size; }

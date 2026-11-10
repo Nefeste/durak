@@ -819,6 +819,11 @@ export class Core {
     return r ? { rating: r.rating, rd: r.rd, vol: r.vol, games: r.games } : { ...GLICKO_START, games: 0 };
   }
 
+  /** Сколько столов быстрой игры сейчас за игрой (экран поиска: «играют: N»). */
+  quickPlaying(): number {
+    return (this.db.query("SELECT COUNT(*) AS n FROM tables WHERE kind = 'quick' AND status = 'playing'").get() as { n: number }).n;
+  }
+
   quickMe(p: Player, variant: Variant): QuickMe {
     const g = this.glickoOf(p.id, variant);
     return { rating: Math.round(g.rating), provisional: g.rd > 110, games: g.games };

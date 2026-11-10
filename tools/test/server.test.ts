@@ -501,7 +501,12 @@ describe('сервер', () => {
   test('быстрая игра: пара по варианту, вход по коду, рейтинг после партии; через минуту — предложение бота', async () => {
     const e = setup(21);
     const a = await e.player('Аня'), b = await e.player('Боря'), c = await e.player('Вера');
-    expect(((await e.call('POST', '/v1/quick', a, { variant: 'podkidnoy' })).body as QuickView).status).toBe('searching');
+    const first = (await e.call('POST', '/v1/quick', a, { variant: 'podkidnoy' })).body as QuickView;
+    expect(first.status).toBe('searching');
+    // экран поиска, как в «Нардах»: кто ищет и играет, рейтинг с «?» и «ещё не играли»
+    if (first.status !== 'searching') throw new Error('не ищет');
+    expect(first.counts).toEqual({ searching: 1, playing: 0 });
+    expect(first.me).toEqual({ rating: 1500, provisional: true, games: 0 });
     // другой вариант — не пара
     expect(((await e.call('POST', '/v1/quick', c, { variant: 'perevodnoy' })).body as QuickView).status).toBe('searching');
     const m = (await e.call('POST', '/v1/quick', b, { variant: 'podkidnoy' })).body as QuickView;
@@ -513,6 +518,9 @@ describe('сервер', () => {
     expect(((await e.call('GET', `/v1/tables/${id}`, a)).body.table as TableView).status).toBe('waiting');
     await joinByCode(e, b, view.code!);
     expect(((await e.call('GET', `/v1/tables/${id}`, a)).body.table as TableView).status).toBe('playing');
+    // Вера всё ищет: один стол быстрой игры за игрой, ищет она одна
+    const counted = (await e.call('POST', '/v1/quick', c, { variant: 'perevodnoy' })).body as QuickView;
+    expect(counted.status === 'searching' && counted.counts).toEqual({ searching: 1, playing: 1 });
     // Аня сдаётся — у Бори рейтинг выше стартового
     await e.call('POST', `/v1/tables/${id}/resign`, a);
     const end = (await e.call('GET', `/v1/tables/${id}`, b)).body.table as TableView;
