@@ -1,0 +1,52 @@
+{
+ "sizes": [
+  482,
+  256,
+  128,
+  1
+ ],
+ "features": 2,
+ "sha256": "1f755f86d3bcd4b120e792f53e7e46be7b1ae0c3ebbf28af6e755090422867f4",
+ "bytes": 626720,
+ "games": 9620000,
+ "samples": 1849917530,
+ "hours": 16.09,
+ "rounds": 2405,
+ "arena": {
+  "net": "D:\\gornitsa.games\\durak\\tools\\gpu\\runs\\main\\arena.bin",
+  "samples": 24,
+  "pairs": 200,
+  "experienced": {
+   "games": 400,
+   "loops": 0,
+   "share": 0.7875,
+   "ci": 0.040089517021286256,
+   "elo": 227.55665123012315,
+   "elo_lo": 188.45754494604998,
+   "elo_hi": 272.50052496569606
+  },
+  "master": {
+   "games": 400,
+   "loops": 0,
+   "share": 0.72375,
+   "ci": 0.04381991263968927,
+   "elo": 167.3145160169302,
+   "elo_lo": 130.88776324339898,
+   "elo_hi": 207.5302389565835
+  },
+  "net:tools/gpu/nets/2026-11-09-cpu-pilot/best.bin:24:bout": {
+   "games": 400,
+   "loops": 0,
+   "share": 0.5475,
+   "ci": 0.04877838635092391,
+   "elo": 33.106215988373506,
+   "elo_lo": -0.8883157563837905,
+   "elo_hi": 67.74682683005334
+  },
+  "seconds": 400.89,
+  "games": 9620000,
+  "hours": 16.09,
+  "rounds": 2405
+ },
+ "run": "main"
+}
