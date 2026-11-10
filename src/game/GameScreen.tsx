@@ -11,7 +11,7 @@ import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
 import { apply, dealOf, deckFrom, firstOf, legalActions, lostBy, newGame, nextFirst, observe, reasonOf, replay, rulesWith, throwerOf } from '../engine';
 import type { Action, Card, GameRecord, Observation, Result, State, ThrowOrder, Variant } from '../engine';
-import { adviseThink, makeRng, think, THINK_MS, TOP } from '../bot';
+import { adviseThink, makeRng, shownChance, think, THINK_MS, TOP } from '../bot';
 import { reviewGame } from './review';
 import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
@@ -204,7 +204,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     const job = thinkSliced(adviseThink(observe(state, YOU), makeRng(record.actions.length + 1)), THINK_MS[TOP]);
     adviseJob.current = job;
     const at = record;
-    job.promise.then(a => { setAdvising(false); setNote(T.game.advice(adviceText(a.action, state), a.chance, a.exact), at); }, () => setAdvising(false));
+    job.promise.then(a => { setAdvising(false); setNote(T.game.advice(adviceText(a.action, state), shownChance(a), a.exact), at); }, () => setAdvising(false));
   };
 
   // учили в этой партии три отбоя — дальше игрок сам

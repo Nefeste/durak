@@ -23,7 +23,10 @@ export function Button({ label, onPress, kind = 'main', disabled, testID, small 
         pressed && !disabled && styles.pressed, disabled && styles.off]}
     >
       <View pointerEvents="none" style={[styles.shine, main && styles.shineGold]} />
-      <Text style={[styles.label, small && styles.smallLabel, main ? styles.mainText : styles.ghostText]} maxFontSizeMultiplier={1.3}>{label}</Text>
+      {/* подпись — заново, когда кнопка меняет вид (стекло или недоступная → золото): на Android у той же подписи менялся
+          фон кнопки, а цвет оставался прежним, светлым, — светлое на золоте, «жёлтая кнопка без надписи» (игра владельца
+          10.11.2026: «Поделиться» в задаче дня, «Повторить замер») */}
+      <Text key={main ? 'main' : 'ghost'} style={[styles.label, small && styles.smallLabel, main ? styles.mainText : styles.ghostText]} maxFontSizeMultiplier={1.3}>{label}</Text>
     </Pressable>
   );
 }
