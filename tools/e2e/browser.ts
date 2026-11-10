@@ -15,6 +15,7 @@
 import { mkdirSync } from 'node:fs';
 import { chromium, type Page } from 'playwright';
 import { serveWeb } from './serve';
+import { parseCard } from '../../src/engine';
 
 let failures = 0;
 function ok(cond: boolean, what: string, detail?: unknown) {
@@ -327,6 +328,56 @@ try {
     await ctx.close();
   }
 
+  console.log('Подсказка после смены позиции (игра владельца 10.11.2026)');
+  {
+    // «Подсказка» считает, а позиция уже другая (подкинули, отбились, сходили сами) — счёт снят; раньше кнопка после
+    // этого молчала до конца партии. Здесь позицию меняет свой ход сразу после касания «Подсказки».
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
+    const ph = await ctx.newPage();
+    ph.on('pageerror', e => errors.push(String(e)));
+    await ph.goto(`${web.url}?seed=13&fast=1`);
+    await ph.getByTestId('menu').waitFor({ timeout: 20000 });
+    await ph.getByTestId('play').click();
+    await ph.getByTestId('game').waitFor({ timeout: 10000 });
+    const ADVICE = /^(Ходите|Подкиньте|Побейте|Переведите|Берите|Пас|Бито)/;
+    const myTurn = async () => {
+      for (let i = 0; i < 100; i++) {
+        if (await visible(ph, 'result')) return false;
+        if (await visible(ph, 'advise') && !(await visible(ph, 'held'))) return true;
+        await ph.waitForTimeout(100);
+      }
+      return false;
+    };
+    let cut = 0, answered = 0;
+    for (let turn = 0; turn < 6 && await myTurn(); turn++) {
+      await ph.getByTestId('advise').click();
+      if (turn % 2 === 0) {
+        // сразу ход — «Подсказка» ещё считает
+        const before = await handCount(ph);
+        const cards = ph.locator('[data-testid^="hand-"]');
+        for (let k = 0; k < await cards.count() && (await handCount(ph)) === before; k++) {
+          await cards.nth(k).click({ force: true, timeout: 1000 }).catch(() => {});
+          if (/Какую карту бить|Коснитесь карты/.test(await ph.getByTestId('hint').innerText().catch(() => ''))) {
+            await ph.getByTestId('table').locator('[data-testid^="table-"]').first().click({ force: true }).catch(() => {});
+          }
+        }
+        if ((await handCount(ph)) === before && await visible(ph, 'take')) await ph.getByTestId('take').click().catch(() => {});
+        cut++;
+        continue;
+      }
+      let said = '';
+      for (let i = 0; i < 80 && !ADVICE.test(said); i++) { said = await ph.getByTestId('hint').innerText().catch(() => ''); await ph.waitForTimeout(100); }
+      if (ADVICE.test(said)) answered++;
+      else { ok(false, `«Подсказка» ответила после смены позиции: «${said}»`, said); break; }
+      // сыграть по-простому дальше: «Берите», «Пас» или первая карта
+      if (await visible(ph, 'pass')) await ph.getByTestId('pass').click().catch(() => {});
+      else if (await visible(ph, 'take')) await ph.getByTestId('take').click().catch(() => {});
+      else await ph.locator('[data-testid^="hand-"]').first().click({ force: true }).catch(() => {});
+    }
+    ok(cut >= 2 && answered >= 2, `«Подсказка» отвечает и после того, как позиция сменилась во время счёта: снято ${cut}, ответов ${answered}`);
+    await ctx.close();
+  }
+
   console.log('Живой стол: реплики, «думает…», значки, порядок руки (игра владельца 09.11.2026)');
   {
     const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
@@ -470,9 +521,13 @@ try {
     await page.waitForTimeout(40);
     if (await handCount(page) < before) break;
   }
+  // руку считать, когда стол стоит: открытое меню партии ставит ботов на паузу, а пауза стола (`held`) показывает руку
+  // до добора. Раньше считали через 300 мс после своего хода — бот в «быстро» успевал ответить, отбой кончался, и рука
+  // добиралась до 6 уже после подсчёта, но до выхода: «5 против 6» без всякой ошибки сохранения
+  await page.getByTestId('game-menu').click();
+  for (let i = 0; i < 40 && await visible(page, 'held'); i++) await page.waitForTimeout(100);
   await page.waitForTimeout(300);
   const handBefore = await handCount(page);
-  await page.getByTestId('game-menu').click();
   await page.getByTestId('game-exit').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
   await page.waitForTimeout(300);
@@ -668,10 +723,34 @@ try {
   await page.getByTestId('puzzle').waitFor({ timeout: 5000 });
   await page.waitForTimeout(400);
   ok(/Задача \d+/.test(await page.getByTestId('puzzle-number').innerText()), 'задача дня с номером');
-  ok(/У соперника:/.test(await page.getByTestId('puzzle-opponent').innerText()), 'карты соперника открыты');
+  ok(/У соперника:/.test(await page.getByTestId('puzzle-table').getAttribute('aria-label').catch(() => '') ?? ''), 'карты соперника названы для чтения с экрана');
   await page.screenshot({ path: `${OUT}/07-puzzle.png` });
   await page.getByTestId('puzzle-answer').click();
-  ok(/Ответ:/.test(await page.getByTestId('puzzle-line').innerText()), 'ответ — по кнопке', await page.getByTestId('puzzle-line').innerText());
+  const line = () => page.getByTestId('puzzle-line').innerText().catch(() => '');
+  ok(/Ответ:/.test(await line()), 'ответ — по кнопке', await line());
+  // после «Ответа» задача доигрывается: ход по ответу, соперник отвечает, ответ — к каждой своей позиции, до выхода
+  // (игра владельца 10.11.2026: после ответа нельзя было ни сходить, ни посмотреть, ответ — только к первому ходу)
+  let answers = 0, last = '';
+  for (let i = 0; i < 80 && !/Вышли без карт/.test(last); i++) {
+    last = await line();
+    const m = /^Ответ: (.*)$/.exec(last);
+    if (!m) { await page.waitForTimeout(150); continue; }
+    answers++;
+    const what = m[1];
+    if (/^Берите/.test(what)) await page.getByTestId('puzzle-take').click();
+    else if (/^(Пас|Бито)/.test(what)) await page.getByTestId('puzzle-pass').click();
+    else {
+      const names = what.match(/(10|[6-9ВДКТ])[♠♥♦♣]/g) ?? [];
+      const beat = /^Побейте/.test(what);
+      const mine = beat ? [names[1]] : names;
+      for (const n of mine) await page.getByTestId(`hand-${parseCard(n)}`).click({ force: true }).catch(() => {});
+      if (beat && /Какую карту бить|Коснитесь карты/.test(await line())) await page.getByTestId(`table-${parseCard(names[0])}`).click({ force: true }).catch(() => {});
+    }
+    await page.waitForTimeout(700);
+  }
+  ok(/Вышли без карт/.test(last) && answers >= 2, `после «Ответа» задача доигрывается по ответам до выхода: ${answers} ответов, «${last}»`, last);
+  await page.screenshot({ path: `${OUT}/07-puzzle-solved.png` });
+  ok(await visible(page, 'puzzle-again'), 'решённую по ответу можно сыграть снова — «Ещё раз»');
   await page.getByTestId('puzzle-share').click();
   ok(/Козырь, задача \d+/.test(await page.getByTestId('puzzle-share-text').innerText().catch(() => '')), 'результат — текстом');
   await page.getByTestId('puzzle-archive').click();

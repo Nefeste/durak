@@ -67,6 +67,27 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   const [picking, setPicking] = useState<{ code: string; info: CodeInfo } | null>(null);
   const [quick, setQuick] = useState<QuickView | null>(null);
   const searching = useRef(false);
+  // сколько ищем — «Ждём 0:12» раз в секунду, как в «Нардах»; отсчёт — с первого «Найти соперника»
+  const [since, setSince] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const looking = quick?.status === 'searching';
+  // «Ждать дальше» прячет предложение бота, поиск идёт (как в «Нардах»)
+  const [offerOff, setOfferOff] = useState(false);
+  // до «Найти соперника» — свой рейтинг и кто сейчас ищет и играет, раз в 10 с
+  const idleOpen = mode === 'quick' && ready && adult && named && !looking;
+  useEffect(() => {
+    if (!idleOpen) return;
+    let live = true;
+    const ask = () => { void net.quickPoll().then(q => { if (live && !searching.current && q.status === 'idle') setQuick(q); }).catch(() => {}); };
+    ask();
+    const t = setInterval(ask, 10_000);
+    return () => { live = false; clearInterval(t); };
+  }, [idleOpen]);
+  useEffect(() => {
+    if (!looking) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [looking]);
 
   useEffect(() => {
     void (async () => {
@@ -134,6 +155,10 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
     setQuick(q);
     if (q.status === 'matched') return matched(q.table);
     searching.current = true;
+    const t = Date.now();
+    setSince(t);
+    setNow(t);
+    setOfferOff(false);
   });
   useEffect(() => {
     if (!quick || quick.status !== 'searching') return;
@@ -143,10 +168,14 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         if (!searching.current) return;
         setQuick(q);
         if (q.status === 'matched') void matched(q.table).catch(e => setErr(errText(e)));
-      }).catch(e => setErr(errText(e)));
+        // сбой связи — сказать и спросить снова через 1,5 с (тот же `quick`, новым объектом)
+      }).catch(e => { setErr(errText(e)); setQuick(v => (v ? { ...v } : v)); });
     }, 1500);
     return () => clearTimeout(t);
-  });
+    // заново — с каждым ответом сервера (новый `quick`), а не с каждой перерисовкой: часы «Ждём 0:12» перерисовывают
+    // экран раз в секунду и иначе снимали бы опрос раньше, чем он успеет уйти
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quick]);
   const cancelSearch = () => run(async () => { searching.current = false; await net.quickCancel(); setQuick(null); });
   const playBot = () => run(async () => {
     searching.current = false;
@@ -181,6 +210,14 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
 
   if (mode === 'quick') {
     const q = quick;
+    /** Кто сейчас ищет и играет, свой рейтинг и что значит «?» (как в «Нардах»). */
+    const quickAbout = (v: Extract<QuickView, { me: unknown }>) => (
+      <>
+        {v.counts ? <Text style={styles.note} testID="quick-counts">{T.online.counts(v.counts.searching, v.counts.playing)}</Text> : null}
+        <Text style={styles.note} testID="quick-rating">{T.online.rating(v.me.rating, v.me.provisional, v.me.games)}</Text>
+        {v.me.provisional ? <Text style={styles.note} testID="quick-rough">{T.online.ratingRough}</Text> : null}
+      </>
+    );
     return (
       <ScrollView style={styles.root} contentContainerStyle={[styles.content, pad]} keyboardShouldPersistTaps="handled" testID="quick">
         <Header title={T.online.quickTitle} back={T.online.back} onBack={onBack} backTestID="online-back" />
@@ -189,17 +226,22 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
           {q?.status === 'searching' ? (
             <>
               <Text style={styles.big} testID="quick-searching">{T.online.searching}</Text>
-              <Text style={styles.note}>{T.online.rating(q.me.rating)}</Text>
-              {q.offerBot ? (
-                <>
-                  <Text style={styles.label}>{T.online.offerBot}</Text>
+              <Text style={styles.label} testID="quick-waited">{T.online.waited(Math.max(0, now - (since ?? now)))}</Text>
+              {quickAbout(q)}
+              {q.offerBot && !offerOff ? (
+                <View style={styles.offer} testID="quick-offer">
+                  <Text style={styles.label}>{T.online.nobody}</Text>
                   <Button label={T.online.playBot} onPress={playBot} testID="quick-bot" />
-                </>
+                  <Button label={T.online.keepWaiting} kind="ghost" onPress={() => setOfferOff(true)} testID="quick-wait" />
+                </View>
               ) : null}
               <Button label={T.online.cancelSearch} kind="ghost" onPress={cancelSearch} testID="quick-cancel" />
             </>
           ) : (
-            <Button label={T.online.find} onPress={find} disabled={busy} testID="quick-find" />
+            <>
+              {q?.status === 'idle' ? quickAbout(q) : null}
+              <Button label={T.online.find} onPress={find} disabled={busy} testID="quick-find" />
+            </>
           )}
           {errorBlock}
         </Glass>
@@ -271,6 +313,7 @@ const styles = StyleSheet.create({
   panel: { gap: SPACE.m, padding: SPACE.l,  },
   label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
   note: { color: C.dim, fontSize: TYPE.caption },
+  offer: { gap: SPACE.s, padding: SPACE.m, borderRadius: RADIUS.panel, borderWidth: 1, borderColor: C.glassLine },
   big: { color: C.text, fontSize: TYPE.section, fontWeight: '700' },
   input: { color: C.text, fontSize: TYPE.button, borderWidth: 1, borderColor: C.glassLine, borderRadius: RADIUS.small, paddingHorizontal: SPACE.m, minHeight: 48 },
   err: { color: C.danger, fontSize: TYPE.body },

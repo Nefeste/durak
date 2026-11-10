@@ -179,15 +179,20 @@ export function BenchScreen({ onBack, quick = false }: { onBack: () => void; qui
       </View>
       <ScrollView style={styles.panel} contentContainerStyle={styles.panelIn}>
         <Text style={styles.note} testID="bench-state">{running ? T.bench.running(T.bench.scenes[running]) : rows.length ? T.bench.done : T.bench.intro}</Text>
-        {text ? <Text selectable style={styles.result} testID="bench-result">{text}</Text> : null}
-        <Button label={T.bench.run} onPress={() => { void run(); }} disabled={!!running} testID="bench-run" />
+        {text ? <Text style={styles.result} testID="bench-result">{text}</Text> : null}
+      </ScrollView>
+      {/* кнопки — не в прокрутке, а полосой внизу, как «Играть» в меню: на Android в прокрутке под длинным выделяемым
+          текстом «Начать замер» выходила огромной жёлтой плашкой без подписи (замер владельца 10.11.2026);
+          скопировать текст — кнопкой «Скопировать» */}
+      <View style={styles.bar}>
         {text && !running ? (
           <View style={styles.row}>
-            <Button kind="ghost" label={copied ? T.bench.copied : T.bench.copy} onPress={copy} testID="bench-copy" />
-            <Button kind="ghost" label={T.bench.share} onPress={() => { Share.share({ message: text }).catch(() => {}); }} />
+            <View style={styles.cell}><Button kind="ghost" label={copied ? T.bench.copied : T.bench.copy} onPress={copy} testID="bench-copy" /></View>
+            <View style={styles.cell}><Button kind="ghost" label={T.bench.share} onPress={() => { Share.share({ message: text }).catch(() => {}); }} testID="bench-share" /></View>
           </View>
         ) : null}
-      </ScrollView>
+        <Button label={rows.length && !running ? T.bench.again : T.bench.run} onPress={() => { void run(); }} disabled={!!running} testID="bench-run" />
+      </View>
     </View>
   );
 }
@@ -199,5 +204,7 @@ const styles = StyleSheet.create({
   panelIn: { gap: SPACE.m, padding: SPACE.m, borderRadius: RADIUS.panel, backgroundColor: C.glass },
   note: { color: C.dim, fontSize: TYPE.caption },
   result: { color: C.text, fontSize: TYPE.caption, lineHeight: 19 },
-  row: { flexDirection: 'row', gap: SPACE.s, flexWrap: 'wrap' },
+  row: { flexDirection: 'row', gap: SPACE.s },
+  cell: { flex: 1 },
+  bar: { gap: SPACE.s },
 });

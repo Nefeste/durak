@@ -8,7 +8,7 @@ import { solver } from '../../src/bot/endgame';
 import { actorOf } from '../../src/bot/sim';
 import { sameAction } from '../../src/bot';
 import { PUZZLES } from '../../src/game/puzzleSet';
-import { dayNumber, puzzleFor, START_DAY, stateOf, valueAfter } from '../../src/game/puzzle';
+import { answerOf, dayNumber, puzzleFor, replyOf, START_DAY, stateOf, valueAfter } from '../../src/game/puzzle';
 
 const pinned: { id: number; sha: string }[] = JSON.parse(readFileSync(join(import.meta.dir, 'fixtures/puzzles.json'), 'utf8'));
 const printOf = (p: unknown) => createHash('sha256').update(JSON.stringify(p)).digest('hex').slice(0, 16);
@@ -46,6 +46,35 @@ describe('набор задач дня', () => {
       expect(valueAfter(p, s, p.answer)).toBe(1);
     }
   }, 120_000);
+});
+
+// «Ответ» в любой момент (игра владельца 10.11.2026: ответ был только к первому ходу, после него — ни хода, ни ответа)
+describe('ответ по ходу задачи', () => {
+  test('в начале — ответ набора; по ответам против лучшей защиты игрок выходит, ответ есть на каждом своём ходе', () => {
+    for (const p of PUZZLES.filter((_, i) => i % 25 === 0)) {
+      let s = stateOf(p);
+      expect(sameAction(answerOf(p, s)!, p.answer)).toBe(true);
+      for (let step = 0; s.phase !== 'end' && step < 200; step++) {
+        const who = actorOf(s);
+        if (who === p.you) {
+          const a = answerOf(p, s);
+          expect(a).not.toBeNull();
+          s = apply(s, p.you, a!);
+        } else s = apply(s, who, replyOf(p, s, who, legalActions(s, who)));
+      }
+      expect(s.phase).toBe('end');
+      expect(s.result!.draw || s.result!.fool !== p.you).toBe(true);
+    }
+  }, 120_000);
+
+  test('после неверного первого хода спасения нет — ответа нет', () => {
+    const p = PUZZLES[0];
+    const s = stateOf(p);
+    const wrong = legalActions(s, p.you).find(a => !sameAction(a, p.answer))!;
+    let t = apply(s, p.you, wrong);
+    while (t.phase !== 'end' && actorOf(t) !== p.you) { const w = actorOf(t); t = apply(t, w, replyOf(p, t, w, legalActions(t, w))); }
+    if (t.phase !== 'end') expect(answerOf(p, t)).toBeNull();
+  });
 });
 
 describe('день', () => {

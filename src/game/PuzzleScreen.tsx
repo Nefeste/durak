@@ -21,12 +21,12 @@ import { useTableCues } from './useTableCues';
 import { useLessMotion, useSettings } from '../state/store';
 import { dateOfDay, loadPuzzleLog, todayKey, updateDay } from '../state/puzzles';
 import type { PuzzleLog } from '../state/puzzles';
-import { dayNumber, puzzleFor, replyOf, START_DAY, stateOf, valueAfter } from './puzzle';
+import { answerOf, dayNumber, puzzleFor, replyOf, START_DAY, stateOf, valueAfter } from './puzzle';
 import { PUZZLES } from './puzzleSet';
 import { tapCard } from './table';
 import { actionText } from './words';
 
-type Status = 'play' | 'wrong' | 'solved' | 'shown';
+type Status = 'play' | 'wrong' | 'solved';
 
 function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   const p = puzzleFor(PUZZLES, day);
@@ -34,6 +34,9 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   const less = useLessMotion();
   const [state, setState] = useState<State>(() => stateOf(p));
   const [status, setStatus] = useState<Status>('play');
+  // «Ответ» открыт: позицию можно доигрывать, над рукой — спасающий ход к каждой своей позиции (игра владельца 10.11.2026:
+  // после «Ответа» нельзя было ни сходить, ни посмотреть, а ответ был только к первому ходу)
+  const [peeked, setPeeked] = useState(false);
   const [tries, setTries] = useState(0);
   const [picked, setPicked] = useState<{ card: Card; options: Action[] } | null>(null);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
@@ -44,15 +47,18 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   const small = useFont(Onest_700Bold, 26);
   const you = p.you, opp = 1 - you;
   const date = dateOfDay(START_DAY, day);
-  useEffect(() => { void loadPuzzleLog().then(l => { const d = l[day]; if (d?.solved) setStatus('solved'); else if (d?.shown) setStatus('shown'); setTries(d?.tries ?? 0); }); }, [day]);
+  useEffect(() => { void loadPuzzleLog().then(l => { const d = l[day]; if (d?.solved) setStatus('solved'); if (d?.shown) setPeeked(true); setTries(d?.tries ?? 0); }); }, [day]);
 
   /** Новая позиция; кончилась партия, и игрок вышел, — задача решена. */
   const step = (next: State) => {
     setState(next);
     if (next.phase === 'end' && next.result && !next.result.draw && next.result.fool !== you) {
       setStatus('solved');
-      setTries(n => n + 1);
-      void updateDay(day, d => ({ ...d, tries: d.tries + 1, solved: true }));
+      // решённая по ответу — не «решена»: в архиве и в тексте для друзей она остаётся «ответ»
+      if (!peeked) {
+        setTries(n => n + 1);
+        void updateDay(day, d => ({ ...d, tries: d.tries + 1, solved: true }));
+      }
     }
   };
   // соперник отвечает лучшей защитой, пока ход за ним
@@ -64,7 +70,7 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
     }, 500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, status, p, you]);
+  }, [state, status, p, you, peeked]);
 
   const act = (a: Action) => {
     setPicked(null);
@@ -77,14 +83,19 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
     step(apply(state, you, a));
   };
   const again = () => { setState(stateOf(p)); setStatus('play'); setPicked(null); setRound(r => r + 1); };
-  const showAnswer = () => { setStatus('shown'); void updateDay(day, d => ({ ...d, shown: true })); };
+  const showAnswer = () => { setPeeked(true); setStatus('play'); setPicked(null); void updateDay(day, d => ({ ...d, shown: true })); };
   const share = () => {
-    const text = T.puzzle.shareText(day, date, tries, status === 'shown');
+    const text = T.puzzle.shareText(day, date, tries, peeked);
     setShared(text);
     Share.share({ message: text }).catch(() => { /* в браузере без «Поделиться» — текст виден на экране */ });
   };
 
-  const view = useMemo(() => observe(state, you), [state, you]);
+  // все карты соперника известны (колода пуста, вышедшие видны) — они и лежат на столе открытыми, а не только взятые
+  // в открытую (игра владельца 10.11.2026: на столе — часть карт, а текстом — все)
+  const view = useMemo(() => {
+    const o = observe(state, you);
+    return { ...o, openly: o.openly.map((x, seat) => (seat === you ? x : [...state.hands[seat]].sort((a, b) => a - b))) };
+  }, [state, you]);
   const targets = picked ? picked.options.flatMap(o => (o.type === 'beat' ? [o.on] : [])) : [];
   // в задаче партия не сыграна на глазах игрока — взятое в открытую входит в условие, его видно всегда
   const origins = useOrigins(view);
@@ -93,6 +104,9 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, origins, size, settings.handOrder, settings.straightHand, picked]);
   const mine = status === 'play' && actorOf(state) === you ? legalActions(state, you) : [];
+  const hintMove = useMemo(() => (peeked && status === 'play' && actorOf(state) === you ? answerOf(p, state) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [peeked, status, state]);
   const take = mine.find(a => a.type === 'take');
   const pass = mine.find(a => a.type === 'pass');
   const onCard = (c: Card) => {
@@ -116,14 +130,14 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
   };
-  const line = status === 'wrong' ? T.puzzle.wrong : status === 'solved' ? T.puzzle.solved(tries)
-    : status === 'shown' ? T.puzzle.answerIs(actionText(p.answer)) : T.puzzle.goal;
+  const line = status === 'wrong' ? T.puzzle.wrong
+    : status === 'solved' ? (peeked ? T.puzzle.solvedPeeked : T.puzzle.solved(tries))
+    : peeked && hintMove ? T.puzzle.answerIs(actionText(hintMove)) : peeked && actorOf(state) !== you ? T.puzzle.answerWait : T.puzzle.goal;
 
   return (
     <View style={styles.board}>
       <Text style={styles.head} testID="puzzle-number">{T.puzzle.number(day, date)}</Text>
-      <Text style={styles.opp} testID="puzzle-opponent">{T.puzzle.opponent(state.hands[opp].map(nameOf).join(' '))}</Text>
-      <View style={styles.area} onLayout={onLayout} testID="puzzle-table">
+      <View style={styles.area} onLayout={onLayout} testID="puzzle-table" accessibilityLabel={T.puzzle.opponent(state.hands[opp].map(nameOf).join(' '))}>
         {layout && font && small ? (
           <TableCanvas layout={layout} font={font} small={small} fourColor={settings.fourColor} less={less}
             hand={state.hands[you]} table={state.table} enabled={status === 'play'} touch={{ onCard, onTableCard, onDrop }} />
@@ -139,9 +153,9 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
         ) : null}
       </View>
       <View style={[styles.row, styles.inset]}>
-        {status === 'wrong' ? <View style={styles.cell}><Button label={T.puzzle.again} onPress={again} testID="puzzle-again" /></View> : null}
-        {status === 'play' || status === 'wrong' ? <View style={styles.cell}><Button label={T.puzzle.answer} kind="ghost" onPress={showAnswer} testID="puzzle-answer" /></View> : null}
-        {status === 'solved' || status === 'shown' ? <View style={styles.cell}><Button label={T.puzzle.share} onPress={share} testID="puzzle-share" /></View> : null}
+        {status === 'wrong' || status === 'solved' ? <View style={styles.cell}><Button label={T.puzzle.again} onPress={again} testID="puzzle-again" /></View> : null}
+        {!peeked && status !== 'solved' ? <View style={styles.cell}><Button label={T.puzzle.answer} kind="ghost" onPress={showAnswer} testID="puzzle-answer" /></View> : null}
+        {status === 'solved' || peeked ? <View style={styles.cell}><Button label={T.puzzle.share} kind={status === 'solved' ? 'main' : 'ghost'} onPress={share} testID="puzzle-share" /></View> : null}
         <View style={styles.cell}><Button label={T.puzzle.archive} kind="ghost" onPress={onArchive} testID="puzzle-archive" /></View>
       </View>
       {shared ? <Text style={[styles.shared, styles.margin]} testID="puzzle-share-text">{shared}</Text> : null}
@@ -186,7 +200,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: SPACE.s, gap: SPACE.s },
   board: { flex: 1, gap: SPACE.s },
   head: { color: C.text, fontSize: TYPE.body, fontWeight: '700', textAlign: 'center' },
-  opp: { color: C.dim, fontSize: TYPE.body, textAlign: 'center' },
   area: { flex: 1 },
   controls: { position: 'absolute', left: 8, right: 8, gap: SPACE.s },
   line: { color: C.text, fontSize: TYPE.body, textAlign: 'center', minHeight: 20 },
