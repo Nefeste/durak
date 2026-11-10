@@ -88,6 +88,8 @@ NODE_PATH=/opt/node22/lib/node_modules bun tools/store/shots.ts # after export:w
 NODE_PATH=/opt/node22/lib/node_modules bun tools/design/shots.ts # after export:web: every screen at 412×915 ×2 → docs/design/ (audits, before/after sheets)
 NODE_PATH=/opt/node22/lib/node_modules bun tools/design/flow.ts [dir]  # after export:web: the whole flow (menu → game to the result → review → settings → stats → store → online → four seats → puzzle), a shot per screen, console errors must be 0 (docs/specs/2026-11-art-premium.md §7)
 NODE_PATH=/opt/node22/lib/node_modules bun tools/design/deck.ts out.png [--four]   # after export:web: all 36 faces (`?deck=1`); `--pair a.png b.png sheet.png` — before/after sheet
+NODE_PATH=/opt/node22/lib/node_modules bun tools/design/cast.ts out.png            # after export:web: every rival portrait by level (`?cast=1`)
+NODE_PATH=/opt/node22/lib/node_modules bun tools/design/pair.ts out.png "title" before.png after.png [...]   # before/after sheet from phone screenshots
 ```
 
 ## Design work
@@ -119,6 +121,13 @@ This project's own rules:
   after the game; offline the phone shuffles with `expo-crypto` at the moment of the deal.
 - **The server sends each seat only what that seat may see** (ADR 0008): no response or event ever carries
   another player's hand or the talon order before the reveal; a test checks every route.
+- **Bots have names and code-drawn portraits** (ADR 0014, owner's decision #20): each level has a cast of three
+  (`src/game/rivals.ts`), the first is the level's face; who sits is derived only from the levels by seat (`rivalsAt`:
+  offline from your seat, online from the host's seat), so saves, history and the server protocol carry no names. The
+  order of a level's cast is eternal (`tools/test/rivals.test.ts`); add new characters only at the end. Names live in
+  `T.rival`, portraits are `src/game/Portrait.tsx` (react-native-svg, colours only from `PORTRAIT` in `src/ui/theme.ts`,
+  style sheet `docs/13-art.md` §11). Wherever a bot's name is shown, the «бот» chip and its level are shown too;
+  statistics stay by level.
 - **No bot, hints, card counting or review during an online game** — for anyone, paid or not (ADR 0006).
 - **Money as nardy** (ADR 0009, `docs/11-money.md`): everything about money lives in `src/money/` (copy of nardy's
   module without skins); screens call only `src/money/index.ts`; ads only when leaving the result screen, never during
