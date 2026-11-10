@@ -49,7 +49,7 @@ def parse():
     ap.add_argument('--threads', type=int, default=0, help='процессов самоигры (0 — ядер минус два)')
     ap.add_argument('--games', type=int, default=0, help='партий на процесс за круг (0 — 400 на этапе TD, 100 на этапе поиска)')
     ap.add_argument('--td-share', type=float, default=0.5, help='доля времени на этап TD(λ), остальное — поиск')
-    ap.add_argument('--td-max-hours', type=float, default=24.0, help='этап TD — не дольше стольких часов (неделя: 24 ч TD, 144 ч поиска)')
+    ap.add_argument('--td-max-hours', type=float, default=2.0, help='этап TD — не дольше стольких часов: на первом прогоне (10.11.2026) сила на арене после часа TD не росла')
     ap.add_argument('--lam', type=float, default=0.8, help='λ возврата')
     ap.add_argument('--beta', type=float, default=0.5, help='этап поиска: доля оценки поиска в цели своих решений')
     ap.add_argument('--samples', type=int, default=8, help='этап поиска: раскладов на решение в самоигре')
