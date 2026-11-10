@@ -241,6 +241,14 @@ async function main() {
     await p.getByTestId('quick-open').click();
     await p.getByTestId('quick').waitFor({ timeout: 10_000 });
     await p.getByTestId('quick-find').click();
+    if (p === a) {
+      // часы поиска, как в «Нардах» (игра владельца 10.11.2026): пока Миша ждёт один, идут «Ждём 0:0N»
+      await a.getByTestId('quick-waited').waitFor({ timeout: 10_000 }).catch(() => {});
+      const w1 = await a.getByTestId('quick-waited').innerText().catch(() => '');
+      await a.waitForTimeout(2200);
+      const w2 = await a.getByTestId('quick-waited').innerText().catch(() => '');
+      ok(/^Ждём 0:\d\d$/.test(w1) && /^Ждём 0:\d\d$/.test(w2) && w1 !== w2, `быстрая игра: часы поиска идут — «${w1}» → «${w2}»`, `${w1} | ${w2}`);
+    }
   }
   await a.getByTestId('online-game').waitFor({ timeout: 20_000 });
   await b.getByTestId('online-game').waitFor({ timeout: 20_000 });

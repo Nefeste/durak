@@ -1,7 +1,7 @@
 // Задача дня (docs/09-game-design.md, «Задача дня»; docs/10-bot.md, «Задача дня»): позиция концовки вдвоём, колода
 // пуст, все карты известны. Спасает ровно одно первое действие — это проверил точный расчёт при сборке набора
 // (`tools/puzzles/collect.ts`). Здесь — чистая часть: позиция из записи, задача на день, проверка хода игрока.
-import { apply, RULES_V1 } from '../engine';
+import { apply, legalActions, RULES_V1 } from '../engine';
 import type { Action, Card, Phase, State, Variant } from '../engine';
 import { solver } from '../bot/endgame';
 
@@ -67,4 +67,18 @@ export function replyOf(p: Puzzle, s: State, who: number, legal: Action[], budge
     if (v < bestV) { bestV = v; best = a; }
   }
   return best;
+}
+
+/**
+ * «Ответ» в любой момент (docs/09-game-design.md, «Задача дня»): спасающее действие игрока в этой позиции — в начале
+ * это `p.answer`, дальше — первое по порядку законных, после которого точный расчёт говорит «выходит». `null` — ход
+ * не игрока, партия кончилась или спасения уже нет (игрок ошибся раньше).
+ */
+export function answerOf(p: Puzzle, s: State, budget = 200_000): Action | null {
+  if (s.phase === 'end') return null;
+  const legal = legalActions(s, p.you);
+  if (legal.length === 0) return null;
+  const sv = solver(p.you, budget);
+  for (const a of legal) if (sv.value(apply(s, p.you, a)) >= 1) return a;
+  return null;
 }

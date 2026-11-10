@@ -192,7 +192,10 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   // «Подсказка»: что сделал бы «Опытный» — кусками, пока игрок ждёт (docs/09-game-design.md)
   const [advising, setAdvising] = useState(false);
   const adviseJob = useRef<ThinkJob<Advice> | null>(null);
-  useEffect(() => () => adviseJob.current?.cancel(), [state]);
+  // позиция сменилась, пока «Подсказка» считала (подкинули, отбились): счёт снят, и кнопку надо отпустить — снятая работа
+  // своё обещание не выполняет, и «считаю» иначе осталось бы навсегда (игра владельца 10.11.2026: после хода соперника
+  // подсказка больше не срабатывала до конца партии)
+  useEffect(() => () => { adviseJob.current?.cancel(); adviseJob.current = null; setAdvising(false); }, [state]);
   const advise = () => {
     if (advising) return;
     hinted.current = true;

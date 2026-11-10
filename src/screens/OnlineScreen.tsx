@@ -67,6 +67,15 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   const [picking, setPicking] = useState<{ code: string; info: CodeInfo } | null>(null);
   const [quick, setQuick] = useState<QuickView | null>(null);
   const searching = useRef(false);
+  // сколько ищем — «Ждём 0:12» раз в секунду, как в «Нардах»; отсчёт — с первого «Найти соперника»
+  const [since, setSince] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const looking = quick?.status === 'searching';
+  useEffect(() => {
+    if (!looking) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [looking]);
 
   useEffect(() => {
     void (async () => {
@@ -134,6 +143,9 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
     setQuick(q);
     if (q.status === 'matched') return matched(q.table);
     searching.current = true;
+    const t = Date.now();
+    setSince(t);
+    setNow(t);
   });
   useEffect(() => {
     if (!quick || quick.status !== 'searching') return;
@@ -189,6 +201,7 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
           {q?.status === 'searching' ? (
             <>
               <Text style={styles.big} testID="quick-searching">{T.online.searching}</Text>
+              <Text style={styles.label} testID="quick-waited">{T.online.waited(Math.max(0, now - (since ?? now)))}</Text>
               <Text style={styles.note}>{T.online.rating(q.me.rating)}</Text>
               {q.offerBot ? (
                 <>
