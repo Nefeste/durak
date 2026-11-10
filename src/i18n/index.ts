@@ -217,7 +217,7 @@ export const T = {
     /** Строка подсказки: что сделать и шанс (docs/09-game-design.md, «Подсказки»). */
     advice: (what: string, chance: number | null, exact: boolean) => chance === null ? what
       : exact ? `${what} — ${chance === 1 ? 'при лучшей игре вы выходите' : chance === 0.5 ? 'при лучшей игре — ничья' : 'проигрыш при лучшей игре соперника, так труднее всего'}`
-      : `${what} — шанс выйти без карт ${Math.round(chance * 100)} %`,
+      : `${what} — шанс выйти без карт около ${Math.round(chance * 100)} %`,
     adviceAttack: (cards: string) => `Ходите ${cards}`,
     adviceThrow: (cards: string) => `Подкиньте ${cards}`,
     adviceBeat: (on: string, by: string) => `Побейте ${on} картой ${by}`,

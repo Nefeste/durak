@@ -119,21 +119,37 @@ export function* searchThink(o: Observation, p: SearchParams, rng: Rng): Thinkin
 /** Совет игроку («Подсказка», docs/09-game-design.md): что сделал бы «Опытный» и его шанс выйти без
  *  карт. В концовке вдвоём — точный расчёт (`exact`), иначе — доля раскладов, где действие ведёт к
  *  выходу. Работает по наблюдению игрока — бот за столом этих расчётов не видит. */
-export interface Advice { action: Action; chance: number | null; exact: boolean }
+/** `samples` — сколько раскладов доиграно (у точной концовки и единственного хода — 0). */
+export interface Advice { action: Action; chance: number | null; exact: boolean; samples: number }
+
+/** Меньше стольких доигранных раскладов — шанс не называть: по 3–10 пробам он скачет от 0 % к 100 % (игра владельца
+ *  10.11.2026 вчетвером: «шанс 0 %», а через ход — «при лучшей игре вы выходите», и он вышел). */
+export const ADVICE_MIN_SAMPLES = 24;
+
+/**
+ * Какой шанс показать в строке «Подсказки»: точный — как есть (1, ½, 0 — «при лучшей игре …»); по раскладам — только
+ * если их хватило, и не 0 и не 100 %: доигрывание «Средним» за всех — оценка, а не приговор; иначе `null` — ход без числа.
+ */
+export function shownChance(a: Advice): number | null {
+  if (a.chance === null) return null;
+  if (a.exact) return a.chance;
+  if (a.samples < ADVICE_MIN_SAMPLES) return null;
+  return Math.min(0.95, Math.max(0.05, Math.round(a.chance * 20) / 20));
+}
 
 export function* adviseThink(o: Observation, rng: Rng, samples = 128, budget = 15_000): Thinking<Advice> {
   const legal = legalFor(o);
-  if (legal.length === 1) return { action: legal[0], chance: null, exact: false };
+  if (legal.length === 1) return { action: legal[0], chance: null, exact: false, samples: 0 };
   if (isEndgame(o)) {
     const solving = solveThink(o, budget);
     let r = solving.next();
     while (!r.done) r = solving.next(yield);
     if (r.value) {
       const top = r.value.reduce((b, x) => (x.value > b.value ? x : b));
-      return { action: top.action, chance: top.value, exact: true };
+      return { action: top.action, chance: top.value, exact: true, samples: 0 };
     }
   }
   const scored = yield* scoreActions(o, isEndgame(o) ? 1 : samples, rng, legal);
   const b = best(scored);
-  return { action: b.action, chance: b.score, exact: false };
+  return { action: b.action, chance: b.score, exact: false, samples: b.samples };
 }

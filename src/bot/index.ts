@@ -93,7 +93,7 @@ export type { Rng } from './rng';
 export { thinkSync } from './think';
 export type { Thinking } from './think';
 export { isEndgame, solveActions } from './endgame';
-export { adviseThink } from './search';
+export { adviseThink, ADVICE_MIN_SAMPLES, shownChance } from './search';
 export type { Advice } from './search';
 export { reviewThink, sameAction, gradeOf, whyOf, ERROR_PTS, INACCURATE_PTS, REVIEW_SAMPLES } from './review';
 export type { Review, Decision, Grade, Why, Move } from './review';

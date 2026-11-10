@@ -2,7 +2,7 @@
 // пару, `tools/sim/ladder.ts`, отчёт в docs/reports/; здесь — короткие проверки, что порядок держится.
 import { describe, expect, test } from 'bun:test';
 import { apply, newGame, observe, RULES_V1 } from '../../src/engine';
-import { adviseThink, legalFor, makeRng, think, thinkSync } from '../../src/bot';
+import { adviseThink, ADVICE_MIN_SAMPLES, legalFor, makeRng, shownChance, think, thinkSync } from '../../src/bot';
 import { actorOf } from '../../src/bot/sim';
 import { arena } from '../sim/arena';
 import { shuffled } from '../sim/play';
@@ -61,6 +61,28 @@ describe('подсказка', () => {
     }
     throw new Error('не нашлось концовки');
   }, 60_000);
+
+  test('кусок — под частоту экрана: доля кадра, не длиннее заданного и не короче 4 мс', async () => {
+    const { sliceFor, SLICE_MS } = await import('../../src/game/think');
+    expect(sliceFor(1000 / 60)).toBe(SLICE_MS);
+    expect(sliceFor(1000 / 120)).toBeCloseTo(5, 5);
+    expect(sliceFor(1000 / 90)).toBeCloseTo(6.67, 1);
+    expect(sliceFor(Infinity)).toBe(4);
+    expect(sliceFor(3)).toBe(4);
+  });
+
+  // игра владельца 10.11.2026 вчетвером: «шанс 0 %», а через ход «при лучшей игре вы выходите» — шанс по 3–10 раскладам
+  test('шанс «Подсказки»: точный — как есть; по раскладам — только если их хватило, и не 0 и не 100 %', () => {
+    const a = { action: { type: 'take' } as const, exact: false };
+    expect(shownChance({ ...a, chance: 0, samples: 5 })).toBeNull();
+    expect(shownChance({ ...a, chance: 1, samples: ADVICE_MIN_SAMPLES - 1 })).toBeNull();
+    expect(shownChance({ ...a, chance: 0, samples: 128 })).toBe(0.05);
+    expect(shownChance({ ...a, chance: 1, samples: 128 })).toBe(0.95);
+    expect(shownChance({ ...a, chance: 0.437, samples: 64 })).toBe(0.45);
+    expect(shownChance({ ...a, chance: null, samples: 0 })).toBeNull();
+    expect(shownChance({ ...a, exact: true, chance: 0, samples: 0 })).toBe(0);
+    expect(shownChance({ ...a, exact: true, chance: 1, samples: 0 })).toBe(1);
+  });
 });
 
 describe('кусками на часах', () => {
