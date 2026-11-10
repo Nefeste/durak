@@ -25,4 +25,23 @@ describe('надписи целиком', () => {
     expect(plateHeight(4, 2)).toBe(plateHeight(4, 1.3));
     expect(plateHeight(4, 0.85)).toBe(plateHeight(4));
   });
+  // соперники с портретами (#20, docs/13-art.md §11): широкая плашка — прежней высоты, узкая — выше на одну строку
+  test('плашка с портретом: сбоку — та же высота, вчетвером — на строку выше, и обе растут с шрифтом', async () => {
+    const { plateHeight, plateOf, PLATE } = await import('../../src/render/layout');
+    expect(plateHeight(3, 1, 'side')).toBe(plateHeight(3));
+    expect(plateHeight(3, 1, 'top')).toBe(plateHeight(3) + PLATE.line);
+    expect(plateHeight(3, 1.3, 'top')).toBeGreaterThan(plateHeight(3, 1, 'top'));
+    expect(plateHeight(3, 2, 'side')).toBe(plateHeight(3, 1.3, 'side'));
+    // стол 360 и 412 точек (поля экрана — по 8): один-два соперника — портрет сбоку, три — в верхнем ряду
+    for (const W of [344, 396]) {
+      expect(plateOf(W, 1, 3, 1, true).face).toBe('side');
+      expect(plateOf(W, 2, 3, 1, true).face).toBe('side');
+      expect(plateOf(W, 3, 3, 1, true).face).toBe('top');
+      // надписям рядом с портретом — не меньше 110 точек: «Начинающий» шрифтом ×1,3
+      for (const n of [1, 2]) {
+        const w = plateOf(W, n, 3, 1, true).w;
+        expect(w - 10 - (w >= PLATE.sideBigFrom ? PLATE.side : PLATE.sideSmall) - PLATE.gap).toBeGreaterThanOrEqual(110);
+      }
+    }
+  });
 });

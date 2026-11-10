@@ -52,6 +52,23 @@ export const GLOWS = [
   { id: 'cool', color: C.cool, opacity: 0.1, cx: '50%', cy: '104%', r: '62%' },
 ] as const;
 
+/**
+ * Портреты соперников-ботов (docs/13-art.md, §11; src/game/Portrait.tsx): приглушённые «нити» под ночную хвою стола.
+ * Золота `accent` среди них нет — оно означает главное действие. `ground` — сукно медальона, `skin` и `shade` — три
+ * тона лица и тень шеи к ним, `hair` — волосы, `cloth` — одежда, кепки и шали, `ink` — глаза и оправа, `metal` —
+ * серьги, `linen` — воротник.
+ */
+export const PORTRAIT = {
+  ground: '#1F4A52',
+  skin: ['#F2D3B5', '#E2B48C', '#BE8A63'],
+  shade: ['#D9B291', '#C4946C', '#9C6C49'],
+  hair: { ink: '#2A2422', brown: '#5E3F2B', chestnut: '#8A5A36', fair: '#D8BE8A', red: '#B5582F', grey: '#A9B1B3', white: '#E6E8E4' },
+  cloth: { wine: '#8C3B3B', teal: '#2F8088', slate: '#5F7890', moss: '#62804F', plum: '#7D5C86', rust: '#B0683E', sand: '#C2AC84', night: '#14242A' },
+  ink: '#1B2328',
+  metal: '#E9E4D4',
+  linen: '#EDE8DA',
+} as const;
+
 /** Цвета мастей ♠ ♣ ♦ ♥ (docs/09-game-design.md, «Вид»): обычная колода или четырёхцветная. */
 export const suitColors = (fourColor: boolean): readonly string[] =>
   fourColor ? [C.black, C.green, C.blue, C.red] : [C.black, C.black, C.red, C.red];

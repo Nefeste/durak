@@ -462,7 +462,11 @@ try {
   ok(await handCount(page) === 6, 'на руке шесть карт', await handCount(page));
   ok(await visible(page, 'opp-1'), 'соперник с подписью «бот»', await page.getByTestId('opp-1').innerText().catch(() => ''));
   const seat = await page.getByTestId('opp-1').innerText().catch(() => '');
-  ok(/^Бот 1\s+Начинающий\s+\d+ карт/.test(seat.trim()), `место соперника — «Бот 1», «Начинающий», «N карт» строками (первая партия, спецификация §3): ${seat.replace(/\n/g, ' · ')}`, seat);
+  // соперник с именем и портретом (решение владельца #20): подпись «бот» у портрета, имя, уровень, число карт — строками
+  ok(/^бот\s+Катя\s+Начинающий\s+\d+ карт/.test(seat.trim()), `место соперника — «бот», «Катя», «Начинающий», «N карт» строками (первая партия; #20): ${seat.replace(/\n/g, ' · ')}`, seat);
+  ok(!/Бот \d/.test(await page.getByTestId('game').innerText()), 'за столом нет «Бот 1»: у соперника имя');
+  ok(await page.getByTestId('opp-1-face').locator('svg').count() === 1 && (await page.getByTestId('opp-1-face-bot').innerText()).trim() === 'бот', 'портрет соперника нарисован, под ним подпись «бот»');
+  const seatBefore = (await page.getByTestId('opp-1-name').innerText()).trim();
   // вдвоём бот всегда ходит или отбивается — его плашка с золотой кромкой
   ok(await page.getByTestId('opp-1').getAttribute('aria-selected').catch(() => null) === 'true', 'плашка ходящего соперника выделена');
   // первая партия: строка над рукой учит первые три отбоя (docs/09-game-design.md, «Первая партия»)
@@ -539,6 +543,7 @@ try {
   await page.getByTestId('game').waitFor({ timeout: 10000 });
   await page.waitForTimeout(500);
   ok(await handCount(page) === handBefore, `партия продолжилась с той же рукой: ${handBefore}`, await handCount(page));
+  ok((await page.getByTestId('opp-1-name').innerText()).trim() === seatBefore, `после перезапуска за столом тот же соперник: ${seatBefore}`, await page.getByTestId('opp-1-name').innerText());
   // отмена: боты с обычной паузой (0,5–0,9 с) — успеваем отменить свой ход до их ответа
   await page.getByTestId('game-menu').click();
   await page.getByTestId('game-exit').click();
@@ -781,9 +786,16 @@ try {
   await setLevel(page, 'Любитель');
   await page.getByTestId('levels-mixed').click();
   ok(!(await visible(page, 'level-value')) && await visible(page, 'level-1-value') && await visible(page, 'level-2-value'), 'включили — строка у каждого бота вместо общей');
+  {
+    // два бота одного уровня — два разных персонажа: «Любитель» — Вера и Захар, не «Бот 1» и «Бот 2» (#20)
+    const who = [await page.getByTestId('rival-1-name').innerText(), await page.getByTestId('rival-2-name').innerText()].map(x => x.trim());
+    ok(who[0] === 'Вера' && who[1] === 'Захар', `меню: у каждого бота имя, за одним столом имена разные: ${who.join(', ')}`);
+    ok(!/Бот \d/.test(await page.getByTestId('menu').innerText()), 'в меню нет «Бот 1»');
+  }
   ok(await page.getByTestId('level-1-value').innerText() === 'Любитель' && await page.getByTestId('level-2-value').innerText() === 'Любитель', 'строки ботов начинаются с общего уровня');
   await setLevel(page, 'Новичок', 'level-1');
   await setLevel(page, 'Средний', 'level-2');
+  ok((await page.getByTestId('rival-1-name').innerText()).trim() === 'Тёма' && (await page.getByTestId('rival-2-name').innerText()).trim() === 'Глеб', 'сменили уровень — сменился соперник: «Новичок» — Тёма, «Средний» — Глеб');
   await setLevel(page, 'Мастер · скоро', 'level-2');
   ok(await visible(page, 'locked-note') && await page.getByTestId('play').isDisabled(), '«Мастер · скоро» в строке бота закрыт, «Играть» недоступна');
   await page.getByTestId('level-2-prev').click();
@@ -818,10 +830,17 @@ try {
   const plate2 = await page.getByTestId('opp-2').innerText().catch(() => '');
   ok(/Новичок/.test(plate1) && !/Средний/.test(plate1), `плашка бота 1 — «Новичок»: ${plate1.replace(/\n/g, ' ')}`);
   ok(/Средний/.test(plate2) && !/Новичок/.test(plate2), `плашка бота 2 — «Средний»: ${plate2.replace(/\n/g, ' ')}`);
+  ok(/Тёма/.test(plate1) && /Глеб/.test(plate2) && /бот/.test(plate1) && /бот/.test(plate2), 'на плашках — те же имена, что в меню, и подпись «бот»');
   ok(await page.getByTestId('game-title').innerText().catch(() => '') === 'Подкидной', 'в верхней полосе — только стол, уровни — на плашках');
   await page.screenshot({ path: `${OUT}/10-levels-table.png` });
   const mixedGame = await playOut(page, 'разные уровни');
   ok(mixedGame.ended, 'партия с ботами разных уровней дошла до итога');
+  {
+    // итог: в ряду мест — имена и уровни ботов, у каждого портрет с подписью «бот»; у своего места портрета нет
+    const places = await page.getByTestId('result-places').innerText().catch(() => '');
+    ok(/Тёма/.test(places) && /Глеб/.test(places) && /Новичок/.test(places) && /Средний/.test(places) && !/Бот \d/.test(places), `итог: места по именам, уровень строкой ниже: ${places.replace(/\n/g, ' ')}`);
+    ok(await page.getByTestId('result-places').locator('svg').count() === 2 && (places.match(/бот/g) ?? []).length === 2, 'итог: два портрета ботов, у каждого «бот»');
+  }
   await page.getByTestId('result-menu').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
   await page.getByTestId('stats-open').click();

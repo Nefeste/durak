@@ -22,7 +22,7 @@ import { TableCanvas } from '../render/TableCanvas';
 import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
 import { resultPlaces } from './outcome';
-import { CONTROLS_GAP, layoutTable, plateOf, plateHeight, TITLE_SCALE } from '../render/layout';
+import { CONTROLS_GAP, layoutTable, plateOf, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { setSettings, useLessMotion, useSettings } from '../state/store';
@@ -31,7 +31,8 @@ import type { SeatView, TableView } from '../state/protocol';
 import { net, newSeed } from '../state/onlineStore';
 import { tapCard } from './table';
 import { SeatMap } from './SeatMap';
-import { placesOf } from './seats';
+import { placesOf, tableRivals } from './seats';
+import type { Rival } from './rivals';
 import { holdMs, tableLabel } from './hold';
 import { useHold } from './useHold';
 import { noteOf } from './note';
@@ -42,9 +43,10 @@ import type { Note } from './note';
 
 export const inviteLink = (code: string) => `${net.base}/t/${code}`;
 
-function seatName(s: SeatView | null | undefined): string {
+/** Имя места в строке итога: у бота — имя персонажа с подписью «бот» (ADR 0011). */
+function seatName(s: SeatView | null | undefined, rival?: Rival | null): string {
   if (!s) return T.online.emptySeat;
-  if (s.bot) return T.online.botSeat(T.level[s.bot]);
+  if (s.bot) return T.online.botSeat(rival ? T.rival[rival.id] : T.level[s.bot]);
   return s.name;
 }
 
@@ -213,7 +215,10 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const bubbles = useSpeech(shown);
   useTableCues(shown, g.no, less);
   // плашка: имя, уровень бота или «играет бот» / «нет связи», число карт, роль — каждая строкой (docs/13-art.md, §3)
-  const plateH = plateHeight(plateLines(2), fontScale);
+  const plate = plateOf(size?.width ?? 412, t.seats.length - 1, plateLines(2), fontScale, true);
+  const plateH = plate.h;
+  // персонажи ботов — из уровней по местам и места создателя: у всех за столом одни и те же имена
+  const rivals = tableRivals(t);
   const lay = useMemo(() => (size && shown ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, plate: plateH, straight: settings.straightHand, orderButton: true }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [shown, origins, size, settings.handOrder, settings.straightHand, picked, plateH]);
@@ -233,14 +238,13 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
     : view.phase === 'giving' && canPass ? T.game.hintGive
     : canPass ? T.game.hintThrow : T.game.hintWait;
   const left = g.deadline && now ? Math.max(0, Math.ceil((g.deadline - now) / 1000)) : null;
-  const plate = plateOf(size?.width ?? 412, t.seats.length - 1);
   const oppW = plate.w;
 
   const gave = (seat: number | null, r: Result) => seat !== null && (r.resigned ?? []).includes(seat);
   const result = (r: Result) => gave(t.you, r) ? T.result.youResigned
     : r.draw || r.fool === null ? T.result.draw
     : r.fool === t.you ? T.result.lose
-    : gave(r.fool, r) ? T.result.otherResigned(seatName(t.seats[r.fool])) : T.result.other(seatName(t.seats[r.fool]));
+    : gave(r.fool, r) ? T.result.otherResigned(seatName(t.seats[r.fool], rivals[r.fool])) : T.result.other(seatName(t.seats[r.fool], rivals[r.fool]));
   const rematch = () => {
     if (!g.nextCommit) return;
     const seed = newSeed();
@@ -272,11 +276,13 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
         {lay && shown ? lay.opponents.map(p => {
           const s = t.seats[p.seat];
           return (
-            <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={s?.bot ? T.online.botName : seatName(s)}
+            <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={s?.bot && rivals[p.seat] ? T.rival[rivals[p.seat]!.id] : seatName(s)}
+              rival={rivals[p.seat]} face={plate.face}
               lines={[
                 ...(s?.bot ? [T.level[s.bot]] : s?.botFor ? [T.online.botPlays] : s && !s.online ? [T.online.offline] : []),
-                (shown.resigned ?? []).includes(p.seat) ? T.game.resigned : shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat]),
+                (shown.resigned ?? []).includes(p.seat) ? T.game.resigned : shown.out.includes(p.seat) ? (rivals[p.seat]?.she ? T.game.outShe : T.game.out) : T.game.cards(shown.handSizes[p.seat]),
               ]}
+              cards={(shown.resigned ?? []).includes(p.seat) || shown.out.includes(p.seat) ? undefined : shown.handSizes[p.seat]}
               role={view ? roleOf(view, p.seat, throwerSeen(view)) : null}
               active={!!view && view.phase !== 'end' && (view.attacker === p.seat || view.defender === p.seat || throwerSeen(view) === p.seat)}
               left={p.x - oppW / 2} width={oppW} top={lay.plate.top} height={lay.plate.height} />
@@ -314,7 +320,10 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
       } : null} />
       {t.status === 'finished' && g.result ? (
         <ResultSheet bottom={insets.bottom} title={result(g.result)}
-          places={resultPlaces(g.result, seat => ({ name: seat === t.you ? T.result.you : seatName(t.seats[seat]) }), t.you)}
+          places={resultPlaces(g.result, seat => {
+            const s = t.seats[seat], rival = rivals[seat];
+            return s?.bot && rival ? { name: T.rival[rival.id], sub: T.level[s.bot], rival } : { name: seat === t.you ? T.result.you : seatName(s) };
+          }, t.you)}
           lines={table.check ? (
             <Text style={[sheetText.line, table.check.ok ? styles.ok : styles.err]} testID="deck-check">
               {table.check.ok ? T.online.deckOk(table.check.cards) : T.online.deckBad}

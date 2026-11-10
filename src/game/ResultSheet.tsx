@@ -8,6 +8,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { T } from '../i18n';
 import { breakable } from './SeatPlate';
+import { FACE, Face } from './Portrait';
 import type { ResultPlace } from './outcome';
 import { useLessMotion } from '../state/store';
 import { Glass } from '../ui/Glass';
@@ -37,9 +38,16 @@ export function ResultSheet({ title, places, lines, main, rest, bottom }: {
         <View style={styles.places} testID="result-places" accessibilityLabel={places.map(p => `${p.n}. ${p.name}${p.fool ? ` — ${T.result.withCards}` : ''}`).join('; ')}>
           {places.map(p => (
             // своё место — золотой кромкой, но не когда остались с картами: итог спокойный, без «награды» за проигрыш
-            <Glass key={p.n} radius={RADIUS.small} style={[styles.place, places.length > 3 && styles.placeHalf, p.you && !p.fool && styles.mine]} testID={`place-${p.n}`}>
-              <Text style={[styles.placeN, p.fool && styles.foolText]} maxFontSizeMultiplier={1.3}>{p.fool ? T.result.withCards : T.result.placeN(p.n)}</Text>
-              <Text style={[styles.placeName, p.fool && styles.foolText]} maxFontSizeMultiplier={1.3}>{breakable(p.name)}</Text>
+            // медальон места слева (портрет бота с подписью «бот» или первая буква имени), справа — место и имя;
+            // уровень бота — строкой ниже во всю ширину плашки: рядом с медальоном «Начинающий» шрифтом ×1,3 не помещается
+            <Glass key={p.n} radius={RADIUS.small} style={[styles.place, places.length > 2 && styles.placeHalf, p.you && !p.fool && styles.mine]} testID={`place-${p.n}`}>
+              <View style={styles.placeHead}>
+                <Face rival={p.rival} name={p.name} size={FACE.tile} testID={`place-${p.n}-face`} />
+                <View style={styles.placeText}>
+                  <Text style={[styles.placeN, p.fool && styles.foolText]} maxFontSizeMultiplier={1.3}>{p.fool ? T.result.withCards : T.result.placeN(p.n)}</Text>
+                  <Text style={[styles.placeName, p.fool && styles.foolText]} maxFontSizeMultiplier={1.3}>{breakable(p.name)}</Text>
+                </View>
+              </View>
               {p.sub ? <Text style={styles.placeSub} maxFontSizeMultiplier={1.3}>{p.sub}</Text> : null}
             </Glass>
           ))}
@@ -67,14 +75,17 @@ const styles = StyleSheet.create({
   grip: { alignSelf: 'center', width: 36, height: 4, borderRadius: RADIUS.pill, backgroundColor: C.glassLine },
   title: { color: C.text, fontSize: TYPE.title, fontWeight: '700', textAlign: 'center' },
   ornament: { alignItems: 'center', marginTop: -SPACE.xs },
-  // вчетвером — два ряда по два: в ряд из четырёх на 360 точках «Начинающий» не помещался (13-art.md, §3 «Надписи целиком»)
+  // не больше двух плашек в ряд: рядом с медальоном «Начинающий» в ряду из трёх на 360 точках не помещается
+  // (13-art.md, §3 «Надписи целиком»); втроём третья плашка — вторым рядом, вчетвером — два ряда по два
   places: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.s, justifyContent: 'center' },
   placeHalf: { flexBasis: '45%' },
-  place: { flex: 1, maxWidth: 160, minHeight: 64, paddingHorizontal: SPACE.s, paddingVertical: SPACE.xs, alignItems: 'center', justifyContent: 'center', gap: SPACE.xs / 2 },
+  place: { flex: 1, maxWidth: 200, minHeight: 64, paddingHorizontal: SPACE.s, paddingVertical: SPACE.s, alignItems: 'center', justifyContent: 'center', gap: SPACE.xs / 2 },
+  placeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.s },
+  placeText: { flexShrink: 1, alignItems: 'flex-start', gap: SPACE.xs / 2 },
   // своё место — золотая кромка в 2 точки, размер тот же
-  mine: { borderColor: C.accent, borderWidth: 2, paddingHorizontal: SPACE.s - 1, paddingVertical: SPACE.xs - 1 },
+  mine: { borderColor: C.accent, borderWidth: 2, paddingHorizontal: SPACE.s - 1, paddingVertical: SPACE.s - 1 },
   placeN: { color: C.accent, fontSize: TYPE.caption, fontWeight: '700' },
-  placeName: { color: C.text, fontSize: TYPE.body, fontWeight: '700', textAlign: 'center' },
+  placeName: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   placeSub: { color: C.dim, fontSize: TYPE.caption, textAlign: 'center' },
   foolText: { color: C.dim, fontWeight: '400' },
   row: { flexDirection: 'row', gap: SPACE.s },
