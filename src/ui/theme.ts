@@ -36,6 +36,10 @@ export const C = {
   sky: '#0F262C',
   lamp: '#F0C878',
   cool: '#2A7F8A',
+  /** Пол комнаты (Backdrop.tsx, 13-art.md §5): тон доски поверх фона, доска посветлее, щель между досками. */
+  floor: 'rgba(126,86,51,0.05)',
+  floorLight: 'rgba(126,86,51,0.085)',
+  floorSeam: 'rgba(2,8,10,0.2)',
   /** Борт стола — дерево: свет сверху, тень снизу. */
   wood: '#5A3A22',
   woodLight: '#7E5633',
@@ -51,6 +55,23 @@ export const GLOWS = [
   { id: 'lamp', color: C.lamp, opacity: 0.14, cx: '50%', cy: '16%', r: '58%' },
   { id: 'cool', color: C.cool, opacity: 0.1, cx: '50%', cy: '104%', r: '62%' },
 ] as const;
+
+/**
+ * Рубашки (13-art.md §11, каталог — src/render/backs.ts): оформления — контент со своей палитрой (ADR устава 0023,
+ * правило 4). `base` — основа, `line` — рамка и узор, `mark` — второй цвет узора, где он есть.
+ */
+export const BACKS = {
+  classic: { base: C.back, line: C.backLine, mark: C.backLine },
+  indigo: { base: '#24406E', line: '#E9E2CF', mark: '#E9E2CF' },
+  pine: { base: '#2E6A55', line: '#E6D29A', mark: '#E6D29A' },
+  weave: { base: '#4B2F57', line: '#E2B8A0', mark: '#E2B8A0' },
+  rays: { base: '#6A2030', line: '#E3B75E', mark: '#E3B75E' },
+  frost: { base: '#C7D6DD', line: '#2C4C6E', mark: '#2C4C6E' },
+  scales: { base: '#1F6068', line: '#A9DAD6', mark: '#A9DAD6' },
+  chevron: { base: '#333E45', line: '#E3B75E', mark: '#E3B75E' },
+  suits: { base: '#EFE7D4', line: '#7A2E2E', mark: '#1B2328' },
+  amber: { base: '#C48A32', line: '#44260E', mark: '#44260E' },
+} as const;
 
 /** Цвета мастей ♠ ♣ ♦ ♥ (docs/09-game-design.md, «Вид»): обычная колода или четырёхцветная. */
 export const suitColors = (fourColor: boolean): readonly string[] =>

@@ -1,6 +1,6 @@
 // Настройки (docs/09-game-design.md, «Настройки»): звук, вибрация, «Меньше движения» (как в системе,
 // пока игрок не выбрал сам — ADR устава 0023, правило 6), скорость ботов, порядок руки, «Подкидывать»,
-// четырёхцветная колода, «Помощь памяти (для учёбы)», персональная реклама (этап Е, как в «Нардах»).
+// рубашка (ряд ведёт на экран «Рубашки»), четырёхцветная колода, «Помощь памяти (для учёбы)», персональная реклама (этап Е, как в «Нардах»).
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
@@ -12,7 +12,7 @@ import { Chips } from '../ui/Chips';
 import { Toggle } from '../ui/Toggle';
 import { C, SPACE, TYPE } from '../ui/theme';
 import { setSettings, useSettings } from '../state/store';
-import { setPersonalAds } from '../money';
+import { setPersonalAds, useBack } from '../money';
 import { APP_VERSION } from '../version';
 
 type Motion = 'system' | 'on' | 'off';
@@ -27,9 +27,10 @@ function Row({ title, note, children }: { title: string; note?: string; children
   );
 }
 
-export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => void; onReport: () => void; onBench?: () => void }) {
+export function SettingsScreen({ onBack, onReport, onBench, onBacks }: { onBack: () => void; onReport: () => void; onBench?: () => void; onBacks: () => void }) {
   const insets = useInsets();
   const s = useSettings();
+  const back = useBack();
   const motion: Motion = s.lessMotion === undefined ? 'system' : s.lessMotion ? 'on' : 'off';
   return (
     <ScrollView style={styles.root} contentContainerStyle={[styles.content, { paddingTop: insets.top + SPACE.l, paddingBottom: insets.bottom + SPACE.xl }]} testID="settings">
@@ -51,6 +52,9 @@ export function SettingsScreen({ onBack, onReport, onBench }: { onBack: () => vo
         <Toggle id="straight" title={T.settings.straightHand} note={T.settings.straightHandNote} value={s.straightHand} onChange={v => setSettings({ straightHand: v })} />
         <Row title={T.settings.throwOrder} note={T.settings.throwOrderNote}>
           <Chips id="throw" items={['queue', 'free'] as const} value={s.throwOrder} label={v => (v === 'queue' ? T.settings.throwQueue : T.settings.throwFree)} onChange={throwOrder => setSettings({ throwOrder })} />
+        </Row>
+        <Row title={T.settings.cardBack}>
+          <Button testID="backs-open" kind="ghost" label={T.settings.backOpen(T.backs.names[back])} onPress={onBacks} />
         </Row>
         <Toggle id="four" title={T.settings.fourColor} note={T.settings.fourColorNote} value={s.fourColor} onChange={v => setSettings({ fourColor: v })} />
         <Toggle id="memory" title={T.settings.memoryAid} note={T.settings.memoryAidNote} value={s.memoryAid} onChange={v => setSettings({ memoryAid: v })} />

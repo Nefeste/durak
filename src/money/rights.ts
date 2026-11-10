@@ -1,7 +1,9 @@
-// из nardy: src/money/rights.ts @ 1d2bdff — без оформлений.
+// из nardy: src/money/rights.ts @ 1d2bdff — оформления — рубашки (src/render/backs.ts).
 // Права игрока: «Без рекламы», «Про» и открытые рекламой разборы (docs/09-game-design.md, «Реклама и
 // покупки»). Правда — у RuStore Pay; на телефоне — кэш `durak.purchases`, чтобы без сети всё купленное
 // работало. Что открывает «Про» в разборе — `reviewAccess`; разбор — этап Д (docs/07-roadmap.md).
+import { isPaidBack } from '../render/backs';
+import type { BackId, PaidBackId } from '../render/backs';
 import { KEYS, loadJson, saveJson } from '../state/storage';
 import type { Owned } from './types';
 
@@ -14,28 +16,35 @@ export interface Rights {
   noAds: boolean;
   /** до какого времени оплачена «Про»; 0 — не было */
   proUntil: number;
+  /** купленные рубашки по одной */
+  backs: PaidBackId[];
+  /** куплены «Все рубашки» — и будущие тоже */
+  backsAll: boolean;
   /** когда права последний раз сверены с магазином; 0 — никогда */
   checkedAt: number;
 }
 
-export const NO_RIGHTS: Rights = { noAds: false, proUntil: 0, checkedAt: 0 };
+export const NO_RIGHTS: Rights = { noAds: false, proUntil: 0, backs: [], backsAll: false, checkedAt: 0 };
 
 export const proActive = (r: Rights, now: number): boolean => r.proUntil > 0 && now < r.proUntil + GRACE_MS;
 /** Полноэкранной рекламы нет: «Без рекламы» или «Про» («Про» включает «Без рекламы»). */
 export const adsOff = (r: Rights, now: number): boolean => r.noAds || proActive(r, now);
+/** Рубашку можно выбрать: бесплатная, куплена сама или куплены все. «Про» рубашек не даёт. */
+export const backOwned = (r: Rights, id: BackId): boolean => !isPaidBack(id) || r.backsAll || r.backs.includes(id);
 
 /**
  * Ответ магазина поверх кэша. Магазин — правда: что он не назвал, того нет. Подписка, которая
  * по словам магазина уже кончилась, выключается сразу — трое суток даются только тому, кто без сети.
  */
 export function withOwned(owned: Owned, now: number): Rights {
-  return { noAds: owned.noAds, proUntil: owned.proUntil > now ? owned.proUntil : 0, checkedAt: now };
+  return { noAds: owned.noAds, proUntil: owned.proUntil > now ? owned.proUntil : 0, backs: [...owned.backs], backsAll: owned.backsAll, checkedAt: now };
 }
 
 export function normalizeRights(raw: unknown): Rights {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
-  return { noAds: r.noAds === true, proUntil: num(r.proUntil), checkedAt: num(r.checkedAt) };
+  const backs = Array.isArray(r.backs) ? [...new Set(r.backs.filter(isPaidBack))] : [];
+  return { noAds: r.noAds === true, proUntil: num(r.proUntil), backs, backsAll: r.backsAll === true, checkedAt: num(r.checkedAt) };
 }
 
 /** Насколько открыт разбор партии. */
@@ -72,6 +81,7 @@ export const getRights = (): Rights => rights;
 export const isPro = (now = Date.now()): boolean => proActive(rights, now);
 export const isAdsOff = (now = Date.now()): boolean => adsOff(rights, now);
 export const isUnlocked = (at: number): boolean => unlocked.includes(at);
+export const ownsBack = (id: BackId): boolean => backOwned(rights, id);
 
 /** Подписаться на перемены прав: экраны перерисовываются после покупки и сверки. */
 export function onRights(f: () => void): () => void {

@@ -14,6 +14,7 @@ import { T } from '../i18n';
 import { Button } from '../ui/Button';
 import { Header } from '../ui/Header';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
+import { useBack } from '../money';
 import { TableCanvas } from '../render/TableCanvas';
 import { CONTROLS_GAP, layoutTable } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
@@ -31,6 +32,7 @@ type Status = 'play' | 'wrong' | 'solved';
 function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   const p = puzzleFor(PUZZLES, day);
   const settings = useSettings();
+  const back = useBack();
   const less = useLessMotion();
   const [state, setState] = useState<State>(() => stateOf(p));
   const [status, setStatus] = useState<Status>('play');
@@ -44,7 +46,6 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
   // «Ещё раз» ставит позицию заново — для звуков стола это новая партия
   const [round, setRound] = useState(0);
   const font = useFont(Onest_700Bold, 15);
-  const small = useFont(Onest_700Bold, 26);
   const you = p.you, opp = 1 - you;
   const date = dateOfDay(START_DAY, day);
   useEffect(() => { void loadPuzzleLog().then(l => { const d = l[day]; if (d?.solved) setStatus('solved'); if (d?.shown) setPeeked(true); setTries(d?.tries ?? 0); }); }, [day]);
@@ -138,8 +139,8 @@ function Board({ day, onArchive }: { day: number; onArchive: () => void }) {
     <View style={styles.board}>
       <Text style={styles.head} testID="puzzle-number">{T.puzzle.number(day, date)}</Text>
       <View style={styles.area} onLayout={onLayout} testID="puzzle-table" accessibilityLabel={T.puzzle.opponent(state.hands[opp].map(nameOf).join(' '))}>
-        {layout && font && small ? (
-          <TableCanvas layout={layout} font={font} small={small} fourColor={settings.fourColor} less={less}
+        {layout && font ? (
+          <TableCanvas layout={layout} font={font} fourColor={settings.fourColor} back={back} less={less}
             hand={state.hands[you]} table={state.table} enabled={status === 'play'} touch={{ onCard, onTableCard, onDrop }} />
         ) : null}
         {layout ? (

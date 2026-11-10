@@ -36,6 +36,8 @@ export const KEYS = {
   device: 'durak.device',
   /** отметка «Мне есть 14 лет» (src/state/onlineStore.ts) */
   adult: 'durak.adult',
+  /** примерка рубашки на одну партию (`TryOn`, src/money/tryon.ts) */
+  tryOn: 'durak.tryon',
   /** счётчики полноэкранной рекламы (`AdCounters`, src/money/ads.ts) */
   ads: 'durak.ads',
   /** кэш прав «Без рекламы» и «Про» (`Rights`, src/money/rights.ts) */

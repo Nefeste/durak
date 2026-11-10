@@ -12,6 +12,8 @@ import { Easing, useDerivedValue, useSharedValue, withDelay, withSequence, withT
 import type { SharedValue } from 'react-native-reanimated';
 import type { Card } from '../engine';
 import { nameOf } from '../engine';
+import { DEFAULT_BACK } from './backs';
+import type { BackId } from './backs';
 import { makeFaces } from './faces';
 import { makeFelt } from './felt';
 import type { Faces } from './faces';
@@ -113,12 +115,16 @@ export interface TableTouch {
   onDrop: (c: Card, on: Card | null) => boolean;
 }
 
-export function TableCanvas({ layout, font, small, fourColor, less, hand, table, enabled, touch }: {
-  layout: Layout; font: SkFont; small: SkFont; fourColor: boolean; less: boolean;
+export function TableCanvas({ layout, font, fourColor, back, less, hand, table, enabled, touch }: {
+  layout: Layout; font: SkFont; fourColor: boolean; less: boolean;
+  /** Рубашка (src/money `useBack`); не задана — «Бордо». */
+  back?: BackId;
   hand: Card[]; table: [Card, Card | null][]; enabled: boolean; touch: TableTouch;
 }) {
   const { cw, ch } = layout;
-  const faces = useMemo(() => makeFaces(cw, ch, font, small, fourColor), [cw, ch, font, small, fourColor]);
+  const faces = useMemo(() => makeFaces(cw, ch, font, fourColor, back), [cw, ch, font, fourColor, back]);
+  // сценарий в браузере (tools/e2e/browser.ts): в какой рубашке стол — холст этого не расскажет; только веб
+  useEffect(() => { if (Platform.OS === 'web') (globalThis as { __kozyrBack?: string }).__kozyrBack = back ?? DEFAULT_BACK; }, [back]);
   // сукно с бортом и светом лампы — одна картинка на размер стола (src/render/felt.ts)
   const { x: fx, y: fy, w: fw, h: fh } = layout.felt;
   const felt = useMemo(() => makeFelt({ x: fx, y: fy, w: fw, h: fh }, cw * 0.4), [fx, fy, fw, fh, cw]);

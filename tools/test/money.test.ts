@@ -1,4 +1,4 @@
-// из nardy: tools/test/money.test.ts @ 1d2bdff — без оформлений, схема своя.
+// из nardy: tools/test/money.test.ts @ 1d2bdff — оформления — рубашки и их примерка, схема своя.
 // Реклама и права (docs/11-money.md, docs/09-game-design.md «Реклама и покупки»): каждое правило частоты
 // полноэкранной рекламы и их сочетания; «Про» с тремя сутками без сети; что открыто в разборе; ответы
 // RuStore Pay; что «Про» не продаётся, пока нет разбора.
@@ -108,8 +108,8 @@ test('«Про»: до конца срока и ещё трое суток бе�
 });
 
 test('сверка с магазином — правда: кончилась подписка — выключено сразу, без трёх суток', () => {
-  expect(withOwned({ noAds: true, proUntil: NOON + DAY }, NOON)).toEqual({ noAds: true, proUntil: NOON + DAY, checkedAt: NOON });
-  const expired = withOwned({ noAds: false, proUntil: NOON - HOUR }, NOON);
+  expect(withOwned({ noAds: true, proUntil: NOON + DAY, backs: ['frost'], backsAll: false }, NOON)).toEqual({ noAds: true, proUntil: NOON + DAY, backs: ['frost'], backsAll: false, checkedAt: NOON });
+  const expired = withOwned({ noAds: false, proUntil: NOON - HOUR, backs: [], backsAll: false }, NOON);
   expect(expired.proUntil).toBe(0);
   expect(proActive(expired, NOON)).toBe(false);
   expect(normalizeRights({ noAds: 'да', proUntil: -5 })).toEqual(NO_RIGHTS);
@@ -136,7 +136,8 @@ test('RuStore Pay: что куплено — по статусам покупо�
     ({ subscriptionPurchase: { purchaseId: 'p', productId, status, expirationDate, gracePeriodEnabled: false, sandbox: true } });
   const product = (productId: string, status: string) =>
     ({ productPurchase: { purchaseId: 'q', productId, status, productType: 'NON_CONSUMABLE_PRODUCT' as const, sandbox: true } });
-  expect(ownedOf([], now)).toEqual({ noAds: false, proUntil: 0 });
+  const none = { noAds: false, proUntil: 0, backs: [], backsAll: false };
+  expect(ownedOf([], now)).toEqual(none);
   expect(ownedOf([product('no_ads', 'CONFIRMED')], now).noAds).toBe(true);
   expect(ownedOf([product('no_ads', 'REFUNDED')], now).noAds).toBe(false);
   const until = '2026-10-28T12:00:00+03:00';
@@ -147,7 +148,10 @@ test('RuStore Pay: что куплено — по статусам покупо�
   expect(ownedOf([sub('pro_month', 'ACTIVE', until), sub('pro_year', 'ACTIVE', '2027-09-28T12:00:00Z')], now).proUntil).toBe(Date.parse('2027-09-28T12:00:00Z'));
   expect(ownedOf([sub('pro_month', 'ACTIVE', 'когда-нибудь')], now).proUntil).toBe(now + DAY);
   // чужой товар ничего не даёт
-  expect(ownedOf([product('coins', 'CONFIRMED')], now)).toEqual({ noAds: false, proUntil: 0 });
+  expect(ownedOf([product('coins', 'CONFIRMED')], now)).toEqual(none);
+  // рубашки: по одной и все сразу; возвращённая и незнакомая — нет
+  expect(ownedOf([product('theme_frost', 'CONFIRMED'), product('theme_rays', 'REFUNDED'), product('theme_gold', 'CONFIRMED'), product('theme_classic', 'CONFIRMED')], now)).toEqual({ ...none, backs: ['frost'] });
+  expect(ownedOf([product('themes_all', 'CONFIRMED')], now)).toEqual({ ...none, backsAll: true });
 });
 
 test('RuStore Pay: ошибка → почему покупки недоступны', () => {
@@ -299,7 +303,7 @@ test('платное не открывает силу: подсказка, вы�
   const readers = (readdirSync(src, { recursive: true }) as string[])
     .filter(f => /\.tsx?$/.test(f) && !f.startsWith('money') && /\b(isPro|isAdsOff|getRights|reviewAccess)\(/.test(readFileSync(join(src, f), 'utf8')));
   // права читают только экраны денег, разбора и статистики — не стол, не подсказка, не бот
-  expect(readers.sort()).toEqual(['game/ReviewScreen.tsx', 'screens/StatsScreen.tsx', 'screens/StoreScreen.tsx']);
+  expect(readers.sort()).toEqual(['game/ReviewScreen.tsx', 'screens/BacksScreen.tsx', 'screens/StatsScreen.tsx', 'screens/StoreScreen.tsx']);
 });
 
 // #59, вариант 1: после показанной полноэкранной — одна строка «Без рекламы — разовая покупка навсегда», раз за запуск
@@ -312,4 +316,102 @@ test('строка «Без рекламы» на итоге: после рек�
   // уже показана в этот запуск: у той же партии остаётся (перерисовка), у следующей — нет, даже после новой рекламы
   expect(offerNoAds({ ...base, shownFor: 100 })).toBe(true);
   expect(offerNoAds({ ...base, shownFor: 100, at: 200 })).toBe(false);
+});
+
+// ── третий круг вида: рубашки и примерка за рекламу (docs/09-game-design.md, «Рубашки») ──
+
+import { canTryOn } from '../../src/money/ads';
+import { backOwned } from '../../src/money/rights';
+import { afterTryGame, backShown, normalizeTryOn, tryOnPending, wearAt } from '../../src/money/tryon';
+import type { TryOn } from '../../src/money/tryon';
+import { PRODUCT_IDS, themeProduct } from '../../src/money/types';
+import { ALL_BACKS, DEFAULT_BACK, FREE_BACKS, PAID_BACKS } from '../../src/render/backs';
+import { BACKS } from '../../src/ui/theme';
+import { parseSettings } from '../../src/state/settings';
+
+test('рубашки: десять, три бесплатны всегда, у каждой — свои цвета и товар', () => {
+  expect(ALL_BACKS.length).toBe(10);
+  expect([...FREE_BACKS]).toEqual(['classic', 'indigo', 'pine']);
+  expect(new Set(ALL_BACKS).size).toBe(10);
+  expect(Object.keys(BACKS).sort()).toEqual([...ALL_BACKS].sort());
+  expect(DEFAULT_BACK).toBe('classic');
+  // товары — навсегда: `theme_<рубашка>` у каждой платной и `themes_all`; у бесплатных товара нет
+  expect([...PRODUCT_IDS] as string[]).toEqual(['no_ads', 'pro_month', 'pro_year', 'themes_all', ...PAID_BACKS.map(b => `theme_${b}`)]);
+  expect(themeProduct('frost')).toBe('theme_frost');
+  expect(PRODUCT_IDS.some(id => /18|adult/.test(id))).toBe(false);
+});
+
+test('рубашки: бесплатная — всем, платная — купившему её или все; «Про» рубашек не даёт', () => {
+  for (const b of FREE_BACKS) expect(backOwned(NO_RIGHTS, b)).toBe(true);
+  for (const b of PAID_BACKS) expect(backOwned(NO_RIGHTS, b)).toBe(false);
+  expect(backOwned({ ...NO_RIGHTS, backs: ['frost'] }, 'frost')).toBe(true);
+  expect(backOwned({ ...NO_RIGHTS, backs: ['frost'] }, 'rays')).toBe(false);
+  for (const b of PAID_BACKS) expect(backOwned({ ...NO_RIGHTS, backsAll: true }, b)).toBe(true);
+  expect(backOwned({ ...NO_RIGHTS, noAds: true, proUntil: NOON + DAY }, 'frost')).toBe(false);
+  // кэш прав: мусор и незнакомые рубашки не проходят
+  expect(normalizeRights({ backs: ['frost', 'frost', 'gold', 7, 'classic'], backsAll: 'да' })).toEqual({ ...NO_RIGHTS, backs: ['frost'] });
+});
+
+test('рубашка на столе: выбранная, если она своя; некупленная — «Бордо»; настройка из хранилища', () => {
+  const owns = (r = NO_RIGHTS) => (id: Parameters<typeof backOwned>[1]) => backOwned(r, id);
+  expect(backShown('indigo', owns(), null)).toBe('indigo');
+  expect(backShown('frost', owns(), null, 'g1')).toBe('classic');
+  expect(backShown('frost', owns({ ...NO_RIGHTS, backs: ['frost'] }), null, 'g1')).toBe('frost');
+  expect(parseSettings(null).back).toBe('classic');
+  expect(parseSettings('{"back":"pine"}').back).toBe('pine');
+  expect(parseSettings('{"back":"gold"}').back).toBe('classic');
+});
+
+test('примерка: на одну партию — следующую, в которую вошёл игрок; до её конца и на её итоге', () => {
+  const owns = (id: Parameters<typeof backOwned>[1]) => backOwned(NO_RIGHTS, id);
+  let t: TryOn | null = { back: 'frost', game: null, over: false };
+  // ждёт партию: в меню, правилах и разборе (без партии) — выбранная; на любом столе партии — примеренная
+  expect(backShown('indigo', owns, t)).toBe('indigo');
+  expect(backShown('indigo', owns, t, 'g1')).toBe('frost');
+  expect(tryOnPending(t)).toBe(true);
+  t = wearAt(t, 'g1');
+  expect(t).toEqual({ back: 'frost', game: 'g1', over: false });
+  // та же партия после перезапуска — та же рубашка; другая партия её не получает
+  expect(wearAt(t, 'g1')).toEqual(t);
+  expect(backShown('indigo', owns, t, 'g1')).toBe('frost');
+  expect(backShown('indigo', owns, t, 'g2')).toBe('indigo');
+  // партия кончилась: на её итоге рубашка та же, а примерить можно уже другую
+  t = afterTryGame(t);
+  expect(backShown('indigo', owns, t, 'g1')).toBe('frost');
+  expect(tryOnPending(t)).toBe(false);
+  // следующая партия — снова в выбранной: примерка кончилась
+  expect(wearAt(t, 'g2')).toBeNull();
+  // без примерки ничего не меняется; ждущая примерка концом чужой партии не тратится
+  expect(wearAt(null, 'g1')).toBeNull();
+  expect(afterTryGame({ back: 'rays', game: null, over: false })).toEqual({ back: 'rays', game: null, over: false });
+});
+
+test('примерка из хранилища: только платная рубашка; мусор — нет примерки', () => {
+  expect(normalizeTryOn(null)).toBeNull();
+  expect(normalizeTryOn({ back: 'classic' })).toBeNull();
+  expect(normalizeTryOn({ back: 'gold', game: 'g' })).toBeNull();
+  expect(normalizeTryOn({ back: 'amber', game: 5, over: 'да' })).toEqual({ back: 'amber', game: null, over: false });
+  expect(normalizeTryOn({ back: 'amber', game: 'g1', over: true })).toEqual({ back: 'amber', game: 'g1', over: true });
+});
+
+test('«Примерить за рекламу»: не пока примерка ждёт или идёт и не чаще, чем через 4 минуты после любой рекламы', () => {
+  expect(canTryOn(EMPTY_COUNTERS, NOON, false)).toBe(true);
+  expect(canTryOn(EMPTY_COUNTERS, NOON, true)).toBe(false);
+  const shown = afterShown(ready(), NOON, 'interstitial');
+  expect(canTryOn(shown, NOON + AD_RULES.minGapMs - 1, false)).toBe(false);
+  expect(canTryOn(shown, NOON + AD_RULES.minGapMs, false)).toBe(true);
+  // примерка — тоже реклама: отодвигает следующую примерку и полноэкранную на те же 4 минуты и не идёт в дневной предел
+  const tried = afterShown(ready(), NOON, 'rewarded');
+  expect(canTryOn(tried, NOON + MIN, false)).toBe(false);
+  expect(canShowInterstitial(tried, NOON + MIN, false)).toBe(false);
+  expect(canShowInterstitial(tried, NOON + AD_RULES.minGapMs, false)).toBe(true);
+  expect(tried.today).toBe(0);
+  expect(tried.shown.rewarded).toBe(1);
+});
+
+test('примерку зовёт только экран «Рубашки»: ни стол, ни итог её не предлагают', () => {
+  const src = join(import.meta.dir, '../../src');
+  const callers = (readdirSync(src, { recursive: true }) as string[])
+    .filter(f => /\.tsx?$/.test(f) && !f.startsWith('money') && /\bwatchToTryOn\(/.test(readFileSync(join(src, f), 'utf8')));
+  expect(callers).toEqual(['screens/BacksScreen.tsx']);
 });

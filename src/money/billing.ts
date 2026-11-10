@@ -1,4 +1,4 @@
-// из nardy: src/money/billing.ts @ 1d2bdff — без оформлений.
+// из nardy: src/money/billing.ts @ 1d2bdff — оформления — рубашки.
 // Оплата на телефоне — RuStore Pay (docs/11-money.md). Сборка `other` покупок не знает вовсе. Сборка
 // RuStore без номера приложения в консоли (`EXPO_PUBLIC_RUSTORE_APP_ID`) — «покупки подключаются»: без
 // него SDK оплаты не работает, а спрашивать его зря — значит показывать игроку ошибку RuStore.

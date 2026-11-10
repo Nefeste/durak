@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { Canvas, Group, Picture, useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import { useSettings } from '../state/store';
+import { useBack } from '../money';
 import { makeFaces } from './faces';
 
 /** Туз червей: масть 3, достоинство 8 (`suit * 9 + rank`). */
@@ -15,8 +16,8 @@ export function Emblem({ width = 64, testID }: { width?: number; testID?: string
   const settings = useSettings();
   const cw = width, ch = Math.round((cw * 88) / 63);
   const font = useFont(Onest_700Bold, Math.round(cw * 0.23));
-  const small = useFont(Onest_700Bold, Math.round(cw * 0.39));
-  const faces = useMemo(() => (font && small ? makeFaces(cw, ch, font, small, settings.fourColor) : null), [cw, ch, font, small, settings.fourColor]);
+  const back = useBack();
+  const faces = useMemo(() => (font ? makeFaces(cw, ch, font, settings.fourColor, back) : null), [cw, ch, font, settings.fourColor, back]);
   const W = Math.round(cw * 2.4), H = Math.round(ch * 1.25);
   const cards: { card: number | null; x: number; y: number; rot: number }[] = [
     { card: null, x: -cw * 0.36, y: ch * 0.06, rot: -16 },

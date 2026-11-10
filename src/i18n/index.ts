@@ -4,6 +4,7 @@
 import type { Reason, ThrowOrder, Variant } from '../engine';
 import type { Level } from '../bot';
 import type { MainProductId, Unavailable } from '../money/types';
+import type { BackId } from '../render/backs';
 import type { Place } from '../state/stats';
 import { pluralRu } from './plural';
 
@@ -95,6 +96,8 @@ export const T = {
     throwQueue: 'По очереди',
     throwFree: 'Кто успел',
     throwOrderNote: 'По очереди: первым подкидывает ходящий, за ним остальные по часовой стрелке. Кто успел — без очереди. Вдвоём разницы нет. Для новых партий.',
+    cardBack: 'Рубашка',
+    backOpen: (name: string) => `${name} · выбрать`,
     fourColor: 'Четырёхцветная колода',
     fourColorNote: '♠ чёрные, ♣ зелёные, ♦ синие, ♥ красные.',
     memoryAid: 'Помощь памяти (для учёбы)',
@@ -363,7 +366,39 @@ export const T = {
     /** что ответил RuStore, как есть, — мелкой строкой под причиной */
     detail: (text: string) => `Ответ RuStore: ${text}`,
     openRuStore: 'Открыть RuStore',
+    /** карточка «Рубашки» на витрине — ведёт на экран «Рубашки» */
+    backs: { title: 'Рубашки', text: 'Десять рубашек для карт: три бесплатны, остальные можно купить навсегда или примерить на одну партию.', open: 'Выбрать рубашку' },
     test: 'Тестовый магазин: настоящей оплаты здесь нет',
+  },
+  /** Экран «Рубашки» (docs/09-game-design.md, «Рубашки»). */
+  backs: {
+    title: 'Рубашки',
+    back: 'Назад',
+    names: {
+      classic: 'Бордо', indigo: 'Индиго', pine: 'Хвоя', weave: 'Плетёнка', rays: 'Лучи', frost: 'Иней', scales: 'Чешуя',
+      chevron: 'Шеврон', suits: 'Масти', amber: 'Янтарь',
+    } satisfies Record<BackId, string>,
+    /** состояние рубашки одной строкой */
+    chosen: 'Выбрана',
+    free: 'Бесплатная',
+    owned: 'Куплена',
+    paid: 'Платная: можно купить навсегда или примерить на одну партию',
+    paidNoTry: 'Платная: можно купить навсегда',
+    /** для чтения с экрана: плитка рубашки */
+    tile: (name: string, state: string) => `${name}. ${state}`,
+    locked: 'платная',
+    buy: (price: string | null) => (price ? `Купить — ${price}` : 'Купить'),
+    tryOn: 'Примерить за рекламу',
+    tryOnNote: 'Примерка — на одну следующую партию, после короткой рекламы.',
+    tried: (name: string) => `Готово: «${name}» — на следующую партию`,
+    trying: (name: string) => `Примерка: «${name}» — на следующую партию`,
+    tryingNow: (name: string) => `Примерка: «${name}» — до конца начатой партии`,
+    notTried: 'Реклама не досмотрена — примерки нет',
+    all: (price: string | null) => (price ? `Все рубашки — ${price}` : 'Все рубашки'),
+    allNote: 'Семь платных и все будущие — одной покупкой, навсегда.',
+    thanks: (name: string) => `Спасибо! «${name}» — ваша`,
+    thanksAll: 'Спасибо! Все рубашки — ваши',
+    note: 'Рубашка — только вид карт на вашем телефоне. На игру она не влияет, соперники её не видят.',
   },
   result: {
     win: 'Вы вышли — без карт',

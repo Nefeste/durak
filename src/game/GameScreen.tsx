@@ -17,7 +17,7 @@ import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
 import type { ThinkJob } from './think';
 import { T } from '../i18n';
-import { gameEnded, gameStarted, leavingEnd, noAdsLineFor } from '../money';
+import { gameEnded, gameStarted, leavingEnd, noAdsLineFor, useBack, wearBack } from '../money';
 import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
@@ -110,7 +110,6 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const hold = useHold(`${deal}:${record.actions.length}`, held && held.n === record.actions.length ? held.view : null, fast ? 400 : holdMs(less));
   const holding = hold.shown !== null;
   const font = useFont(Onest_700Bold, 15);
-  const small = useFont(Onest_700Bold, 26);
   // уровни стола — на всю партию и «Ещё партию»: тот же массив, а не новый с каждой отрисовкой меню (иначе бот думал бы заново)
   const [lvls] = useState(() => restored?.levels ?? levels);
   /** Уровень бота на месте `seat` (места ботов — 1 … bots). */
@@ -130,6 +129,13 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   // деньги (src/money): полноэкранная грузится в начале партии и показывается только при уходе с итога
   const startedAt = useRef(0);
   useEffect(() => { startedAt.current = Date.now(); gameStarted(); }, [deal]);
+  // рубашка: выбранная или примеренная на эту партию (docs/09-game-design.md, «Рубашки»); партию узнаём по её колоде —
+  // продолженная после перезапуска остаётся в той же рубашке. Примерка тратится с первым ходом партии: стол, с
+  // которого ушли, не сыграв ни карты, не сохраняется — и примерку не съедает
+  const wearing = `bots:${record.deck.join('.')}`;
+  const begun = record.actions.length > 0;
+  useEffect(() => { if (begun) wearBack(wearing); }, [wearing, begun]);
+  const back = useBack(wearing);
   // разбор (docs/10-bot.md, «Разбор»): считается кусками после партии, пока виден итог; главная ошибка — на итоге
   const hinted = useRef(false);
   const [review, setReview] = useState<Review | null>(null);
@@ -336,8 +342,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {settings.memoryAid ? <Button small label={T.game.seen} kind="ghost" onPress={() => setShowSeen(v => !v)} testID="seen" /> : null}
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
-        {layout && font && small ? (
-          <TableCanvas key={deal} layout={layout} font={font} small={small} fourColor={settings.fourColor} less={less}
+        {layout && font ? (
+          <TableCanvas key={deal} layout={layout} font={font} fourColor={settings.fourColor} back={back} less={less}
             hand={shown.hand} table={shown.table} enabled={state.phase !== 'end'}
             touch={{ onCard, onTableCard, onDrop }} />
         ) : null}

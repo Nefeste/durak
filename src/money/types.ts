@@ -1,13 +1,20 @@
-// из nardy: src/money/types.ts @ 1d2bdff — без оформлений (их в «Козыре» пока нет, docs/11-money.md).
+// из nardy: src/money/types.ts @ 1d2bdff — оформления «Козыря» — рубашки (src/render/backs.ts, docs/11-money.md).
 // Общие типы денег (docs/11-money.md): товары, права, порты оплаты и рекламы. Кода платформ здесь нет:
 // реализации — billing.ts / adsSdk.ts (телефон) и *.web.ts (браузер, только для проверок).
 
-/** Товары карточками в «Магазине». */
+import { PAID_BACKS } from '../render/backs';
+import type { PaidBackId } from '../render/backs';
+
+/** Оформление (рубашка) навсегда (docs/09-game-design.md, «Рубашки»): `theme_<рубашка>`; `themes_all` — все платные,
+ *  в том числе будущие. */
+export type ThemeProductId = `theme_${PaidBackId}`;
+/** Товары карточками в «Магазине»; рубашки — своим экраном. */
 export type MainProductId = 'no_ads' | 'pro_month' | 'pro_year';
 /** Идентификаторы товаров — навсегда, как `applicationId` (они же в консоли RuStore). */
-export type ProductId = MainProductId;
+export type ProductId = MainProductId | 'themes_all' | ThemeProductId;
 export const MAIN_PRODUCTS: readonly MainProductId[] = ['no_ads', 'pro_month', 'pro_year'];
-export const PRODUCT_IDS: readonly ProductId[] = MAIN_PRODUCTS;
+export const themeProduct = (id: PaidBackId): ThemeProductId => `theme_${id}`;
+export const PRODUCT_IDS: readonly ProductId[] = [...MAIN_PRODUCTS, 'themes_all', ...PAID_BACKS.map(themeProduct)];
 
 /**
  * «Про» продаётся, только когда есть то, что она даёт: полный разбор и подробная статистика (устав,
@@ -20,8 +27,8 @@ export const ON_SALE: readonly MainProductId[] = PRO_ON_SALE ? MAIN_PRODUCTS : [
 /** Товар для витрины: цена — строкой из магазина («249 ₽»); `null` — магазин цену не назвал. */
 export interface Product { id: ProductId; price: string | null }
 
-/** Что куплено, по словам магазина: «Без рекламы» и до какого времени оплачена «Про» (0 — нет). */
-export interface Owned { noAds: boolean; proUntil: number }
+/** Что куплено, по словам магазина: «Без рекламы», до какого времени оплачена «Про» (0 — нет), рубашки. */
+export interface Owned { noAds: boolean; proUntil: number; backs: PaidBackId[]; backsAll: boolean }
 
 /** Почему покупки недоступны. */
 export type Unavailable =
