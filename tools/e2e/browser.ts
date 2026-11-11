@@ -557,12 +557,15 @@ try {
   for (let tries = 0; tries < 40 && !undone; tries++) {
     const n = await handCount(page);
     for (let k = 0; k < n; k++) {
-      await page.locator('[data-testid^="hand-"]').nth(k).click({ force: true }).catch(() => {});
-      if (await handCount(page) < n) {
+      const card = page.locator('[data-testid^="hand-"]').nth(k);
+      const id = await card.getAttribute('data-testid').catch(() => null);
+      await card.click({ force: true }).catch(() => {});
+      if (id && await page.getByTestId(id).count() === 0) {
         // бот мог ответить между «кнопка видна» и касанием — тогда кнопки уже нет: не ждём её 30 с, пробуем следующим ходом
         if (await visible(page, 'undo') && await page.getByTestId('undo').click({ timeout: 1500 }).then(() => true, () => false)) {
           await page.waitForTimeout(100);
-          ok(await handCount(page) === n, '«Отменить» вернул карту в руку до ответа бота', await handCount(page));
+          // та самая карта снова в руке (число карт не годится: отбой мог кончиться, и рука добралась из колоды)
+          ok(await page.getByTestId(id).count() === 1, `«Отменить» вернул карту в руку до ответа бота: ${id}`, await handCount(page));
           undone = true;
         }
         break;
