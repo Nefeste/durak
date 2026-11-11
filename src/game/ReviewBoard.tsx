@@ -9,14 +9,16 @@ import { useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import { suitOf, throwerSeen } from '../engine';
 import type { Card, Observation } from '../engine';
+import type { Level } from '../bot';
 import { T } from '../i18n';
 import { TableCanvas } from '../render/TableCanvas';
-import { layoutTable, PLATE, plateOf, plateHeight } from '../render/layout';
+import { layoutTable, PLATE, plateOf } from '../render/layout';
 import type { Layout, Sprite } from '../render/layout';
 import { useSettings } from '../state/store';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { reviewLayout } from './review';
+import { rivalsOf } from './rivals';
 import type { MarkKind, ReviewMarks } from './review';
 
 /** Рамка метки снаружи карты: «Лучше» — ближе, «Сыграно» — дальше, чтобы у карты с обеими метками были видны обе. */
@@ -37,15 +39,19 @@ function Frame({ s, l, kind }: { s: Sprite; l: Layout; kind: MarkKind }) {
   );
 }
 
-export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }) {
+/** `levels` — уровни ботов партии по местам: по ним на плашках те же имена и портреты, что были за столом. */
+export function ReviewBoard({ o, marks, levels }: { o: Observation; marks: ReviewMarks; levels: readonly Level[] }) {
   const settings = useSettings();
   const { fontScale } = useWindowDimensions();
-  const plateH = plateHeight(plateLines(1), fontScale);
+  const rivals = useMemo(() => rivalsOf(levels), [levels]);
   // подпись «Сыграно» / «Лучше» растёт с шрифтом телефона до ×1,3 (13-art.md, §3): ряд подписей — по её высоте
   const labelH = Math.ceil(LABEL_H * Math.min(PLATE.maxScale, Math.max(1, fontScale)));
   const font = useFont(Onest_700Bold, 15);
   const small = useFont(Onest_700Bold, 26);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  // плашка — как в партии: портрет, имя, уровень, число карт
+  const plate = plateOf(size?.width ?? 412, o.seats - 1, plateLines(2), fontScale, true);
+  const plateH = plate.h;
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
@@ -70,8 +76,7 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
   }
 
   const others = layout ? layout.opponents : [];
-  const plate = plateOf(size?.width ?? 412, others.length);
-  const oppW = Math.min(150, plate.w);
+  const oppW = plate.w;
   const chipText = (c: ReviewMarks['chips'][number]) =>
     T.review.chip(c.kind === 'best' ? T.review.markBest : T.review.markPlayed, c.action === 'take' ? T.game.take : c.done ? T.game.done : T.game.pass);
 
@@ -82,8 +87,9 @@ export function ReviewBoard({ o, marks }: { o: Observation; marks: ReviewMarks }
           hand={o.hand} table={o.table} enabled={false} touch={TOUCH} />
       ) : null}
       {layout ? others.map(p => (
-        <SeatPlate key={p.seat} testID={`review-opp-${p.seat}`} name={T.game.bot(p.seat)}
-          lines={[o.out.includes(p.seat) ? T.game.out : T.game.cards(o.handSizes[p.seat])]}
+        <SeatPlate key={p.seat} testID={`review-opp-${p.seat}`} name={rivals[p.seat] ? T.rival[rivals[p.seat]!.id] : ''} rival={rivals[p.seat]} face={plate.face}
+          lines={[...(rivals[p.seat] ? [T.rivals.level(rivals[p.seat]!.level)] : []), o.out.includes(p.seat) ? (rivals[p.seat]?.she ? T.game.outShe : T.game.out) : T.game.cards(o.handSizes[p.seat])]}
+          cards={o.out.includes(p.seat) ? undefined : o.handSizes[p.seat]}
           role={roleOf(o, p.seat, throwerSeen(o))}
           active={o.phase !== 'end' && (o.attacker === p.seat || o.defender === p.seat || throwerSeen(o) === p.seat)}
           left={p.x - oppW / 2} width={oppW} top={layout.plate.top} height={layout.plate.height} />

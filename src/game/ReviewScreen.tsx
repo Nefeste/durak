@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import { markOf, positionAt, reviewGame } from './review';
-import type { Decision, Review } from '../bot';
+import type { Decision, Level, Review } from '../bot';
 import type { GameRecord } from '../engine';
 import { setReview } from '../state/history';
 import { thinkSliced } from './think';
@@ -20,6 +20,8 @@ import { Toggle } from '../ui/Toggle';
 import { C, SPACE, TYPE } from '../ui/theme';
 import { actionText, whyText, worstText } from './words';
 import { ReviewBoard } from './ReviewBoard';
+
+const NO_LEVELS: Level[] = [];
 
 /** `done` — на столе всё покрыто: «пас» ходящего здесь значит «Бито», как на плашке стола. */
 function Panel({ d, i, n, main, done }: { d: Decision; i: number; n: number; main: boolean; done: boolean }) {
@@ -45,8 +47,9 @@ function Panel({ d, i, n, main, done }: { d: Decision; i: number; n: number; mai
 
 /** `at` — начало партии (им разбор открывается рекламой); `lastToday` — это последняя партия дня; `counting` — разбор
  *  ещё считает экран партии (тогда здесь его не считать второй раз). Запись нужна для стола. */
-export function ReviewScreen({ review: given, record, at, lastToday, counting, onBack, onStore }: {
-  review: Review | null; record?: GameRecord; at: number; lastToday: boolean; counting?: boolean; onBack: () => void; onStore: () => void;
+export function ReviewScreen({ review: given, record, levels, at, lastToday, counting, onBack, onStore }: {
+  /** `levels` — уровни ботов партии по местам: имена и портреты на плашках стола разбора. */
+  review: Review | null; record?: GameRecord; levels?: readonly Level[]; at: number; lastToday: boolean; counting?: boolean; onBack: () => void; onStore: () => void;
 }) {
   const insets = useInsets();
   const { height } = useWindowDimensions();
@@ -83,14 +86,16 @@ export function ReviewScreen({ review: given, record, at, lastToday, counting, o
   const o = useMemo(() => (d && record ? positionAt(record, d.at, review?.seat ?? YOU) : null), [d, record, review]);
   const marks = useMemo(() => (d && o ? markOf(d, o) : null), [d, o]);
   const go = (k: number) => { const x = shown[idx + k]; if (x) setSel(x.at); };
-  const boardH = Math.round(Math.max(300, Math.min(520, height * 0.5)));
+  // плашка соперника — как в партии, с портретом и уровнем: она выше прежней на строку (вчетвером — на две), и стол
+  // разбора получает эту высоту обратно, сукно не становится ниже
+  const boardH = Math.round(Math.max(300, Math.min(520, height * 0.5))) + (record && record.seats > 3 ? SPACE.xxl : SPACE.l);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="review">
       <Header title={T.review.title} back={T.review.back} onBack={onBack} backTestID="review-back" />
       {!review ? <Text style={styles.text}>{T.result.counting}</Text> : (
         <>
-          {o && marks ? <View style={{ height: boardH }}><ReviewBoard o={o} marks={marks} /></View> : null}
+          {o && marks ? <View style={{ height: boardH }}><ReviewBoard o={o} marks={marks} levels={levels ?? NO_LEVELS} /></View> : null}
           <ScrollView style={styles.scroll} contentContainerStyle={styles.list}>
             {!review.worst || !d ? <Text style={styles.head} testID="review-worst">{review.worst ? worstText(review.worst) : T.result.clean}</Text> : null}
             {d ? <Panel d={d} i={idx + 1} n={shown.length} main={d.at === review.worst?.at}

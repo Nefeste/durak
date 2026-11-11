@@ -75,22 +75,47 @@ export interface LayoutOptions {
   straight?: boolean;
   /** Слева от руки — кнопка порядка руки (`ORDER_BUTTON`): рука на её ширину правее. */
   orderButton?: boolean;
-  /** Высота плашки соперника над веером (`plateHeight`); по умолчанию — `plateOf`: четыре строки обычным шрифтом. */
+  /** Высота плашки соперника над веером (`plateHeight`); по умолчанию — как в партии: медальон места, имя, уровень,
+   *  число карт обычным шрифтом (`plateOf` с медальоном). */
   plate?: number;
 }
 
 /** Плашка соперника (docs/13-art.md, §3 «Надписи целиком»): имя — строка 20 точек, остальные строки — по 17, поля 4
  *  и кромка. Каждая надпись — своей строкой, без многоточия; крупный шрифт телефона плашка растит до ×1,3. */
-export const PLATE = { name: 20, line: 17, pad: 5, maxScale: 1.3 } as const;
+export const PLATE = {
+  name: 20, line: 17, pad: 5, maxScale: 1.3,
+  /** Медальон места (src/game/Portrait.tsx): сбоку от надписей на широкой плашке, в верхнем ряду — на узкой. */
+  side: 44, top: 34,
+  /** Широкая плашка уже `sideBigFrom` (два соперника на 360 dp): медальон сбоку — `sideSmall`, чтобы «Начинающий»
+   *  шрифтом ×1,3 помещался рядом с ним. */
+  sideSmall: 36, sideBigFrom: 176,
+  /** Подпись «бот»: строка 15 и кромка. На широкой плашке — под медальоном, заходит на него на `over`; на узкой —
+   *  справа от медальона, над числом карт. */
+  chip: 15, over: 8,
+  /** Зазор между медальоном и надписями. */
+  gap: 8,
+  /** С какой ширины плашки медальон встаёт сбоку: надписям остаётся не меньше 104 точек («Начинающий» шрифтом ×1,3). */
+  sideFrom: 166,
+} as const;
+
+/** Где на плашке медальон места: `side` — слева от надписей; `top` (три соперника на телефоне) — в верхнем ряду, справа
+ *  от него подпись «бот» и число карт значком, имя и уровень — строками ниже во всю ширину. */
+export type PlateFace = 'side' | 'top';
 
 /** Название стола в верхней полосе растёт с шрифтом телефона не больше, чем в ×1,15: так на 360 точках рядом с ним
  *  помещаются «В меню» и «Вышедшие» (13-art.md, §3). */
 export const TITLE_SCALE = 1.15;
 
-/** Высота плашки из `lines` строк (имя и строки под ним) при шрифте телефона `fontScale`. */
-export function plateHeight(lines: number, fontScale = 1): number {
+/** Высота плашки из `lines` строк (имя и строки под ним) при шрифте телефона `fontScale`; `face` — с медальоном места:
+ *  сбоку плашка не ниже медальона с подписью «бот»; сверху — ряд медальона (в нём подпись «бот» и число карт, последняя
+ *  из строк) и остальные строки под ним. */
+export function plateHeight(lines: number, fontScale = 1, face?: PlateFace): number {
   const k = Math.min(PLATE.maxScale, Math.max(1, fontScale));
-  return Math.ceil((PLATE.name + PLATE.line * Math.max(0, lines - 1)) * k + PLATE.pad * 2);
+  const text = (PLATE.name + PLATE.line * Math.max(0, lines - 1)) * k;
+  const unit = (size: number) => size + PLATE.chip * k + 2 - PLATE.over;
+  const head = Math.max(PLATE.top, PLATE.chip * k + 2 + PLATE.line * k);
+  const inner = face === 'side' ? Math.max(text, unit(PLATE.side)) : face === 'top' ? head + text - PLATE.line * k : text;
+  return Math.ceil(inner + PLATE.pad * 2);
 }
 
 /** Откуда летят новые карты: место, положившее карту на стол, и место, взявшее стол. */
@@ -152,9 +177,10 @@ export const CONTROLS_GAP = 8;
  *  уровень, число карт, роль — каждая своей строкой при любой ширине: вдвоём крупным шрифтом «Бот 1 · Начинающий»
  *  в строку тоже не влезал) и шрифту телефона (`plateHeight`). Одна функция для раскладки и экранов. `narrow` — три
  *  соперника на 412 dp и уже. */
-export function plateOf(W: number, others: number, lines = 4, fontScale = 1): { w: number; h: number; narrow: boolean } {
+export function plateOf(W: number, others: number, lines = 4, fontScale = 1, faces = false): { w: number; h: number; narrow: boolean; face: PlateFace } {
   const w = Math.min(180, W / Math.max(1, others) - 6);
-  return { w, h: plateHeight(lines, fontScale), narrow: w < 150 };
+  const face: PlateFace = w >= PLATE.sideFrom ? 'side' : 'top';
+  return { w, h: plateHeight(lines, fontScale, faces ? face : undefined), narrow: w < 150, face };
 }
 
 /** Цель касания кнопки порядка руки, dp: столько места рука оставляет слева. */
@@ -188,7 +214,7 @@ export function layoutTable(o: Observation, opt: LayoutOptions): Layout {
   // соперники: по часовой стрелке от вас — слева направо по верху
   const others = Array.from({ length: o.seats - 1 }, (_, i) => (o.seat + 1 + i) % o.seats);
   // место под плашку (имя, уровень, число карт, роль) над веером соперника: плашка кончается у верха веера
-  const plateH = opt.plate ?? plateOf(W, others.length).h;
+  const plateH = opt.plate ?? plateOf(W, others.length, 3, 1, true).h;
   const plateTop = Math.max(0, m - 8);
   const oppY = Math.round(ch * 0.55 * 0.5 + plateTop + plateH);
   const opponents: Seat[] = others.map((seat, i) => ({ seat, x: Math.round((W * (2 * i + 1)) / (2 * others.length)), y: oppY }));

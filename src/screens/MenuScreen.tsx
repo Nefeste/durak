@@ -1,9 +1,10 @@
 // Главный экран: стол, число соперников и уровень — «Играть»; «Продолжить партию», если она
-// сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки». С двумя-тремя ботами — «Разные уровни»: строка
-// «Бот N ‹ Любитель ›» у каждого бота (docs/09-game-design.md, «Боты за столом»). «Играть» — закреплённой полосой внизу
+// сохранена; «С друзьями», «Быстрая игра», «Магазин», «Настройки». Под уровнем — «За столом»: кто из персонажей
+// уровня сядет (портрет с подписью «бот», имя, характер одной строкой; решение владельца #20). С двумя-тремя ботами —
+// «Разные уровни»: у каждого соперника своя строка «‹ Любитель ›» (docs/09-game-design.md, «Боты за столом»). «Играть» — закреплённой полосой внизу
 // над кнопками телефона, меню прокручивается над ней (аудит 09.11.2026, находка 7; решение владельца 09.11.2026).
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import type { Variant } from '../engine';
 import { LEVELS, LOCKED_LEVEL } from '../bot';
@@ -14,7 +15,11 @@ import { Button } from '../ui/Button';
 import { Chips } from '../ui/Chips';
 import { Stepper } from '../ui/Stepper';
 import { Toggle } from '../ui/Toggle';
+import { botLevels } from '../state/settings';
 import type { Choice } from '../state/settings';
+import { Face, FACE } from '../game/Portrait';
+import { rivalsOf } from '../game/rivals';
+import type { Rival } from '../game/rivals';
 import { C, SPACE, TYPE } from '../ui/theme';
 import { Emblem } from '../render/Emblem';
 import { Glass } from '../ui/Glass';
@@ -22,14 +27,24 @@ import { Ornament } from '../ui/Ornament';
 
 export type { Choice } from '../state/settings';
 
+/** Соперник в меню: портрет с подписью «бот», имя и характер одной строкой. */
+function RivalRow({ rival, n }: { rival: Rival; n: number }) {
+  return (
+    <View style={styles.rival} testID={`rival-${n}`}>
+      <Face rival={rival} size={FACE.tile} testID={`rival-${n}-face`} />
+      <View style={styles.rivalText}>
+        <Text style={styles.rivalName} testID={`rival-${n}-name`}>{T.rival[rival.id]}</Text>
+        <Text style={styles.note}>{T.rivals.about[rival.id]}</Text>
+      </View>
+    </View>
+  );
+}
+
 export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore, onPuzzle, onStats, onRules }: {
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
   onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void; onRules: () => void;
 }) {
   const insets = useInsets();
-  // узкий телефон: «Бот N» — над своей строкой уровня, иначе «Начинающий» крупным шрифтом не помещался между стрелками
-  // (13-art.md, §3 «Надписи целиком»; 360 точек: 124 на название, нужно 143)
-  const stack = useWindowDimensions().width < 390;
   // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна.
   // На какой строке он показан: 0 — общий уровень, N — бот N; `null` — нигде
   const [lockedAt, setLockedAt] = useState<number | null>(null);
@@ -37,6 +52,8 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   const [bar, setBar] = useState(0);
   const onLocked = lockedAt !== null;
   const mixed = choice.mixed && choice.bots > 1;
+  // кто сядет за стол при этих уровнях — те же, что потом на плашках (src/game/rivals.ts)
+  const rivals = rivalsOf(botLevels(choice)).slice(1) as Rival[];
   /** Строка уровня: 0 — общая на всех ботов, N — бота N. */
   const levelRow = (row: number) => {
     const value = row === 0 ? choice.level : choice.levels[row - 1];
@@ -72,13 +89,20 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
             <Toggle id="levels-mixed" title={T.menu.mixed} value={mixed}
               onChange={on => { setLockedAt(null); onChange({ ...choice, mixed: on, levels: on ? choice.levels.map(() => choice.level) : choice.levels }); }} />
           ) : null}
-          {mixed ? Array.from({ length: choice.bots }, (_, i) => (
-            <View key={i} style={stack ? styles.botColumn : styles.botRow} testID={`level-row-${i + 1}`}>
-              <Text style={stack ? styles.label : styles.botName}>{T.game.bot(i + 1)}</Text>
-              <View style={stack ? null : styles.botStep}>{levelRow(i + 1)}</View>
+          {/* «Разные уровни»: соперник и под ним его строка уровня — сменили уровень, сменился и соперник */}
+          {mixed ? rivals.map((r, i) => (
+            <View key={i} style={styles.botColumn} testID={`level-row-${i + 1}`}>
+              <RivalRow rival={r} n={i + 1} />
+              {levelRow(i + 1)}
             </View>
           )) : levelRow(0)}
           {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
+          {mixed ? null : (
+            <View style={styles.botColumn} testID="rivals">
+              <Text style={styles.label}>{T.rivals.atTable}</Text>
+              {rivals.map((r, i) => <RivalRow key={r.id} rival={r} n={i + 1} />)}
+            </View>
+          )}
         </Glass>
         <View style={styles.actions}>
           {onResume ? <Button label={T.menu.resume} kind="ghost" onPress={onResume} testID="resume" /> : null}
@@ -113,10 +137,10 @@ const styles = StyleSheet.create({
   panel: { gap: SPACE.m, padding: SPACE.l },
   label: { color: C.dim, fontSize: TYPE.caption, marginTop: SPACE.xs },
   note: { color: C.dim, fontSize: TYPE.caption },
-  botRow: { flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
-  botName: { color: C.text, fontSize: TYPE.body, fontWeight: '700', minWidth: 52 },
-  botStep: { flex: 1 },
-  botColumn: { gap: SPACE.xs },
+  botColumn: { gap: SPACE.s },
+  rival: { flexDirection: 'row', alignItems: 'center', gap: SPACE.m },
+  rivalText: { flex: 1, gap: SPACE.xs / 2 },
+  rivalName: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   actions: { gap: SPACE.m },
   row: { flexDirection: 'row', gap: SPACE.m },
   cell: { flex: 1 },
