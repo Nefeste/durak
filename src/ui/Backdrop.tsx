@@ -1,13 +1,15 @@
-// из nardy: src/ui/Backdrop.tsx @ 1d2bdff — своя палитра: ночная хвоя и одна тёплая лампа над столом.
-// Фон комнаты (13-art.md §5, specs/2026-11-art-premium.md §2): небо сверху вниз, тёплое пятно лампы в верхней
-// трети и холодный отсвет внизу. Один рисунок под всеми экранами, рисуется один раз и не двигается: экраны поверх
-// него прозрачны, панели — стекло (src/ui/Glass.tsx).
-import React, { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+// Комната с лампой (13-art.md §5, specs/2026-11-art-premium.md §2): фон под всеми экранами — ночная хвоя сверху вниз,
+// дощатый пол (третий круг вида), тёплое пятно лампы над столом и холодный отсвет снизу. Рисуется один раз и не
+// двигается: экраны поверх него прозрачны, панели — стекло (src/ui/Glass.tsx).
+import React, { memo, useMemo } from 'react';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { GLOWS, SKY } from './theme';
+import { planks } from './floor';
+import { C, GLOWS, SKY } from './theme';
 
 export const Backdrop = memo(function Backdrop() {
+  const { width, height } = useWindowDimensions();
+  const floor = useMemo(() => planks(width, height), [width, height]);
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="backdrop">
       <Svg width="100%" height="100%" preserveAspectRatio="none">
@@ -25,6 +27,14 @@ export const Backdrop = memo(function Backdrop() {
           ))}
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#bd-sky)" />
+        {/* пол: доска — тон поверх фона, щель — тёмная линия справа и по торцу */}
+        {floor.map((p, i) => (
+          <React.Fragment key={i}>
+            <Rect x={p.x} y={p.y} width={p.w} height={p.h} fill={p.light ? C.floorLight : C.floor} />
+            <Rect x={p.x + p.w - 1} y={p.y} width={1} height={p.h} fill={C.floorSeam} />
+            <Rect x={p.x} y={p.y + p.h - 1} width={p.w - 1} height={1} fill={C.floorSeam} />
+          </React.Fragment>
+        ))}
         {GLOWS.map(g => <Rect key={g.id} x="0" y="0" width="100%" height="100%" fill={`url(#bd-${g.id})`} />)}
       </Svg>
     </View>

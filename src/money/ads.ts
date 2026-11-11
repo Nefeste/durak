@@ -82,6 +82,16 @@ export function offerNoAds(o: { adSeen: boolean; adsOff: boolean; canBuy: boolea
   return o.adSeen && !o.adsOff && o.canBuy;
 }
 
+/**
+ * Можно ли предложить «Примерить на одну партию» — рекламу за вознаграждение по желанию (docs/09-game-design.md,
+ * «Рубашки»): пока прошлая примерка ждёт партию или идёт (`pending`) — нет; с прошлого показа любой рекламы — не меньше
+ * тех же 4 минут, что у полноэкранной. «Без рекламы» и «Про» примерке не мешают: её смотрят по своей воле.
+ */
+export function canTryOn(c: AdCounters, now: number, pending: boolean): boolean {
+  if (pending) return false;
+  return !c.lastShown || now - c.lastShown >= AD_RULES.minGapMs;
+}
+
 /** Сохранённое — поверх пустых счётчиков; битое не проходит. */
 export function normalizeCounters(raw: unknown): AdCounters {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;

@@ -10,6 +10,8 @@ import { nameOf } from '../engine';
 import type { Card } from '../engine';
 import { useSettings } from '../state/store';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
+import { useBack } from '../money';
+import type { BackId } from './backs';
 import { makeFaces } from './faces';
 import type { Faces } from './faces';
 import { placePicture } from './picture';
@@ -26,14 +28,18 @@ function Sprite({ p, faces }: { p: Placed; faces: Faces }) {
   );
 }
 
-export function CardPicture({ spec, width, testID }: { spec: PictureSpec; width: number; testID?: string }) {
+export function CardPicture({ spec, width, testID, back }: {
+  spec: PictureSpec; width: number; testID?: string;
+  /** Рубашка картинки; не задана — та, что у игрока (экран «Рубашки» показывает просматриваемую). */
+  back?: BackId;
+}) {
   const settings = useSettings();
+  const mine = useBack();
   const placed = useMemo(() => placePicture(spec.slots, width), [spec, width]);
   const { cw, ch, height } = placed;
   // размер индекса — как за столом: 15 точек на карту 66
   const font = useFont(Onest_700Bold, Math.round(cw * 0.23));
-  const small = useFont(Onest_700Bold, Math.round(cw * 0.39));
-  const faces = useMemo(() => (font && small ? makeFaces(cw, ch, font, small, settings.fourColor) : null), [cw, ch, font, small, settings.fourColor]);
+  const faces = useMemo(() => (font ? makeFaces(cw, ch, font, settings.fourColor, back ?? mine) : null), [cw, ch, font, settings.fourColor, back, mine]);
   // для чтения с экрана: карты картинки по порядку
   const said = placed.cards.filter(p => p.card !== null).map(p => nameOf(p.card as Card)).join(' ');
   // подписи стоят под своими местами и переносятся сколько нужно (13-art.md, §3 «Надписи целиком»): высота ряда — по

@@ -1,24 +1,29 @@
-// из nardy: src/money/index.ts @ 1d2bdff — без оформлений и дневной статистики.
+// из nardy: src/money/index.ts @ 1d2bdff — без дневной статистики; оформления — рубашки и их примерка (tryon.ts).
 // Деньги в игре (docs/11-money.md, docs/09-game-design.md «Реклама и покупки»): когда грузить и показывать
 // рекламу, сверка прав с магазином, покупка. Экраны зовут только эти функции; правила частоты — в ads.ts,
 // права — в rights.ts.
+import { useEffect, useState } from 'react';
 import { Linking } from 'react-native';
 import { logError } from '../state/crashlog';
-import { getSettings } from '../state/store';
-import { afterGame, afterShown, canShowInterstitial, getAdCounters, loadAdCounters, offerNoAds, updateAdCounters } from './ads';
+import type { BackId, PaidBackId } from '../render/backs';
+import { getSettings, useSettings } from '../state/store';
+import { afterGame, afterShown, canShowInterstitial, canTryOn, getAdCounters, loadAdCounters, offerNoAds, updateAdCounters } from './ads';
 import { adsSdk } from './adsSdk';
 import { billing, STORE } from './billing';
-import { isAdsOff, loadRights, setRights, unlockReview, withOwned } from './rights';
+import { isAdsOff, loadRights, onRights, ownsBack, setRights, unlockReview, withOwned } from './rights';
+import { afterTryGame, backShown, getTryOn, loadTryOn, onTryOn, setTryOn, tryOnPending, wearAt } from './tryon';
 import { getRate, loadRate, markAsked, shouldAskRating } from './review';
 import { pay, review } from './rustore';
 import { ON_SALE } from './types';
 import type { Availability, BuyResult, ProductId, Unavailable } from './types';
 
 export { billing, STORE } from './billing';
-export { getRights, isAdsOff, isPro, isUnlocked, onRights, reviewAccess } from './rights';
+export { getRights, isAdsOff, isPro, isUnlocked, onRights, ownsBack, reviewAccess } from './rights';
 export type { ReviewAccess } from './rights';
-export { MAIN_PRODUCTS, ON_SALE, PRO_ON_SALE } from './types';
-export type { Availability, BuyResult, MainProductId, Product, ProductId, Unavailable } from './types';
+export { MAIN_PRODUCTS, ON_SALE, PRO_ON_SALE, themeProduct } from './types';
+export type { Availability, BuyResult, MainProductId, Product, ProductId, ThemeProductId, Unavailable } from './types';
+export { getTryOn } from './tryon';
+export type { TryOn } from './tryon';
 
 /** SDK рекламы упал при запуске — реклама выключена до перезапуска приложения. */
 let adsBroken = false;
@@ -27,7 +32,7 @@ let started: Promise<void> | null = null;
 /** При запуске: счётчики, кэш прав, SDK рекламы (без показа), сверка прав с магазином. */
 export function startMoney(): Promise<void> {
   started ??= (async () => {
-    await Promise.all([loadAdCounters(), loadRights(), loadRate()]);
+    await Promise.all([loadAdCounters(), loadRights(), loadRate(), loadTryOn()]);
     try {
       await adsSdk.init(getSettings().personalAds);
     } catch (e) {
@@ -81,6 +86,8 @@ export function gameStarted(): void {
 /** Партия закончилась (любая: с ботами и онлайн): в счётчики. */
 export function gameEnded(durationMs: number): void {
   void updateAdCounters(c => afterGame(c, durationMs));
+  // партия в примеренной рубашке кончилась: рубашка остаётся на итоге, примерить можно уже другую
+  void setTryOn(afterTryGame(getTryOn()));
 }
 
 /**
@@ -127,6 +134,50 @@ export async function watchForReview(at: number): Promise<boolean> {
     return true;
   }
   return false;
+}
+
+/**
+ * Какая рубашка на картах (docs/09-game-design.md, «Рубашки»): выбранная в настройках, если она бесплатна или
+ * куплена; на столе партии `game` — примеренная за рекламу, пока эта партия не сменится другой. Рубашка — только вид
+ * на своём телефоне: сервер и соперники о ней не знают.
+ */
+export function backInUse(game?: string): BackId {
+  return backShown(getSettings().back, ownsBack, getTryOn(), game);
+}
+
+/** То же для экранов: перерисовка при смене настройки, прав и примерки. */
+export function useBack(game?: string): BackId {
+  const chosen = useSettings().back;
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const again = () => tick(n => n + 1);
+    const offRights = onRights(again), offTry = onTryOn(again);
+    return () => { offRights(); offTry(); };
+  }, []);
+  return backShown(chosen, ownsBack, getTryOn(), game);
+}
+
+/** В партии `game` (новой или продолженной) сделан ход: ждавшая примерка надевается на неё, прошлая — кончается. */
+export function wearBack(game: string): void {
+  void setTryOn(wearAt(getTryOn(), game));
+}
+
+/** Перемены примерки — экрану «Рубашки». */
+export { onTryOn } from './tryon';
+
+/** Можно ли сейчас предложить «Примерить на одну партию» (правило — `canTryOn`; реклама должна быть загружена). */
+export function tryOnOffered(now = Date.now()): boolean {
+  return !adsBroken && adsSdk.rewardedReady() && canTryOn(getAdCounters(), now, tryOnPending(getTryOn()));
+}
+
+/** Реклама за вознаграждение: досмотрена — рубашка `back` надета на следующую партию (одну). */
+export async function watchToTryOn(back: PaidBackId): Promise<boolean> {
+  if (adsBroken || !canTryOn(getAdCounters(), Date.now(), tryOnPending(getTryOn()))) return false;
+  const r = await adsSdk.showRewarded();
+  if (r !== 'rewarded') return false;
+  await updateAdCounters(c => afterShown(c, Date.now(), 'rewarded'));
+  await setTryOn({ back, game: null, over: false });
+  return true;
 }
 
 let offeredFor: number | null = null;

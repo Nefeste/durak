@@ -4,6 +4,8 @@
 import { levelOf } from '../bot';
 import type { Level } from '../bot';
 import type { ThrowOrder, Variant } from '../engine';
+import { ALL_BACKS, DEFAULT_BACK } from '../render/backs';
+import type { BackId } from '../render/backs';
 
 export type BotSpeed = 'normal' | 'fast';
 export type HandOrder = 'suit' | 'rank';
@@ -22,6 +24,9 @@ export interface Settings {
   throwOrder: ThrowOrder;
   /** Четырёхцветная колода: ♠ чёрные, ♣ зелёные, ♥ красные, ♦ синие. */
   fourColor: boolean;
+  /** Выбранная рубашка (docs/09-game-design.md, «Рубашки»). Что на столе на самом деле — `backInUse` в src/money:
+   *  некупленная заменяется на «Бордо», примерка на одну партию — поверх выбора. */
+  back: BackId;
   /** «Помощь памяти (для учёбы)»: взятые в открытую карты соперников лицом и таблица вышедших —
    *  только против ботов, онлайн никогда (ADR 0006). По умолчанию выключена (решение владельца 08.11.2026). */
   memoryAid: boolean;
@@ -48,7 +53,7 @@ export function botLevels(c: Choice): Level[] {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', straightHand: false, throwOrder: 'queue', fourColor: false, memoryAid: false, personalAds: true,
+  sound: true, vibration: true, botSpeed: 'normal', handOrder: 'suit', straightHand: false, throwOrder: 'queue', fourColor: false, back: DEFAULT_BACK, memoryAid: false, personalAds: true,
   newbie: true, transferTold: false, choice: { variant: 'podkidnoy', bots: 1, level: 'beginner', mixed: false, levels: ['beginner', 'beginner', 'beginner'] },
 };
 
@@ -83,6 +88,8 @@ export function parseSettings(raw: string | null): Settings {
     // до очереди атакующих (после 0.9.0) настройки не было — по очереди, как теперь по умолчанию
     throwOrder: pick(v.throwOrder, ['queue', 'free'] as const, d.throwOrder),
     fourColor: flag(v.fourColor, d.fourColor),
+    // до третьего круга вида рубашка была одна
+    back: pick(v.back, ALL_BACKS, d.back),
     // до 0.5.1 настройка звалась `seenCards` и включала только таблицу
     memoryAid: flag(v.memoryAid ?? v.seenCards, d.memoryAid),
     personalAds: flag(v.personalAds, d.personalAds),

@@ -1,4 +1,4 @@
-// из nardy: src/money/rustoreRules.ts @ 1d2bdff — без оформлений.
+// из nardy: src/money/rustoreRules.ts @ 1d2bdff — оформления — рубашки.
 // Ответы RuStore Pay → права и причины, и сама покупка: модуль оплаты ей передают параметром, поэтому
 // всё здесь гоняют тесты под Bun без телефона. Коды и тексты ошибок SDK, их причины и сама покупка —
 // из общего набора `@gornitsa/kit` (ADR студии 0022, с 2026-10-31); здесь — что они значат для «Козыря»:
@@ -6,6 +6,8 @@
 import { buy, causeReasonOf, reasonOf, rsCode, rsDetail, rsText } from '@gornitsa/kit/rustore-pay/rules';
 import type { RsReason } from '@gornitsa/kit/rustore-pay/rules';
 import type { PayNative, RsPurchase } from '@gornitsa/kit/rustore-pay';
+import { isPaidBack } from '../render/backs';
+import type { PaidBackId } from '../render/backs';
 import type { BuyResult, Owned, Unavailable } from './types';
 
 export { rsCode, rsDetail, rsText };
@@ -49,17 +51,23 @@ const PAID_PRODUCT = new Set(['CONFIRMED']);
 
 /** Что куплено, по списку покупок RuStore. */
 export function ownedOf(list: readonly RsPurchase[], now: number): Owned {
-  let noAds = false, proUntil = 0;
+  let noAds = false, proUntil = 0, backsAll = false;
+  const backs = new Set<PaidBackId>();
   for (const p of list) {
     const product = p.productPurchase, sub = p.subscriptionPurchase;
-    if (product && PAID_PRODUCT.has(product.status) && product.productId === 'no_ads') noAds = true;
+    if (product && PAID_PRODUCT.has(product.status)) {
+      const id = product.productId, back = id.slice('theme_'.length);
+      if (id === 'no_ads') noAds = true;
+      else if (id === 'themes_all') backsAll = true;
+      else if (id.startsWith('theme_') && isPaidBack(back)) backs.add(back);
+    }
     if (sub && (sub.productId === 'pro_month' || sub.productId === 'pro_year') && ACTIVE_SUB.has(sub.status)) {
       const until = Date.parse(sub.expirationDate);
       // дата не разобралась — считаем, что подписка действует ещё сутки: сверка при запуске продлит
       proUntil = Math.max(proUntil, Number.isFinite(until) ? until : now + 24 * 3600_000);
     }
   }
-  return { noAds, proUntil };
+  return { noAds, proUntil, backs: [...backs], backsAll };
 }
 
 /** Что покупке нужно от Pay SDK — только оплата. */

@@ -11,6 +11,7 @@ import { suitOf, throwerSeen } from '../engine';
 import type { Card, Observation } from '../engine';
 import type { Level } from '../bot';
 import { T } from '../i18n';
+import { useBack } from '../money';
 import { TableCanvas } from '../render/TableCanvas';
 import { layoutTable, PLATE, plateOf } from '../render/layout';
 import type { Layout, Sprite } from '../render/layout';
@@ -42,12 +43,12 @@ function Frame({ s, l, kind }: { s: Sprite; l: Layout; kind: MarkKind }) {
 /** `levels` — уровни ботов партии по местам: по ним на плашках те же имена и портреты, что были за столом. */
 export function ReviewBoard({ o, marks, levels }: { o: Observation; marks: ReviewMarks; levels: readonly Level[] }) {
   const settings = useSettings();
+  const back = useBack();
   const { fontScale } = useWindowDimensions();
   const rivals = useMemo(() => rivalsOf(levels), [levels]);
   // подпись «Сыграно» / «Лучше» растёт с шрифтом телефона до ×1,3 (13-art.md, §3): ряд подписей — по её высоте
   const labelH = Math.ceil(LABEL_H * Math.min(PLATE.maxScale, Math.max(1, fontScale)));
   const font = useFont(Onest_700Bold, 15);
-  const small = useFont(Onest_700Bold, 26);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   // плашка — как в партии: портрет, имя, уровень, число карт
   const plate = plateOf(size?.width ?? 412, o.seats - 1, plateLines(2), fontScale, true);
@@ -82,8 +83,8 @@ export function ReviewBoard({ o, marks, levels }: { o: Observation; marks: Revie
 
   return (
     <View style={styles.area} onLayout={onLayout} testID="review-table" accessibilityLabel={T.review.table}>
-      {layout && font && small ? (
-        <TableCanvas layout={layout} font={font} small={small} fourColor={settings.fourColor} less
+      {layout && font ? (
+        <TableCanvas layout={layout} font={font} fourColor={settings.fourColor} back={back} less
           hand={o.hand} table={o.table} enabled={false} touch={TOUCH} />
       ) : null}
       {layout ? others.map(p => (

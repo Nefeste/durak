@@ -41,7 +41,6 @@ interface Row { scene: Scene; ui: FrameSummary; js: FrameSummary; bot?: { n: num
 export function BenchScreen({ onBack, quick = false }: { onBack: () => void; quick?: boolean }) {
   const insets = useInsets();
   const font = useFont(Onest_700Bold, 15);
-  const small = useFont(Onest_700Bold, 26);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [view, setView] = useState<{ o: Observation; mirror: boolean; key: number }>(() => ({ o: dealScene(), mirror: false, key: 0 }));
   const [running, setRunning] = useState<Scene | null>(null);
@@ -172,8 +171,8 @@ export function BenchScreen({ onBack, quick = false }: { onBack: () => void; qui
     <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="bench">
       <Header title={T.bench.title} back={T.bench.back} onBack={onBack} backTestID="bench-back" />
       <View style={styles.table} onLayout={onLayout}>
-        {layout && font && small ? (
-          <TableCanvas key={view.key} layout={layout} font={font} small={small} fourColor={false} less={false}
+        {layout && font ? (
+          <TableCanvas key={view.key} layout={layout} font={font} fourColor={false} less={false}
             hand={view.o.hand} table={view.o.table} enabled={false} touch={touch} />
         ) : null}
       </View>

@@ -69,3 +69,44 @@ describe('токены вместо чисел на глаз', () => {
   });
   test('цвета — только C', () => expect(bad(/#[0-9a-fA-F]{3,8}\b|rgba?\(/)).toEqual([]));
 });
+
+// Третий круг вида (13-art.md §5, §11): пол не спорит с текстом, рубашка читается на сукне.
+describe('пол и рубашки', () => {
+  test('пол: текст на досках читается как на фоне', () => {
+    for (const plank of [C.floor, C.floorLight]) {
+      for (const under of [solid(C.bg), solid(C.sky)]) {
+        const ground = over(under, plank);
+        expect(contrast(solid(C.text), ground)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(solid(C.dim), ground)).toBeGreaterThanOrEqual(4.5);
+        // доска — оттенок фона, а не новая поверхность
+        expect(contrast(ground, under)).toBeLessThan(1.25);
+      }
+    }
+  });
+  test('пол один и тот же при каждом запуске и покрывает экран', async () => {
+    const { planks, PLANK } = await import('../../src/ui/floor');
+    for (const [w, h] of [[360, 740], [412, 915]]) {
+      const a = planks(w, h);
+      expect(planks(w, h)).toEqual(a);
+      const cols = new Set(a.map(p => p.x));
+      expect(cols.size).toBe(Math.ceil(w / PLANK.width));
+      for (const x of cols) {
+        const col = a.filter(p => p.x === x).sort((p, q) => p.y - q.y);
+        expect(col[0].y).toBeLessThanOrEqual(0);
+        expect(col[col.length - 1].y + col[col.length - 1].h).toBeGreaterThanOrEqual(h);
+        for (let i = 1; i < col.length; i++) expect(col[i].y).toBe(col[i - 1].y + col[i - 1].h);
+      }
+      // торцы соседних рядов не на одной линии
+      const ends = (x: number) => a.filter(p => p.x === x).map(p => p.y);
+      const xs = [...cols].sort((p, q) => p - q);
+      for (let i = 1; i < xs.length; i++) expect(ends(xs[i]).filter(y => y > 0 && ends(xs[i - 1]).includes(y))).toEqual([]);
+    }
+  });
+  test('рубашки: узор виден на основе, основа — на сукне', async () => {
+    const { BACKS } = await import('../../src/ui/theme');
+    for (const [id, b] of Object.entries(BACKS)) {
+      expect([id, contrast(solid(b.line), solid(b.base)) >= 3]).toEqual([id, true]);
+      expect([id, contrast(solid(b.base), solid(C.felt)) >= 1.15]).toEqual([id, true]);
+    }
+  });
+});

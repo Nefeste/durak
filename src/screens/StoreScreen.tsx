@@ -1,4 +1,4 @@
-// «Магазин» — по образцу StoreScreen «Нард» (nardy @ 1d2bdff), в портрете и без оформлений
+// «Магазин» — по образцу StoreScreen «Нард» (nardy @ 1d2bdff), в портрете; оформления (рубашки) — своим экраном
 // (docs/09-game-design.md, «Реклама и покупки»): товары на витрине — что даёт, цена из магазина,
 // кнопка; внизу — «Восстановить покупки». Покупки недоступны — строка почему и, где поможет,
 // «Открыть RuStore»; товары всё равно видны, чтобы было понятно, что есть. «Про» на витрине
@@ -20,7 +20,7 @@ const OPEN_RUSTORE: Unavailable[] = ['other-build', 'no-rustore', 'not-signed-in
 /** Итог покупки или сверки и, если RuStore отказал, его ответ как есть. */
 interface Msg { text: string; detail?: string }
 
-export function StoreScreen({ onBack }: { onBack: () => void }) {
+export function StoreScreen({ onBack, onBacks }: { onBack: () => void; onBacks: () => void }) {
   const insets = useInsets();
   // `undefined` — ещё спрашиваем магазин; `null` — покупки доступны; иначе — почему нет
   const [why, setWhy] = useState<Unavailable | null | undefined>(undefined);
@@ -86,6 +86,12 @@ export function StoreScreen({ onBack }: { onBack: () => void }) {
           </Glass>
         );
       })}
+      {/* рубашки — своим экраном: там плитка, покупка по одной и всех сразу, примерка */}
+      <Glass style={styles.card} testID="product-backs">
+        <Text style={styles.name} maxFontSizeMultiplier={1.3}>{T.money.backs.title}</Text>
+        <Text style={styles.note} maxFontSizeMultiplier={1.3}>{T.money.backs.text}</Text>
+        <Button testID="store-backs" kind="ghost" label={T.money.backs.open} onPress={onBacks} />
+      </Glass>
       <Text style={styles.note} maxFontSizeMultiplier={1.3}>{T.money.free}</Text>
       {msg ? <Text style={styles.text} testID="store-msg" maxFontSizeMultiplier={1.3}>{msg.text}</Text> : null}
       {msg?.detail ? <Text style={styles.note} testID="store-msg-detail" selectable maxFontSizeMultiplier={1.3}>{T.money.detail(msg.detail)}</Text> : null}

@@ -12,7 +12,7 @@ import type { Action, Card, Result } from '../engine';
 import type { Level } from '../bot';
 import { layout as fill, unseen } from '../bot/legal';
 import { T } from '../i18n';
-import { gameEnded, leavingEnd } from '../money';
+import { gameEnded, leavingEnd, useBack, wearBack } from '../money';
 import { BottomBar } from '../ui/BottomBar';
 import { Button } from '../ui/Button';
 import { Dialog } from '../ui/dialog';
@@ -132,7 +132,6 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const settings = useSettings();
   const less = useLessMotion();
   const font = useFont(Onest_700Bold, 15);
-  const small = useFont(Onest_700Bold, 26);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [pick, setPick] = useState<{ card: Card; options: Action[]; at: string } | null>(null);
   const [noted, setNoted] = useState<Note<string> | null>(null);
@@ -140,6 +139,11 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
   const [askedNo, setAskedNo] = useState(-1);
   const g = t.game!;
   const at = `${g.no}:${g.n}`;
+  // рубашка — только вид на этом телефоне: выбранная или примеренная на эту партию; сервер о ней не знает
+  const wearing = `online:${t.id}:${g.no}`;
+  const begun = g.n > 0;
+  useEffect(() => { if (begun) wearBack(wearing); }, [wearing, begun]);
+  const back = useBack(wearing);
   const note = noteOf(noted, at);
   // деньги (src/money): партия по сети — в счётчики рекламы, когда кончилась; реклама — только при
   // уходе с итога в меню, никогда во время партии и не между партиями за одним столом
@@ -268,8 +272,8 @@ function Play({ table, t, onExit, pad, down }: { table: OnlineTable; t: TableVie
       </View>
       <View style={styles.area} onLayout={onLayout} testID="table">
         {down ? <Text style={[styles.err, styles.down]} pointerEvents="none" testID="online-down">{T.online.noNet}</Text> : null}
-        {lay && font && small && shown ? (
-          <TableCanvas key={g.no} layout={lay} font={font} small={small} fourColor={settings.fourColor} less={less}
+        {lay && font && shown ? (
+          <TableCanvas key={g.no} layout={lay} font={font} fourColor={settings.fourColor} back={back} less={less}
             hand={shown.hand} table={shown.table} enabled={!!view && view.phase !== 'end'} touch={{ onCard, onTableCard, onDrop }} />
         ) : null}
         {holding ? <View pointerEvents="none" style={styles.held} testID="held" accessible accessibilityLabel={tableLabel(hold.shown!.table)} /> : null}

@@ -8,6 +8,7 @@ import { MenuScreen } from './src/screens/MenuScreen';
 import type { Choice } from './src/screens/MenuScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { StoreScreen } from './src/screens/StoreScreen';
+import { BacksScreen } from './src/screens/BacksScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
 import { BenchScreen } from './src/screens/BenchScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
@@ -36,10 +37,13 @@ installCrashHandlers();
 /** Быстрый «Замер» для сценария в браузере: `?bench=quick`. */
 const quickBench = typeof globalThis.location !== 'undefined' && /[?&]bench=quick/.test(globalThis.location.search);
 
-type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'bench' | 'rules';
+type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'bench' | 'rules' | 'backs';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('menu');
+  // «Рубашки» открываются из настроек и из магазина — «Назад» ведёт туда, откуда пришли
+  const [backsFrom, setBacksFrom] = useState<'settings' | 'store'>('settings');
+  const openBacks = (from: 'settings' | 'store') => { setBacksFrom(from); setRoute('backs'); };
   // стол в меню запоминается в настройках; первый запуск — подкидной вдвоём против «Начинающего» (спецификация 1.0, §3)
   const choice: Choice = useSettings().choice;
   const setChoice = (c: Choice) => setSettings({ choice: c });
@@ -79,11 +83,11 @@ export default function App() {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (route === 'menu') return false;
-      setRoute(route === 'report' || route === 'bench' ? 'settings' : 'menu');
+      setRoute(route === 'report' || route === 'bench' ? 'settings' : route === 'backs' ? backsFrom : 'menu');
       return true;
     });
     return () => sub.remove();
-  }, [route]);
+  }, [route, backsFrom]);
   const play = (from: SavedGame | null) => {
     setResume(from);
     setGame(n => n + 1);
@@ -113,9 +117,11 @@ export default function App() {
         ) : route === 'stats' ? (
           <StatsScreen onBack={() => setRoute('menu')} onStore={() => setRoute('store')} />
         ) : route === 'store' ? (
-          <StoreScreen onBack={() => setRoute('menu')} />
+          <StoreScreen onBack={() => setRoute('menu')} onBacks={() => openBacks('store')} />
+        ) : route === 'backs' ? (
+          <BacksScreen onBack={() => setRoute(backsFrom)} />
         ) : route === 'settings' ? (
-          <SettingsScreen onBack={() => setRoute('menu')} onReport={() => setRoute('report')} onBench={() => setRoute('bench')} />
+          <SettingsScreen onBack={() => setRoute('menu')} onReport={() => setRoute('report')} onBench={() => setRoute('bench')} onBacks={() => openBacks('settings')} />
         ) : route === 'bench' ? (
           <BenchScreen onBack={() => setRoute('settings')} quick={quickBench} />
         ) : route === 'report' ? (
