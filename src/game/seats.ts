@@ -2,6 +2,8 @@
 // стрелке слева направо (src/render/layout.ts), поэтому следующее за создателем место — слева, предпоследнее — справа,
 // а вчетвером через одно — напротив. Без React — проверяется тестом (tools/test/seats.test.ts).
 import type { TableView } from '../state/protocol';
+import { rivalsAt } from './rivals';
+import type { Rival } from './rivals';
 
 export type Where = 'opposite' | 'left' | 'right';
 
@@ -25,4 +27,10 @@ export function placeRows(host: number, n: number): number[][] {
 /** Места стола для схемы из вида места (`TableView`). */
 export function placesOf(t: TableView): ({ name: string; bot: TableView['bots']; host: boolean; you: boolean } | null)[] {
   return t.seats.map((s, i) => (s ? { name: s.name, bot: s.bot, host: i === t.host, you: i === t.you } : null));
+}
+
+/** Кто из персонажей сидит на местах ботов онлайн-стола: сервер шлёт только уровень бота на месте, имена считает
+ *  телефон — от места создателя по часовой стрелке (`rivalsAt`), поэтому у всех за столом они одни и те же. */
+export function tableRivals(t: Pick<TableView, 'seats' | 'host'>): (Rival | null)[] {
+  return rivalsAt(t.seats.map(s => s?.bot ?? null), Math.max(0, t.host));
 }

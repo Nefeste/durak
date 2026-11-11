@@ -13,6 +13,7 @@ import { ReportScreen } from './src/screens/ReportScreen';
 import { BenchScreen } from './src/screens/BenchScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { DeckSheet, deckSheetWanted } from './src/render/DeckSheet';
+import { CastSheet, castSheetWanted } from './src/game/CastSheet';
 import { RulesScreen } from './src/screens/RulesScreen';
 import { PuzzleScreen } from './src/game/PuzzleScreen';
 import { GameScreen } from './src/game/GameScreen';
@@ -94,6 +95,7 @@ export default function App() {
   };
   const r = resume?.record;
   if (deckSheetWanted()) return <DeckSheet />;
+  if (castSheetWanted()) return <CastSheet />;
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />

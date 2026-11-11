@@ -163,6 +163,8 @@ async function main() {
   await a.waitForTimeout(800);
   const s3 = await a.getByTestId('lobby-seat-3').innerText().catch(() => '');
   ok(s3.includes(T.level.beginner) && s3.includes('бот'), `бот справа — «${T.level.beginner}»`, s3);
+  // соперники с именами (#20): сервер шлёт уровень бота, имя считает телефон; сменился уровень — сменился персонаж
+  ok(s3.includes(T.rival.katya) && (await a.getByTestId('lobby-seat-1').innerText()).includes(T.rival.tyoma), `схема мест: у ботов имена — ${T.rival.tyoma} и ${T.rival.katya}`, s3);
   ok((await a.getByTestId('lobby-seat-1').innerText()).includes(T.level.novice), `бот слева — по-прежнему «${T.level.novice}»`);
   await a.screenshot({ path: `${OUT}/online-01-lobby.png` });
 
@@ -193,6 +195,13 @@ async function main() {
   ok(/Саша/.test(await opp(2)), 'за столом Саша — напротив Миши', await opp(2));
   ok((await opp(1)).includes(T.level.novice) && (await opp(3)).includes(T.level.beginner) && /бот/i.test(await opp(3)),
     'боты за столом — разных уровней, подписаны «бот»', `${await opp(1)} / ${await opp(3)}`);
+  {
+    // у Миши и у Саши боты зовутся одинаково: имена считаются от места создателя (у Саши боты — на тех же местах стола)
+    const names = async (p: Page) => Promise.all([1, 3].map(s => p.getByTestId(`opp-${s}-name`).innerText().then(x => x.trim()).catch(() => '')));
+    const [na, nb] = [await names(a), await names(b)];
+    ok(na[0] === T.rival.tyoma && na[1] === T.rival.katya, `боты за столом — с именами: ${na.join(', ')}`);
+    ok(na.join() === nb.join(), 'у обоих игроков имена ботов одни и те же', `${na} / ${nb}`);
+  }
   await a.screenshot({ path: `${OUT}/online-02-game.png` });
 
   ok(await playOut([a, b], 'стол'), 'партия вчетвером дошла до итога');

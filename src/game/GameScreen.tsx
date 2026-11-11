@@ -21,7 +21,7 @@ import { gameEnded, gameStarted, leavingEnd, noAdsLineFor, useBack, wearBack } f
 import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
-import { CONTROLS_GAP, layoutTable, plateOf, plateHeight, TITLE_SCALE } from '../render/layout';
+import { CONTROLS_GAP, layoutTable, plateOf, TITLE_SCALE } from '../render/layout';
 import { useOrigins } from '../render/useOrigins';
 import { useTableCues } from './useTableCues';
 import { botDelay } from '../state/settings';
@@ -36,6 +36,7 @@ import { SeenCards } from './SeenCards';
 import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
 import { resultPlaces } from './outcome';
+import { rivalsOf } from './rivals';
 import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
@@ -114,6 +115,9 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const [lvls] = useState(() => restored?.levels ?? levels);
   /** Уровень бота на месте `seat` (места ботов — 1 … bots). */
   const lvlAt = (seat: number): Level => levelAt(lvls, seat);
+  // кто сидит на местах ботов — из уровней стола: та же партия после перезапуска — те же имена (src/game/rivals.ts)
+  const rivals = useMemo(() => rivalsOf(lvls), [lvls]);
+  const botName = (seat: number) => { const r = rivals[seat]; return r ? T.rival[r.id] : ''; };
   // первая партия (docs/09-game-design.md, «Первая партия»): окно о переводе перед первым переводным столом и
   // «Правила» поверх стола; пока они открыты, боты ждут
   const [told, setTold] = useState(() => variant === 'perevodnoy' && !restored && !settings.transferTold);
@@ -238,7 +242,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const bubbles = useSpeech(shown);
   const saying = bubbles.some(b => b.seat === YOU);
   useTableCues(shown, deal, less);
-  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid, straight: settings.straightHand, orderButton: true, plate: plateHeight(plateLines(2), fontScale) }) : null),
+  const layout = useMemo(() => (size ? layoutTable(shown, { ...size, origins, order: settings.handOrder, picked: picked?.card ?? null, targets, showOpenly: settings.memoryAid, straight: settings.straightHand, orderButton: true, plate: plateOf(size.width, bots, plateLines(2), fontScale, true).h }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [shown, origins, size, settings.handOrder, settings.memoryAid, settings.straightHand, picked, fontScale]);
 
@@ -313,7 +317,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     : mine.some(a => a.type === 'attack') ? T.game.hintAttack
     : state.phase === 'giving' && canPass ? T.game.hintGive
     : canPass ? (allCovered && autoPass(state, YOU) ? T.game.hintAutoDone : T.game.hintThrow)
-    : thrower >= 0 && thrower !== YOU && state.defender !== YOU ? T.game.hintQueue(T.game.bot(thrower)) : T.game.hintWait;
+    : thrower >= 0 && thrower !== YOU && state.defender !== YOU ? T.game.hintQueue(botName(thrower)) : T.game.hintWait;
 
   const name = (seat: number) => T.level[lvlAt(seat)];
   const resultText = (r: Result) => (r.resigned ?? []).includes(YOU) ? T.result.youResigned
@@ -321,7 +325,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     : r.fool === YOU ? T.result.lose
     : seats === 2 ? T.result.win : r.order[0] === YOU ? T.result.first : T.result.win;
 
-  const plate = plateOf(size?.width ?? 412, bots, plateLines(2), fontScale);
+  const plate = plateOf(size?.width ?? 412, bots, plateLines(2), fontScale, true);
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     if (!size || Math.abs(size.width - width) > 1 || Math.abs(size.height - height) > 1) setSize({ width, height });
@@ -329,7 +333,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
 
   if (rulesOpen) return <RulesScreen section="transfer" onBack={() => setRulesOpen(false)} />;
   if (showReview) {
-    return <ReviewScreen review={review} record={record} counting at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
+    return <ReviewScreen review={review} record={record} levels={lvls} counting at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
   }
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
@@ -348,8 +352,9 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
             touch={{ onCard, onTableCard, onDrop }} />
         ) : null}
         {layout ? layout.opponents.map(p => (
-          <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={T.game.bot(p.seat)}
-            lines={[name(p.seat), shown.out.includes(p.seat) ? T.game.out : T.game.cards(shown.handSizes[p.seat])]}
+          <SeatPlate key={p.seat} testID={`opp-${p.seat}`} name={botName(p.seat)} rival={rivals[p.seat]} face={plate.face}
+            lines={[name(p.seat), shown.out.includes(p.seat) ? (rivals[p.seat]?.she ? T.game.outShe : T.game.out) : T.game.cards(shown.handSizes[p.seat])]}
+            cards={shown.out.includes(p.seat) ? undefined : shown.handSizes[p.seat]}
             role={roleOf(state, p.seat, thrower)}
             active={state.phase !== 'end' && (state.attacker === p.seat || state.defender === p.seat || thrower === p.seat)}
             left={p.x - plate.w / 2} width={plate.w} top={layout.plate.top} height={layout.plate.height} />
@@ -418,7 +423,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
       {state.phase === 'end' && state.result && !holding ? (
-        <ResultSheet bottom={insets.bottom} title={resultText(state.result)} places={resultPlaces(state.result, seat => (seat === YOU ? { name: T.result.you } : { name: T.game.bot(seat), sub: name(seat) }), YOU)}
+        <ResultSheet bottom={insets.bottom} title={resultText(state.result)} places={resultPlaces(state.result, seat => (seat === YOU ? { name: T.result.you } : { name: botName(seat), sub: name(seat), rival: rivals[seat] }), YOU)}
           lines={<>
             <Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>
             {/* после показанной межпартийной рекламы, раз за запуск — одна спокойная строка (#59, вариант 1) */}

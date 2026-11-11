@@ -2,11 +2,13 @@
 // для листа итога с ботами и онлайн. Без React — проверяется tools/test/result.test.ts.
 import { placesOf } from '../engine';
 import type { Result } from '../engine';
+import type { Rival } from './rivals';
 
 /** Место в ряду итога: номер выхода, имя, своё ли, остался ли с картами (сдавшийся — тоже, docs/08-rules.md, п. 8.5). */
-export interface ResultPlace { n: number; name: string; sub?: string; you: boolean; fool: boolean; resigned?: boolean }
-/** Имя места: своё — «вы»; бот — «Бот N» и уровень второй строкой (в одну строку не помещается). */
-export interface Who { name: string; sub?: string }
+export interface ResultPlace { n: number; name: string; sub?: string; rival?: Rival | null; you: boolean; fool: boolean; resigned?: boolean }
+/** Имя места: своё — «вы»; бот — имя персонажа (`rival` — он сам, для портрета и подписи «бот») и уровень второй
+ *  строкой (в одну строку не помещается). */
+export interface Who { name: string; sub?: string; rival?: Rival | null }
 
 /** Ряд мест по `Result`: вышедшие по порядку, затем кто остался с картами, затем сдавшиеся (кто сдался раньше —
  *  ниже); ничья — все вышедшие. Чистая функция. */
