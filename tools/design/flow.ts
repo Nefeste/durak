@@ -42,8 +42,9 @@ async function playOne(p: Page): Promise<boolean> {
 
 async function step(p: Page) {
   if (!(await playOne(p))) {
-    if (await visible(p, 'pass')) await p.getByTestId('pass').click().catch(() => {});
-    else if (await visible(p, 'take')) await p.getByTestId('take').click().catch(() => {});
+    // касание — с коротким пределом: кнопка могла пропасть или оказаться под окном, 30 с ждать её незачем
+    if (await visible(p, 'pass')) await p.getByTestId('pass').click({ timeout: 1500 }).catch(() => {});
+    else if (await visible(p, 'take')) await p.getByTestId('take').click({ timeout: 1500 }).catch(() => {});
   }
 }
 

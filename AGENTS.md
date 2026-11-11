@@ -121,12 +121,15 @@ This project's own rules:
   another player's hand or the talon order before the reveal; a test checks every route.
 - **No bot, hints, card counting or review during an online game** — for anyone, paid or not (ADR 0006).
 - **Money as nardy** (ADR 0009, `docs/11-money.md`): everything about money lives in `src/money/` (copy of nardy's
-  module without skins); screens call only `src/money/index.ts`; ads only when leaving the result screen, never during
+  module; skins here are card backs — `src/render/backs.ts`, ten of them, three free; products `theme_<back>` and
+  `themes_all`; the rewarded try-on of a paid back for one game is `watchToTryOn`, called only by the «Рубашки» screen); screens call only `src/money/index.ts`; ads only when leaving the result screen, never during
   a game. Never call the RuStore Pay wrapper's `updateAcknowledgementState` (it crashes 11.1.0 after a payment;
   `money.test.ts` fails on any caller). «Про» is on sale only with the review (`PRO_ON_SALE`, stage Д); hints,
   seen cards and undo never read purchase rights.
 - **Portrait only** (ADR 0007).
 - **Own look, not the studio brand book** (ADR 0012, owner's decision): dark table with glass, colours only in
   `src/ui/theme.ts`. Unique card backs «including 18+» are a post-1.0 owner decision (the age rating changes).
-- **Cards are drawn by code** (ADR 0010): own deck with Russian indices (В, Д, К, Т), no copied deck art.
+- **Cards are drawn by code** (ADR 0010): own deck with Russian indices (В, Д, К, Т), no copied deck art — faces in
+  `src/render/faces.ts` (classic pip layouts, emblems instead of people on В, Д, К), backs in `src/render/backArt.ts`
+  (geometry only, colours in `BACKS` of `theme.ts`, the same picture both ways up), the floor in `src/ui/floor.ts`.
 - `applicationId` is `games.gornitsa.durak` — eternal (charter ADR 0006); confirmed by the owner (#1). In the game the app is «Козырь».
