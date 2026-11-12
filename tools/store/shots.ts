@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { T } from '../../src/i18n';
 import { C } from '../../src/ui/theme';
-import { svg } from '../art/icon';
+import { cards } from '../art/icon';
 import { serveWeb } from '../e2e/serve';
 
 const ROOT = join(import.meta.dir, '../..');
@@ -82,13 +82,12 @@ async function shot(p: Page, name: string) {
   console.log(`  ${name}.png`);
 }
 
-/** Баннер и картинка для ссылок: сукно, две карты значка, название и строка о главном. */
-function banner(w: number, h: number): string {
+/** Баннер и картинка для ссылок: сукно, две карты значка (PNG той же страницы `?icon=1`), название и строка о главном. */
+function banner(w: number, h: number, icon: Buffer): string {
   const s = Math.round(h * 0.98);
-  const icon = svg(s, 0.7, null).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
 <rect width="${w}" height="${h}" fill="${C.felt}"/>
-<g transform="translate(${Math.round(w * 0.04)} ${Math.round((h - s) / 2)})">${icon}</g>
+<image x="${Math.round(w * 0.04)}" y="${Math.round((h - s) / 2)}" width="${s}" height="${s}" href="data:image/png;base64,${icon.toString('base64')}"/>
 <text x="${Math.round(w * 0.47)}" y="${Math.round(h * 0.46)}" font-family="Onest" font-weight="700" font-size="${Math.round(h * 0.2)}" fill="${C.accent}">Козырь</text>
 <text x="${Math.round(w * 0.47)}" y="${Math.round(h * 0.6)}" font-family="Onest" font-weight="700" font-size="${Math.round(h * 0.056)}" fill="${C.text}">Дурак подкидной и переводной</text>
 <text x="${Math.round(w * 0.47)}" y="${Math.round(h * 0.7)}" font-family="Onest" font-weight="700" font-size="${Math.round(h * 0.046)}" fill="${C.dim}">Колоду можно проверить после партии</text>
@@ -97,10 +96,13 @@ function banner(w: number, h: number): string {
 
 async function graphics(p: Page) {
   const font = readFileSync(FONT).toString('base64');
+  // карты значка — со страницы `?icon=1`: тем же кодом, что за столом (туз червей и «Бордо», решение владельца 12.11.2026)
+  const icon512 = await cards(p, web.url, 512, 0.62, true);
+  writeFileSync(join(STORE, 'graphics', 'icon-512.png'), icon512);
+  console.log('  graphics/icon-512.png');
   const files: { file: string; w: number; h: number; body: string }[] = [
-    { file: 'icon-512.png', w: 512, h: 512, body: svg(512, 0.62, C.felt) },
-    { file: 'feature-1024x500.png', w: 1024, h: 500, body: banner(1024, 500) },
-    { file: 'og-1200x630.png', w: 1200, h: 630, body: banner(1200, 630) },
+    { file: 'feature-1024x500.png', w: 1024, h: 500, body: banner(1024, 500, await cards(p, web.url, 490, 0.7, false)) },
+    { file: 'og-1200x630.png', w: 1200, h: 630, body: banner(1200, 630, await cards(p, web.url, 617, 0.7, false)) },
   ];
   for (const f of files) {
     await p.setViewportSize({ width: f.w, height: f.h });
@@ -116,6 +118,8 @@ const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePa
 try {
   console.log('Графика');
   await graphics(await browser.newPage());
+  // `--graphics` — только значок и баннеры, без снимков экрана (новый значок — снимки менять незачем)
+  if (process.argv.includes('--graphics')) { await browser.close(); web.stop(); process.exit(0); }
 
   console.log('Снимки');
   // 540 × 960 точек при плотности 2 — 1080 × 1920, как телефон
