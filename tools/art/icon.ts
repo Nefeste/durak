@@ -1,47 +1,34 @@
-// Значок и заставка «Козыря» — рисунок кодом (ADR устава 0023, правило 3: рисунок — скрипт с паспортом;
-// ADR 0010: карты — кодом). Две карты веером на тёмном сукне: рубашка — бордо с золотой рамкой,
-// поверх — туз червей с русским индексом «Т». Цвета — токены облика (src/ui/theme.ts, ADR 0012),
-// шрифт индекса — Onest (OFL, как в игре). Рисует Chromium без окна (Playwright); паспорт — assets/LICENSES.md.
+// Значок и заставка «Козыря» — те же карты, что за столом (ADR устава 0023, правило 3: рисунок — скрипт с паспортом;
+// ADR 0010: карты — кодом). Две карты веером: рубашка «Бордо» и поверх — туз червей нового лица (третий круг вида),
+// нарисованные самой игрой (`makeBack`, `makeFaces`) на странице веб-сборки `?icon=1` (`src/render/IconSheet.tsx`;
+// решение владельца 12.11.2026). Снимает Chromium без окна (Playwright); паспорт — assets/LICENSES.md.
 //
-//   bun tools/art/icon.ts   — assets/icon.png, assets/adaptive-icon.png, assets/splash-icon.png и паспорт
+//   EXPO_OFFLINE=1 npm run export:web && bun tools/art/icon.ts   — assets/icon.png, adaptive-icon.png, splash-icon.png и паспорт
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { C } from '../../src/ui/theme';
+import type { Page } from 'playwright';
+import { serveWeb } from '../e2e/serve';
 
 const ROOT = join(import.meta.dir, '..', '..');
-const FONT = join(ROOT, 'node_modules/@expo-google-fonts/onest/700Bold/Onest_700Bold.ttf');
 
-/** Сердце (масть ♥) в квадрате `s` с серединой в (cx, cy) — тот же путь, что src/render/faces.ts. */
-function heart(cx: number, cy: number, s: number): string {
-  const p = (x: number, y: number) => `${cx + x * s} ${cy + y * s}`;
-  return `M ${p(0, 0.45)} C ${p(-0.55, 0.05)} ${p(-0.5, -0.48)} ${p(-0.12, -0.42)} C ${p(-0.04, -0.4)} ${p(0, -0.32)} ${p(0, -0.25)} `
-    + `C ${p(0, -0.32)} ${p(0.04, -0.4)} ${p(0.12, -0.42)} C ${p(0.5, -0.48)} ${p(0.55, 0.05)} ${p(0, 0.45)} Z`;
-}
-
-/** Две карты веером в квадрате `size`; `scale` — какая доля стороны занята (адаптивный — в безопасном круге). */
-export function svg(size: number, scale: number, background: string | null): string {
-  const h = size * scale, w = (h * 63) / 88, r = w * 0.1;
-  const cx = size / 2, cy = size / 2;
-  const card = (rot: number, dx: number, body: string) =>
-    `<g transform="translate(${cx + dx} ${cy}) rotate(${rot})"><g transform="translate(${-w / 2} ${-h / 2})">${body}</g></g>`;
-  const back = `<rect width="${w}" height="${h}" rx="${r}" fill="${C.back}"/>`
-    + `<rect x="${w * 0.07}" y="${w * 0.07}" width="${w * 0.86}" height="${h - w * 0.14}" rx="${r * 0.7}" fill="none" stroke="${C.backLine}" stroke-width="${w * 0.025}"/>`;
-  const face = `<rect width="${w}" height="${h}" rx="${r}" fill="${C.face}" stroke="${C.faceLine}" stroke-width="${w * 0.012}"/>`
-    + `<text x="${w * 0.1}" y="${w * 0.24}" font-family="Onest" font-weight="700" font-size="${w * 0.22}" fill="${C.red}">Т</text>`
-    + `<path d="${heart(w * 0.16, w * 0.36, w * 0.16)}" fill="${C.red}"/>`
-    + `<path d="${heart(w / 2, h / 2, w * 0.56)}" fill="${C.red}"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-${background ? `<rect width="${size}" height="${size}" fill="${background}"/>` : ''}
-${card(-12, -w * 0.22, back)}
-${card(9, w * 0.2, face)}
-</svg>`;
+/**
+ * Две карты значка квадратом `size`: `scale` — какая доля стороны занята картой по высоте (адаптивный — в безопасном
+ * круге), `felt` — на сукне, иначе на прозрачном. PNG со страницы `?icon=1` веб-сборки по адресу `url`.
+ */
+export async function cards(page: Page, url: string, size: number, scale: number, felt: boolean): Promise<Buffer> {
+  await page.setViewportSize({ width: size, height: size });
+  await page.goto(`${url}?icon=1&size=${size}&scale=${scale}${felt ? '&bg=felt' : ''}`);
+  await page.addStyleTag({ content: 'html,body,#root,#root>div{background:transparent!important}' });
+  await page.getByTestId('icon-ready').waitFor({ timeout: 20000 });
+  await page.waitForTimeout(300);
+  return page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
 }
 
 const FILES: { file: string; size: number; scale: number; background: string | null }[] = [
   // значок магазина и старых Android — на сукне во весь квадрат
-  { file: 'icon.png', size: 1024, scale: 0.62, background: C.felt },
+  { file: 'icon.png', size: 1024, scale: 0.62, background: 'felt' },
   // передний слой адаптивного значка: 108 dp, безопасный круг — 66 dp (радиус 0,306 стороны); фон слоя — сукно (app.json)
   { file: 'adaptive-icon.png', size: 1024, scale: 0.42, background: null },
   // заставка Android 12+: картинка в круге на фоне приложения
@@ -49,33 +36,36 @@ const FILES: { file: string; size: number; scale: number; background: string | n
 ];
 
 async function main() {
-  const font = readFileSync(FONT).toString('base64');
+  const web = serveWeb();
   const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
   const lines: string[] = [];
   try {
     const page = await browser.newPage();
     for (const f of FILES) {
-      await page.setViewportSize({ width: f.size, height: f.size });
-      await page.setContent(`<html><head><style>@font-face{font-family:Onest;font-weight:700;src:url(data:font/ttf;base64,${font})}html,body{margin:0;background:transparent}</style></head><body>${svg(f.size, f.scale, f.background)}</body></html>`);
-      await page.evaluate(() => document.fonts.ready);
-      const png = await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: f.size, height: f.size } });
+      const png = await cards(page, web.url, f.size, f.scale, f.background !== null);
       writeFileSync(join(ROOT, 'assets', f.file), png);
       lines.push(`| \`assets/${f.file}\` | ${f.size} × ${f.size} | \`${createHash('sha256').update(png).digest('hex')}\` |`);
     }
   } finally {
     await browser.close();
+    web.stop();
   }
-  const pass = `# Паспорт картинок «Козыря»
+  const pass = `# Паспорт картинок и звуков «Козыря»
 
-Значок и заставка нарисованы кодом: \`bun tools/art/icon.ts\` (ADR устава 0023, правило 3; ADR 0010).
-Генераторов изображений нет. Шрифт индекса — Onest 700, SIL Open Font License 1.1
+Значок и заставка нарисованы кодом самой игры — туз червей и рубашка «Бордо» (\`makeFaces\`, \`makeBack\`) на
+странице веб-сборки \`?icon=1\`: \`EXPO_OFFLINE=1 npm run export:web && bun tools/art/icon.ts\` (ADR устава 0023,
+правило 3; ADR 0010). Генераторов изображений нет. Шрифт индекса — Onest 700, SIL Open Font License 1.1
 (\`@expo-google-fonts/onest\`, текст лицензии — \`assets/fonts/Onest-OFL.txt\`).
 
 | Файл | Размер | SHA-256 |
 |---|---|---|
 ${lines.join('\n')}
 `;
-  writeFileSync(join(ROOT, 'assets', 'LICENSES.md'), pass);
+  // в паспорте есть и другие разделы («## Звуки»): их не трогаем, меняется только шапка с таблицей картинок
+  const file = join(ROOT, 'assets', 'LICENSES.md');
+  const old = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const rest = old.includes('\n## ') ? old.slice(old.indexOf('\n## ')) : '';
+  writeFileSync(file, rest ? `${pass}${rest}` : pass);
   console.log(pass);
 }
 
