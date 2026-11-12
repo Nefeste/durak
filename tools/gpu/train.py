@@ -37,7 +37,12 @@ PILOT = 'tools/gpu/nets/2026-11-09-cpu-pilot/best.bin'
 
 def name_of(rival):
     if rival.startswith('net:'):
-        return '«пилота»' if PILOT in rival else rival
+        if PILOT in rival:
+            return '«пилота»'
+        # net:<путь>/<папка>/last.bin[:расклады:горизонт] → «сети <папка>»; путь Windows тоже (`D:\…`)
+        path = rival[4:].replace('\\', '/')
+        parts = [p for p in path.split('/') if p]
+        return f'«сети {parts[-2]}»' if len(parts) >= 2 else rival
     return NAMES.get(rival, rival)
 
 
