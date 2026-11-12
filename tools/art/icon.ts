@@ -5,7 +5,7 @@
 //
 //   EXPO_OFFLINE=1 npm run export:web && bun tools/art/icon.ts   — assets/icon.png, adaptive-icon.png, splash-icon.png и паспорт
 import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import type { Page } from 'playwright';
@@ -50,7 +50,7 @@ async function main() {
     await browser.close();
     web.stop();
   }
-  const pass = `# Паспорт картинок «Козыря»
+  const pass = `# Паспорт картинок и звуков «Козыря»
 
 Значок и заставка нарисованы кодом самой игры — туз червей и рубашка «Бордо» (\`makeFaces\`, \`makeBack\`) на
 странице веб-сборки \`?icon=1\`: \`EXPO_OFFLINE=1 npm run export:web && bun tools/art/icon.ts\` (ADR устава 0023,
@@ -61,7 +61,11 @@ async function main() {
 |---|---|---|
 ${lines.join('\n')}
 `;
-  writeFileSync(join(ROOT, 'assets', 'LICENSES.md'), pass);
+  // в паспорте есть и другие разделы («## Звуки»): их не трогаем, меняется только шапка с таблицей картинок
+  const file = join(ROOT, 'assets', 'LICENSES.md');
+  const old = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const rest = old.includes('\n## ') ? old.slice(old.indexOf('\n## ')) : '';
+  writeFileSync(file, rest ? `${pass}${rest}` : pass);
   console.log(pass);
 }
 
