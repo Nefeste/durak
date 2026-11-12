@@ -1,7 +1,7 @@
 // Примерка платной рубашки на одну партию — награда за рекламу по желанию (docs/09-game-design.md, «Рубашки»;
 // решение владельца #59, вариант 1). Чистые правила — какая рубашка на столе и когда примерка кончается — и её
 // хранение (`durak.tryon`): партия, продолженная после перезапуска, остаётся в примеренной рубашке.
-import { DEFAULT_BACK, isPaidBack } from '../render/backs';
+import { DEFAULT_BACK, PAID_BACKS, isPaidBack } from '../render/backs';
 import type { BackId, PaidBackId } from '../render/backs';
 import { KEYS, loadJson, saveJson } from '../state/storage';
 
@@ -11,6 +11,15 @@ export interface TryOn {
   game: string | null;
   /** Эта партия кончилась: рубашка остаётся на её итоге, а примерить можно уже другую. */
   over: boolean;
+}
+
+/**
+ * Какую рубашку предложить примерить на итоге партии (решение владельца #79): некупленную платную, по кругу — `n`-я
+ * по счёту партия предлагает следующую в каталоге. Все куплены — `null`.
+ */
+export function suggestBack(owns: (id: PaidBackId) => boolean, n: number): PaidBackId | null {
+  const left = PAID_BACKS.filter(id => !owns(id));
+  return left.length ? left[((n % left.length) + left.length) % left.length] : null;
 }
 
 /** Примерка ждёт партию или идёт — вторую взять нельзя. */

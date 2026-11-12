@@ -126,12 +126,12 @@ This project's own rules:
   offline from your seat, online from the host's seat), so saves, history and the server protocol carry no names. The
   order of a level's cast is eternal (`tools/test/rivals.test.ts`); add new characters only at the end. Names live in
   `T.rival`, portraits are `src/game/Portrait.tsx` (react-native-svg, colours only from `PORTRAIT` in `src/ui/theme.ts`,
-  style sheet `docs/13-art.md` §11). Wherever a bot's name is shown, the «бот» chip and its level are shown too;
+  style sheet `docs/13-art.md` §11; generated portraits are allowed later only by ADR 0015 — a recorded departure from the charter, with a generation log and the owner's approval). Wherever a bot's name is shown, the «бот» chip and its level are shown too;
   statistics stay by level.
 - **No bot, hints, card counting or review during an online game** — for anyone, paid or not (ADR 0006).
 - **Money as nardy** (ADR 0009, `docs/11-money.md`): everything about money lives in `src/money/` (copy of nardy's
   module; skins here are card backs — `src/render/backs.ts`, ten of them, three free; products `theme_<back>` and
-  `themes_all`; the rewarded try-on of a paid back for one game is `watchToTryOn`, called only by the «Рубашки» screen); screens call only `src/money/index.ts`; ads only when leaving the result screen, never during
+  `themes_all`; the rewarded try-on of a paid back for one game is `watchToTryOn`, called only by the «Рубашки» screen and one quiet line on the result sheet of a game with bots, #79); screens call only `src/money/index.ts`; ads only when leaving the result screen, never during
   a game. Never call the RuStore Pay wrapper's `updateAcknowledgementState` (it crashes 11.1.0 after a payment;
   `money.test.ts` fails on any caller). «Про» is on sale only with the review (`PRO_ON_SALE`, stage Д); hints,
   seen cards and undo never read purchase rights.

@@ -322,7 +322,7 @@ test('строка «Без рекламы» на итоге: после рек�
 
 import { canTryOn } from '../../src/money/ads';
 import { backOwned } from '../../src/money/rights';
-import { afterTryGame, backShown, normalizeTryOn, tryOnPending, wearAt } from '../../src/money/tryon';
+import { afterTryGame, backShown, normalizeTryOn, suggestBack, tryOnPending, wearAt } from '../../src/money/tryon';
 import type { TryOn } from '../../src/money/tryon';
 import { PRODUCT_IDS, themeProduct } from '../../src/money/types';
 import { ALL_BACKS, DEFAULT_BACK, FREE_BACKS, PAID_BACKS } from '../../src/render/backs';
@@ -409,9 +409,26 @@ test('«Примерить за рекламу»: не пока примерка
   expect(tried.shown.rewarded).toBe(1);
 });
 
-test('примерку зовёт только экран «Рубашки»: ни стол, ни итог её не предлагают', () => {
+// решение владельца #79: примерка — на «Рубашках» и строкой на итоге партии с ботами; за столом и онлайн — нет
+test('примерку зовут только «Рубашки» и итог партии с ботами', () => {
   const src = join(import.meta.dir, '../../src');
   const callers = (readdirSync(src, { recursive: true }) as string[])
-    .filter(f => /\.tsx?$/.test(f) && !f.startsWith('money') && /\bwatchToTryOn\(/.test(readFileSync(join(src, f), 'utf8')));
-  expect(callers).toEqual(['screens/BacksScreen.tsx']);
+    .filter(f => /\.tsx?$/.test(f) && !f.startsWith('money') && /\bwatchToTryOn\(/.test(readFileSync(join(src, f), 'utf8')))
+    .sort();
+  expect(callers).toEqual(['game/GameScreen.tsx', 'screens/BacksScreen.tsx']);
+  // в экране партии — только из строки итога (TryOnLine), не из стола
+  const game = readFileSync(join(src, 'game/GameScreen.tsx'), 'utf8');
+  expect(game.match(/\bwatchToTryOn\(/g)?.length).toBe(1);
+  expect(game).toMatch(/<TryOnLine back=\{tryBack\} onTry=\{\(\) => \{ void watchToTryOn\(/);
+});
+
+// #79: примерка и на итоге партии — некупленная платная рубашка, по кругу от партии к партии
+test('рубашка для строки примерки на итоге: некупленная платная, по кругу; все куплены — нет', () => {
+  const none = () => false;
+  expect(suggestBack(none, 0)).toBe('weave');
+  expect(suggestBack(none, 1)).toBe('rays');
+  expect(suggestBack(none, 7)).toBe('weave');
+  const ownsWeave = (id: string) => id === 'weave';
+  expect(suggestBack(ownsWeave, 0)).toBe('rays');
+  expect(suggestBack(() => true, 3)).toBeNull();
 });
