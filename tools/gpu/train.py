@@ -37,13 +37,20 @@ PILOT = 'tools/gpu/nets/2026-11-09-cpu-pilot/best.bin'
 
 def name_of(rival):
     if rival.startswith('net:'):
-        return '«пилота»' if PILOT in rival else rival
+        if PILOT in rival:
+            return '«пилота»'
+        # net:<путь>/<папка>/last.bin[:расклады:горизонт] → «сети <папка>»; путь Windows тоже (`D:\…`)
+        path = rival[4:].replace('\\', '/')
+        parts = [p for p in path.split('/') if p]
+        return f'«сети {parts[-2]}»' if len(parts) >= 2 else rival
     return NAMES.get(rival, rival)
 
 
 def parse():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--out', default=os.path.join(HERE, 'runs', 'main'), help='папка прогона (продолжается, если есть)')
+    ap.add_argument('--init', default=None, help='новый прогон начать с весов этого last.pt (те же --hidden), а не со случайных; '
+                    'если в --out уже есть last.pt, он главнее')
     ap.add_argument('--hours', type=float, default=168.0, help='сколько учиться всего, с учётом прошлых запусков')
     ap.add_argument('--hidden', default='256,128', help='скрытые слои; 256,128 — под телефон (замер — в спецификации)')
     ap.add_argument('--threads', type=int, default=0, help='процессов самоигры (0 — ядер минус два)')
@@ -101,6 +108,15 @@ def main():
         opt.load_state_dict(ck['opt'])
         state.update(ck['state'])
         log(f'продолжаю: {state["games"]:,} партий, {state["seconds"] / 3600:.2f} ч обучения позади из {args.hours:g}')
+    elif args.init:
+        # третий прогон (12.11.2026): с сети прошлого, а не с нуля — оптимизатор и счёт часов новые, веса прежние
+        ck = torch.load(args.init, map_location=dev, weights_only=False)
+        if tuple(ck['hidden']) != hidden or ck.get('features') != VERSION:
+            sys.exit(f'{args.init}: другая сеть ({ck["hidden"]}, признаки {ck.get("features")}) — нужны те же --hidden')
+        model.load_state_dict(ck['model'])
+        log(f'новый прогон с весов {args.init} ({ck["state"]["games"]:,} партий, {ck["state"]["seconds"] / 3600:.1f} ч), '
+            f'устройство {dev}' + (f' ({torch.cuda.get_device_name(0)})' if dev.type == 'cuda' else '')
+            + f', процессов самоигры {threads}, Bun {bun}')
     else:
         log(f'новая сеть {INPUTS}×{"×".join(map(str, hidden))}×1 (признаки {VERSION}), устройство {dev}'
             + (f' ({torch.cuda.get_device_name(0)})' if dev.type == 'cuda' else '') + f', процессов самоигры {threads}, Bun {bun}')
