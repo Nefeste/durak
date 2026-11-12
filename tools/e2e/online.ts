@@ -129,10 +129,11 @@ async function main() {
   await profile(a, 'Миша', 'friends-open');
   await a.getByTestId('friends').waitFor({ timeout: 10_000 });
   await a.getByTestId('f-seats-4').click();
-  // уровень ботов — одной строкой «‹ Средний ›», как в меню (аудит 09.11.2026, находка 9); «Мастер · скоро» закрыт
+  // уровень ботов — одной строкой «‹ Средний ›», как в меню (аудит 09.11.2026, находка 9); седьмой — «Мастер» (#83)
   ok(await a.getByTestId('f-level-value').innerText().then(x => x.includes(T.level.average)).catch(() => false), 'с друзьями: уровень ботов — строка «‹ Средний ›»');
   for (let i = 0; i < 3; i++) await a.getByTestId('f-level-next').click();
-  ok(await visible(a, 'locked-note') && await a.getByTestId('create').isDisabled(), 'с друзьями: на «Мастер · скоро» «Создать стол» недоступна');
+  ok(await a.getByTestId('f-level-value').innerText().then(x => x.includes(T.level.neural)).catch(() => false) && await a.getByTestId('create').isEnabled()
+    && await a.getByTestId('f-level-next').isDisabled(), 'с друзьями: седьмой шаг — «Мастер», «Создать стол» доступна');
   for (let i = 0; i < 6; i++) await a.getByTestId('f-level-prev').click();
   ok(await a.getByTestId('f-level-value').innerText().then(x => x.includes(T.level.novice)).catch(() => false) && await a.getByTestId('f-level-prev').isDisabled(),
     'с друзьями: «‹» до «Новичка», дальше стрелка гаснет');
@@ -149,13 +150,14 @@ async function main() {
     const vh = a.viewportSize()!.height;
     const sb = await a.getByTestId('start').boundingBox();
     ok(!!sb && sb.y >= 0 && sb.y + sb.height <= vh, 'сбор стола: «Начать» на экране без прокрутки', JSON.stringify(sb));
-    // закрытый седьмой уровень и в строке бота: «Начать» недоступна, «‹» — назад к прежнему, на сервер не ходим
+    // седьмой уровень и в строке бота: сервер принимает «Мастера» (`neural`), у бота — лицо уровня, Лев;
     // каждый шаг уровня идёт на сервер: следующий — после ответа
     for (let i = 0; i < 6; i++) { await a.getByTestId('bot-level-1-next').click(); await a.waitForTimeout(500); }
-    ok(await visible(a, 'locked-note') && await a.getByTestId('start').isDisabled(), 'сбор стола: на «Мастер · скоро» «Начать» недоступна');
-    // «‹» с закрытого — «Опытный», ещё пять — снова «Новичок» у бота слева
+    const s1 = await a.getByTestId('lobby-seat-1').innerText().catch(() => '');
+    ok(s1.includes(T.level.neural) && s1.includes('Лев') && await a.getByTestId('start').isEnabled(), 'сбор стола: бот слева — «Мастер» (Лев), «Начать» доступна', s1);
+    // шесть шагов назад — снова «Новичок» у бота слева
     for (let i = 0; i < 6; i++) { await a.getByTestId('bot-level-1-prev').click(); await a.waitForTimeout(500); }
-    ok(!(await visible(a, 'locked-note')) && await a.getByTestId('start').isEnabled(), 'сбор стола: «‹» с закрытого — снова можно начать');
+    ok(await a.getByTestId('bot-level-1-value').innerText().then(x => x.includes(T.level.novice)).catch(() => false), 'сбор стола: «‹» до «Новичка»');
   }
   // уровень каждого бота: хозяин делает бота справа на ступень сильнее
   ok(await a.getByTestId('bot-level-3-value').innerText().then(x => x.includes(T.level.novice)).catch(() => false), 'у каждого бота — своя строка уровня');

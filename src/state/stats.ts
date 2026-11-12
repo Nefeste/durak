@@ -13,7 +13,7 @@ export const ME = 0;
 
 /** Рейтинг тренировок — Эло против ботов (как в «Нардах»): у каждого уровня — своё постоянное число. */
 export const LEVEL_ELO: Record<Level, number> = {
-  novice: 700, beginner: 900, amateur: 1100, average: 1300, experienced: 1500, master: 1700,
+  novice: 700, beginner: 900, amateur: 1100, average: 1300, experienced: 1500, master: 1700, neural: 1900,
 };
 export const START_ELO = 1200;
 export const ELO_K = 24;

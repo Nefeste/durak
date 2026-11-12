@@ -210,9 +210,9 @@ try {
     await page.getByTestId('report-back').click().catch(() => {});
     await page.getByTestId('settings-back').click().catch(() => {});
     await page.getByTestId('menu').waitFor({ timeout: 5000 }).catch(() => {});
-    // седьмой, закрытый шаг уровня: «Мастер · скоро», «Играть» недоступна
+    // седьмой шаг уровня: «Мастер» (нейросеть) и «За столом» — Лев
     for (let k = 0; k < 6 && await page.getByTestId('level-next').isEnabled().catch(() => false); k++) await page.getByTestId('level-next').click();
-    await shot(page, '23-level-locked');
+    await shot(page, '23-level-master');
     await levels(page);
   }
 } finally {

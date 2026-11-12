@@ -377,6 +377,32 @@ describe('сервер', () => {
     }
   });
 
+  test('«Мастер» (`neural`, сеть, #83) — бот стола с друзьями: сервер его принимает, бот ходит', async () => {
+    const e = setup(33);
+    const a = await e.player('Аня');
+    const t = (await e.call('POST', '/v1/tables', a, { variant: 'podkidnoy', seats: 2, bots: 'neural' })).body.table as TableView;
+    expect(t.seats[1]!.bot).toBe('neural');
+    await joinByCode(e, a, t.code!);
+    expect((await e.call('POST', `/v1/tables/${t.id}/start`, a)).status).toBe(200);
+    // бот ходит после своей паузы; человек — ходом «Среднего», пока бот не сходит хоть раз
+    const pick = makeRng(5);
+    let botMoved = false;
+    for (let guard = 0; guard < 200 && !botMoved; guard++) {
+      const v = (await e.call('GET', `/v1/tables/${t.id}`, a)).body.table as TableView;
+      noLeak(v);
+      if (v.status !== 'playing') break;
+      const g = v.game!;
+      if (g.waiting.includes(0) && g.view) {
+        await e.call('POST', `/v1/tables/${t.id}/act`, a, { game: g.no, n: g.n, action: chooseAction(g.view, 'average', pick) });
+        continue;
+      }
+      e.clock.advance(ONLINE.botMs + ONLINE.holdMs + 50);
+      const w = (await e.call('GET', `/v1/tables/${t.id}`, a)).body.table as TableView;
+      botMoved = w.game!.n > g.n;
+    }
+    expect(botMoved).toBe(true);
+  });
+
   test('боты разных уровней за одним столом: каждый ходит своим уровнем, зёрна мест — после пересадки', async () => {
     const e = setup(41);
     const a = await e.player('Аня');

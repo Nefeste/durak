@@ -47,9 +47,11 @@ describe('наблюдение', () => {
         const seat = actorOf(s);
         const t = twin(s, seat, g * 1000 + n);
         // поиск по раскладам дорогой: `experienced` — на каждой двадцатой позиции, `master` (и старый `strong`) — на
-        // каждой восьмидесятой; уровни по правилам — на всех
+        // каждой восьмидесятой, «Мастер» на сети из сборки (`neural`) — на каждой двадцатой; уровни по правилам — на всех
         const k = g * 25 + n;
-        for (const level of LEVELS.filter(l => RULE_LEVELS.includes(l) || (l === 'experienced' ? k % 20 === 0 : k % 80 === 0))) {
+        const every = (l: string) => (l === 'experienced' || l === 'neural' ? 20 : 80);
+        expect(LEVELS).toContain('neural');
+        for (const level of LEVELS.filter(l => RULE_LEVELS.includes(l) || k % every(l) === 0)) {
           const a = chooseAction(observe(s, seat), level, makeRng(g * 31 + n));
           const b = chooseAction(observe(t, seat), level, makeRng(g * 31 + n));
           expect(b).toEqual(a);

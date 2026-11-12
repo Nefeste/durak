@@ -154,10 +154,11 @@ describe('геометрия', () => {
     const v = (l: keyof typeof LEVEL_ELO) => LEVEL_ELO[l];
     expect(neighbours(LEVELS, v, 1350)).toEqual(['average', 'experienced']);
     expect(neighbours(LEVELS, v, 600)).toEqual([null, 'novice']);
-    expect(neighbours(LEVELS, v, 1800)).toEqual(['master', null]);
+    expect(neighbours(LEVELS, v, 1800)).toEqual(['master', 'neural']);
+    expect(neighbours(LEVELS, v, 2000)).toEqual(['neural', null]);
     const x = ladderScale(Object.values(LEVEL_ELO), 1200, 300);
     expect(x(600)).toBe(6);
-    expect(x(1800)).toBe(294);
+    expect(x(2000)).toBe(294);
   });
 });
 

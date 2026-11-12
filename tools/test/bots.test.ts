@@ -94,13 +94,16 @@ describe('кусками на часах', () => {
     for (let n = 0; n < 40 && s.phase !== 'end'; n++) {
       const o = observe(s, actorOf(s));
       if (legalFor(o).length > 2) {
-        const sync = thinkSync(think(o, 'master', makeRng(n)));
-        const sliced = await thinkSliced(think(o, 'master', makeRng(n)), 1e9, 1).promise;
-        expect(sliced).toEqual(sync);
-        // шаг — работа между двумя `yield`: одно доигрывание или 48 узлов концовки
-        const t = think(o, 'master', makeRng(n));
-        let at = performance.now();
-        for (let r = t.next(); !r.done; r = t.next(false)) { const now = performance.now(); longest = Math.max(longest, now - at); at = now; }
+        // «Опытный» и «Мастер» (сеть): шаг у сети — один кандидат расклада или кусок раскодировки весов
+        for (const level of ['master', 'neural'] as const) {
+          const sync = thinkSync(think(o, level, makeRng(n)));
+          const sliced = await thinkSliced(think(o, level, makeRng(n)), 1e9, 1).promise;
+          expect(sliced).toEqual(sync);
+          // шаг — работа между двумя `yield`: одно доигрывание или 48 узлов концовки
+          const t = think(o, level, makeRng(n));
+          let at = performance.now();
+          for (let r = t.next(); !r.done; r = t.next(false)) { const now = performance.now(); longest = Math.max(longest, now - at); at = now; }
+        }
         checked++;
       }
       s = apply(s, actorOf(s), thinkSync(think(o, 'average', rng)));
