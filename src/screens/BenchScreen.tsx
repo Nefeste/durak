@@ -1,6 +1,6 @@
 // «Замер» (спецификация 1.0, критерий 9; docs/06-testing.md, «Замер»; по образцу «Замера» «Узоров»): настоящий
 // стол (src/render/TableCanvas.tsx) сам играет сцены — раздачу вчетвером, «беру» с 12 картами, 36 карт в полёте
-// разом — и «Опытный» решает на позициях из партий; экран считает кадры двух потоков: UI (Reanimated, на нём
+// разом — и «Опытный» и «Мастер» (сеть) решают на позициях из партий; экран считает кадры двух потоков: UI (Reanimated, на нём
 // летят карты и рисуется Skia) и JS (там думает бот). Итог — текстом, его можно скопировать для журнала.
 // Вход скрытый: долгое нажатие на строку версии внизу настроек.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -12,7 +12,7 @@ import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import { useFrameCallback, useSharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import type { Observation } from '../engine';
-import { makeRng, think, THINK_MS, TOP } from '../bot';
+import { makeRng, NET_LEVEL, think, THINK_MS, TOP } from '../bot';
 import { botPositions, dealScene, frameSummary, mirrored, msSummary, takeScene, withinBudget } from '../game/bench';
 import type { FrameSummary } from '../game/bench';
 import { thinkSliced } from '../game/think';
@@ -26,11 +26,16 @@ import { useInsets } from '../ui/insets';
 import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { APP_VERSION } from '../version';
 
-type Scene = 'deal' | 'take' | 'flight' | 'master';
-const SCENES: Scene[] = ['deal', 'take', 'flight', 'master'];
+type Scene = 'deal' | 'take' | 'flight' | 'master' | 'neural';
+const SCENES: Scene[] = ['deal', 'take', 'flight', 'master', 'neural'];
+/** Сцены, где думает бот: уровень сцены (`neural` — «Мастер», сеть; первое решение заодно раскодирует сеть). */
+const BOT_SCENE: Partial<Record<Scene, typeof TOP>> = { master: TOP, neural: NET_LEVEL };
 
 /** Сколько повторов каждой сцены: полный замер и быстрый (сценарий в браузере). */
-const ROUNDS = { full: { deal: 4, take: 6, flight: 12, master: 8 }, quick: { deal: 1, take: 1, flight: 2, master: 1 } } as const;
+const ROUNDS = {
+  full: { deal: 4, take: 6, flight: 12, master: 8, neural: 8 },
+  quick: { deal: 1, take: 1, flight: 2, master: 1, neural: 1 },
+} as const;
 
 const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 const noop = () => {};
@@ -123,14 +128,15 @@ export function BenchScreen({ onBack, quick = false }: { onBack: () => void; qui
         }
       }
       let bot: Row['bot'];
-      if (scene === 'master') {
+      const level = BOT_SCENE[scene];
+      if (level) {
         const times: number[] = [];
-        const positions = botPositions(n.master);
+        const positions = botPositions(n[scene]);
         start();
         for (const o of positions) {
           if (!live.current) return;
           const t0 = Date.now();
-          await thinkSliced(think(o, TOP, makeRng(1)), THINK_MS[TOP]).promise;
+          await thinkSliced(think(o, level, makeRng(1)), THINK_MS[level]).promise;
           times.push(Date.now() - t0);
         }
         bot = msSummary(times);
@@ -153,7 +159,7 @@ export function BenchScreen({ onBack, quick = false }: { onBack: () => void; qui
   const text = rows.length ? [
     T.bench.head(APP_VERSION, Platform.OS === 'web' ? 'web' : `${Platform.OS} ${String(Platform.Version)}`, size ? `${Math.round(size.width)}×${Math.round(size.height)}` : '', quick),
     ...rows.flatMap(r => [
-      `${T.bench.scenes[r.scene]} — ${withinBudget(r.ui) && (r.scene !== 'master' || withinBudget(r.js)) ? T.bench.ok : T.bench.over}`,
+      `${T.bench.scenes[r.scene]} — ${withinBudget(r.ui) && (!BOT_SCENE[r.scene] || withinBudget(r.js)) ? T.bench.ok : T.bench.over}`,
       `  UI: ${line(r.ui)}`,
       `  JS: ${line(r.js)}`,
       ...(r.bot ? [`  ${T.bench.bot(r.bot.n, Math.round(r.bot.p50), Math.round(r.bot.worst))}`] : []),

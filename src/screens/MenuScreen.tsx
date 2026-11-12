@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import type { Variant } from '../engine';
-import { LEVELS, LOCKED_LEVEL } from '../bot';
+import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { BottomBar } from '../ui/BottomBar';
@@ -45,12 +45,8 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
   onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void; onRules: () => void;
 }) {
   const insets = useInsets();
-  // закрытый седьмой уровень можно показать стрелкой, но не выбрать: пока он показан, «Играть» недоступна.
-  // На какой строке он показан: 0 — общий уровень, N — бот N; `null` — нигде
-  const [lockedAt, setLockedAt] = useState<number | null>(null);
   /** Высота полосы «Играть»: нижнее поле прокрутки, чтобы последний ряд вставал над полосой. */
   const [bar, setBar] = useState(0);
-  const onLocked = lockedAt !== null;
   const mixed = choice.mixed && choice.bots > 1;
   // кто сядет за стол при этих уровнях — те же, что потом на плашках (src/game/rivals.ts)
   const rivals = rivalsOf(botLevels(choice)).slice(1) as Rival[];
@@ -59,10 +55,8 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
     const value = row === 0 ? choice.level : choice.levels[row - 1];
     const set = (l: Level) => row === 0 ? onChange({ ...choice, level: l }) : onChange({ ...choice, levels: choice.levels.map((x, i) => (i === row - 1 ? l : x)) });
     return (
-      <Stepper<string> id={row === 0 ? 'level' : `level-${row}`} items={LEVELS} value={lockedAt === row ? LOCKED_LEVEL : value} label={l => T.level[l as Level]}
-        prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp}
-        onChange={l => { if (l === LOCKED_LEVEL) { setLockedAt(row); return; } setLockedAt(null); set(l as Level); }}
-        locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel }} />
+      <Stepper<Level> id={row === 0 ? 'level' : `level-${row}`} items={LEVELS} value={value} label={l => T.level[l]}
+        prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp} onChange={set} />
     );
   };
   return (
@@ -82,12 +76,12 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
           <Text style={styles.label}>{T.menu.variant}</Text>
           <Chips id="variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={choice.variant} label={v => T.variant[v]} onChange={variant => onChange({ ...choice, variant })} />
           <Text style={styles.label}>{T.menu.opponents}</Text>
-          <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => { setLockedAt(null); onChange({ ...choice, bots }); }} />
+          <Chips id="bots" items={[1, 2, 3]} value={choice.bots} label={n => T.menu.bots(n)} onChange={bots => onChange({ ...choice, bots })} />
           <Text style={styles.label}>{T.menu.level}</Text>
           {/* «Разные уровни» — над строками: включили, и строки ботов появляются ниже, а переключатель остаётся под пальцем */}
           {choice.bots > 1 ? (
             <Toggle id="levels-mixed" title={T.menu.mixed} value={mixed}
-              onChange={on => { setLockedAt(null); onChange({ ...choice, mixed: on, levels: on ? choice.levels.map(() => choice.level) : choice.levels }); }} />
+              onChange={on => onChange({ ...choice, mixed: on, levels: on ? choice.levels.map(() => choice.level) : choice.levels })} />
           ) : null}
           {/* «Разные уровни»: соперник и под ним его строка уровня — сменили уровень, сменился и соперник */}
           {mixed ? rivals.map((r, i) => (
@@ -96,7 +90,6 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
               {levelRow(i + 1)}
             </View>
           )) : levelRow(0)}
-          {onLocked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
           {mixed ? null : (
             <View style={styles.botColumn} testID="rivals">
               <Text style={styles.label}>{T.rivals.atTable}</Text>
@@ -121,7 +114,7 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
         </View>
       </ScrollView>
       <BottomBar bottom={insets.bottom} onHeight={setBar} testID="play-bar">
-        <Button label={T.menu.play} onPress={onPlay} disabled={onLocked} testID="play" />
+        <Button label={T.menu.play} onPress={onPlay} testID="play" />
       </BottomBar>
     </View>
   );

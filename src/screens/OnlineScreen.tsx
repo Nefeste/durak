@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import type { ThrowOrder, Variant } from '../engine';
-import { LEVELS, LOCKED_LEVEL } from '../bot';
+import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
@@ -58,10 +58,9 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
   // «Подкидывать» (ADR 0013): как в настройках, создатель меняет для этого стола
   const [order, setOrder] = useState<ThrowOrder>(() => getSettings().throwOrder);
   // кто займёт свободные места: боты какого уровня или никто (аудит 09.11.2026, находка 9 — уровень одной строкой
-  // «‹ Средний ›», как в меню и в сборе стола; «Мастер · скоро» показан, но закрыт — «Создать стол» тогда недоступна)
+  // «‹ Средний ›», как в меню и в сборе стола, все семь уровней)
   const [withBots, setWithBots] = useState(true);
   const [botLevel, setBotLevel] = useState<Level>('average');
-  const [lockedShown, setLockedShown] = useState(false);
   const [code, setCode] = useState(invite ?? '');
   /** Стол по коду, где выбирают место. */
   const [picking, setPicking] = useState<{ code: string; info: CodeInfo } | null>(null);
@@ -282,17 +281,15 @@ export function OnlineScreen({ mode, invite, onBack, onTable }: {
         ) : null}
         <Text style={styles.label}>{T.online.bots}</Text>
         <Chips id="f-bots" items={['bots', 'none'] as const} value={withBots ? 'bots' : 'none'} label={v => (v === 'bots' ? T.online.withBots : T.online.noBots)}
-          onChange={v => { setWithBots(v === 'bots'); setLockedShown(false); }} />
+          onChange={v => setWithBots(v === 'bots')} />
         {withBots ? (
           <>
             <Text style={styles.label}>{T.online.botsLevel}</Text>
-            <Stepper<string> id="f-level" items={LEVELS} value={lockedShown ? LOCKED_LEVEL : botLevel} label={l => T.level[l as Level]}
-              prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp} locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel }}
-              onChange={l => { if (l === LOCKED_LEVEL) { setLockedShown(true); return; } setLockedShown(false); setBotLevel(l as Level); }} />
-            {lockedShown ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
+            <Stepper<Level> id="f-level" items={LEVELS} value={botLevel} label={l => T.level[l]}
+              prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp} onChange={setBotLevel} />
           </>
         ) : null}
-        <Button label={T.online.create} onPress={create} disabled={busy || (withBots && lockedShown)} testID="create" />
+        <Button label={T.online.create} onPress={create} disabled={busy} testID="create" />
       </Glass>
       <Glass style={styles.panel}>
         <Text style={styles.label}>{T.online.joinByCode}</Text>

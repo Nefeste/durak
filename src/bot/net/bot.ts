@@ -55,6 +55,7 @@ export interface NetScored { action: Action; score: number }
 export function* netScores(o: Observation, net: Net, p: NetParams, rng: Rng, legal: Action[] = legalFor(o)): Thinking<{ scored: NetScored[]; samples: number }> {
   const cands = candidates(o, legal, rng);
   const sum = new Array<number>(cands.length).fill(0);
+  const part = new Array<number>(cands.length).fill(0);
   const x = new Float32Array(net.sizes[0]);
   const pool = unseen(o);
   // в концовке скрытых карт нет: все расклады одинаковы
@@ -66,9 +67,12 @@ export function* netScores(o: Observation, net: Net, p: NetParams, rng: Rng, leg
     const { hidden, talon } = layout(o, shuffle(pool, rng));
     const base = stateFrom(o, hidden, talon);
     const seed = rng.int(2 ** 31);
+    // порция работы — один кандидат, а не весь расклад (как у поиска, `scoreActions`): на телефоне расклад с десятком
+    // кандидатов не влезает в кусок 12 мс. Прерванный на середине расклад не считается
+    let stopped = false;
     for (let i = 0; i < cands.length; i++) {
       const known = fixed[i];
-      if (known !== null) { sum[i] += known; continue; }
+      if (known !== null) { part[i] = known; continue; }
       const s = cloneState(base);
       applyInPlace(s, o.seat, cands[i]);
       if (p.horizon === 'bout') {
@@ -81,8 +85,12 @@ export function* netScores(o: Observation, net: Net, p: NetParams, rng: Rng, leg
       }
       const v = valueAt(net, s, o.seat, x);
       if (p.horizon === 'now' && s.phase !== 'end' && s.bout === o.bout) fixed[i] = v;
-      sum[i] += v;
+      part[i] = v;
+      // «хватит» на первом раскладе не слушается: без него нечего сравнивать (бюджет 1,5 с — в десятки раз больше расклада)
+      if (i + 1 < cands.length && (yield) && n > 0) { stopped = true; break; }
     }
+    if (stopped) break;
+    for (let i = 0; i < cands.length; i++) sum[i] += part[i];
     n++;
     if (n < samples && (yield)) break;
   }

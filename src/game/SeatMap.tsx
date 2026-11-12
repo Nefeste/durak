@@ -3,11 +3,10 @@
 // («Сесть», «Пересесть»): бот уходит. Хозяин стола с ботами меняет уровень каждого бота строкой «‹ Средний ›»
 // (ADR 0011: у бота имя персонажа, подпись «бот» и уровень). В ячейке бота — портрет с подписью «бот», имя и уровень
 // строкой ниже; кто из состава уровня сядет, считается от места создателя (`rivalsAt`) — как потом за столом, у всех
-// одинаково. Строка уровня — та же, что в меню,
-// с закрытым «Мастер · скоро» (находка 9): пока он показан, `onLocked(true)` — хозяин не может начать.
-import React, { useEffect, useState } from 'react';
+// одинаково. Строка уровня — та же, что в меню (находка 9), все семь уровней.
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { LEVELS, LOCKED_LEVEL } from '../bot';
+import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 import { T } from '../i18n';
 import { Button } from '../ui/Button';
@@ -20,7 +19,7 @@ import { placeRows, whereOf } from './seats';
 
 export interface Place { name: string; bot: Level | null; host: boolean; you: boolean }
 
-export function SeatMap({ places, host, onSit, sitLabel, onLevel, onLocked }: {
+export function SeatMap({ places, host, onSit, sitLabel, onLevel }: {
   places: (Place | null)[];
   /** Место создателя: оно внизу схемы. */
   host: number;
@@ -29,14 +28,8 @@ export function SeatMap({ places, host, onSit, sitLabel, onLevel, onLocked }: {
   sitLabel?: string;
   /** Хозяин: уровень бота на месте. */
   onLevel?: (seat: number, level: Level) => void;
-  /** Показан ли закрытый седьмой уровень в какой-нибудь строке бота. */
-  onLocked?: (on: boolean) => void;
 }) {
   const n = places.length;
-  // на каком месте стрелкой показан «Мастер · скоро»; место ушло от бота — показывать нечего
-  const [lockedSeat, setLockedSeat] = useState<number | null>(null);
-  const locked = lockedSeat !== null && !!places[lockedSeat]?.bot && !!onLevel;
-  useEffect(() => { onLocked?.(locked); }, [locked, onLocked]);
   // кто из персонажей сидит на местах ботов: меняется вместе с уровнем бота и с тем, кто куда сел
   const rivals = rivalsAt(places.map(p => p?.bot ?? null), host);
   const nameOf = (seat: number) => { const r = rivals[seat]; return r ? T.rival[r.id] : ''; };
@@ -65,17 +58,11 @@ export function SeatMap({ places, host, onSit, sitLabel, onLevel, onLocked }: {
       {bots.map(({ p, seat }) => (
         <View key={seat} style={styles.level}>
           <Text style={styles.note}>{T.online.seatBot(seat + 1, wordOf(seat), nameOf(seat))}</Text>
-          <Stepper<string> id={`bot-level-${seat}`} items={LEVELS} value={locked && lockedSeat === seat ? LOCKED_LEVEL : p!.bot!} label={l => T.level[l as Level]}
-            prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp} locked={{ key: LOCKED_LEVEL, label: T.menu.lockedLevel }}
-            onChange={l => {
-              if (l === LOCKED_LEVEL) { setLockedSeat(seat); return; }
-              setLockedSeat(null);
-              // «‹» с закрытого возвращает к уровню, который у бота и так стоит: на сервер идти не за чем
-              if (l !== p!.bot) onLevel!(seat, l as Level);
-            }} />
+          <Stepper<Level> id={`bot-level-${seat}`} items={LEVELS} value={p!.bot!} label={l => T.level[l]}
+            prevLabel={T.menu.levelDown} nextLabel={T.menu.levelUp}
+            onChange={l => { if (l !== p!.bot) onLevel!(seat, l); }} />
         </View>
       ))}
-      {locked ? <Text style={styles.note} testID="locked-note">{T.menu.lockedNote}</Text> : null}
     </View>
   );
 }

@@ -65,7 +65,7 @@ async function checkReviewTable(p: Page) {
 mkdirSync(OUT, { recursive: true });
 /** Уровень стрелками «‹ ›» до подписи `name`; `id` — строка: `level` — общая, `level-N` — бота N. */
 async function setLevel(p: Page, name: string, id = 'level') {
-  const order = ['Новичок', 'Начинающий', 'Любитель', 'Средний', 'Сильный', 'Опытный', 'Мастер · скоро'];
+  const order = ['Новичок', 'Начинающий', 'Любитель', 'Средний', 'Сильный', 'Опытный', 'Мастер'];
   for (let k = 0; k < 8; k++) {
     const now = (await p.getByTestId(`${id}-value`).innerText()).trim();
     if (now === name) return;
@@ -792,22 +792,27 @@ try {
   await page.getByTestId('puzzle-back').click();
   await page.getByTestId('puzzle-back').click();
   await page.getByTestId('menu').waitFor({ timeout: 5000 });
-  // уровень — одной строкой «‹ Средний ›» (аудит, находка 12); седьмой шаг закрыт; выбор запоминается
+  // уровень — одной строкой «‹ Средний ›» (аудит, находка 12); седьмой шаг — «Мастер» (сеть, #83); выбор запоминается
   await setLevel(page, 'Средний');
   await page.reload();
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
   ok(await page.getByTestId('level-value').innerText() === 'Средний', 'уровень одной строкой: «Средний»', await page.getByTestId('level-value').innerText());
   await page.getByTestId('level-prev').click();
   ok(await page.getByTestId('level-value').innerText() === 'Любитель', '«‹» — уровень слабее: «Любитель»');
-  ok(!(await visible(page, 'locked-note')), 'седьмой уровень закрыт');
-  await setLevel(page, 'Мастер · скоро');
-  ok(await visible(page, 'locked-note'), '«Мастер · скоро»: последний шаг объясняет, выбрать нельзя');
+  await setLevel(page, 'Мастер');
+  ok((await page.getByTestId('level-value').innerText()).trim() === 'Мастер', 'седьмой шаг — «Мастер», без «скоро»');
+  ok(!(await visible(page, 'locked-note')), '«Мастер» открыт: объяснения о закрытом уровне нет');
   ok(await page.getByTestId('level-next').isDisabled(), 'дальше седьмого шага стрелки нет');
-  ok(await page.getByTestId('play').isDisabled(), 'на закрытом уровне «Играть» недоступна');
-  await page.screenshot({ path: `${OUT}/08-level-locked.png` });
+  ok(await page.getByTestId('play').isEnabled(), 'на «Мастере» можно играть');
+  {
+    const who = (await page.getByTestId('rival-1-name').innerText().catch(() => '')).trim();
+    const about = await page.getByTestId('rivals').innerText().catch(() => '');
+    ok(who === 'Лев' && /Нейросеть/.test(about), `«За столом» с «Мастером» — Лев, строка характера о нейросети: ${about.replace(/\n/g, ' ')}`);
+  }
+  await page.screenshot({ path: `${OUT}/08-level-master.png` });
 
   console.log('Разные уровни: два бота, у каждого свой');
-  await page.getByTestId('level-prev').click();
+  await setLevel(page, 'Опытный');
   await page.getByTestId('variant-podkidnoy').click();
   await page.getByTestId('bots-1').click();
   ok(!(await visible(page, 'levels-mixed')), 'с одним ботом «Разных уровней» нет');
@@ -826,9 +831,8 @@ try {
   await setLevel(page, 'Новичок', 'level-1');
   await setLevel(page, 'Средний', 'level-2');
   ok((await page.getByTestId('rival-1-name').innerText()).trim() === 'Тёма' && (await page.getByTestId('rival-2-name').innerText()).trim() === 'Глеб', 'сменили уровень — сменился соперник: «Новичок» — Тёма, «Средний» — Глеб');
-  await setLevel(page, 'Мастер · скоро', 'level-2');
-  ok(await visible(page, 'locked-note') && await page.getByTestId('play').isDisabled(), '«Мастер · скоро» в строке бота закрыт, «Играть» недоступна');
-  await page.getByTestId('level-2-prev').click();
+  await setLevel(page, 'Мастер', 'level-2');
+  ok((await page.getByTestId('rival-2-name').innerText()).trim() === 'Лев' && await page.getByTestId('play').isEnabled(), '«Мастер» в строке бота — Лев, «Играть» доступна');
   await setLevel(page, 'Средний', 'level-2');
   await page.getByTestId('bots-3').click();
   ok(await visible(page, 'level-3-value'), 'три бота — три строки');
@@ -922,7 +926,7 @@ try {
   await page.getByTestId('variant-podkidnoy').click();
   await page.getByTestId('bots-1').click();
   await setLevel(page, 'Опытный');
-  ok(!(await visible(page, 'locked-note')) && await page.getByTestId('play').isEnabled(), '«‹» с закрытого — «Опытный», можно играть');
+  ok(await page.getByTestId('play').isEnabled(), '«Опытный» — можно играть');
   await page.getByTestId('play').click();
   await page.getByTestId('game').waitFor({ timeout: 10000 });
   await page.waitForTimeout(300);
@@ -943,6 +947,29 @@ try {
   await page.screenshot({ path: `${OUT}/06-advice.png` });
   const third = await playOut(page, 'против «Опытного»');
   ok(third.ended, 'партия с «Опытным» дошла до итога');
+  await page.getByTestId('result-menu').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
+
+  console.log('«Мастер» — нейросеть (#83)');
+  await page.getByTestId('variant-podkidnoy').click();
+  await page.getByTestId('bots-1').click();
+  await setLevel(page, 'Мастер');
+  await page.getByTestId('play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  if (await page.getByTestId('transfer-ok').waitFor({ timeout: 800 }).then(() => true, () => false)) await page.getByTestId('transfer-ok').click();
+  await page.waitForTimeout(300);
+  {
+    const plate = await page.getByTestId('opp-1').innerText().catch(() => '');
+    ok(/Лев/.test(plate) && /бот/.test(plate) && /Мастер/.test(plate), `плашка «Мастера»: имя из состава, «бот» и уровень: ${plate.replace(/\n/g, ' ')}`);
+  }
+  await page.screenshot({ path: `${OUT}/06b-master-table.png` });
+  const neural = await playOut(page, 'против «Мастера»');
+  ok(neural.ended, 'партия с «Мастером» дошла до итога');
+  {
+    const places = await page.getByTestId('result-places').innerText().catch(() => '');
+    ok(/Лев/.test(places) && /Мастер/.test(places) && /бот/.test(places), `итог: «Лев · Мастер», с подписью «бот»: ${places.replace(/\n/g, ' ')}`);
+  }
+  await page.screenshot({ path: `${OUT}/06c-master-result.png` });
 
   console.log('Рубашки и примерка за рекламу');
   // примерка — не чаще, чем через 4 минуты после любой рекламы: сценарий играет быстрее, поэтому счётчик времени
@@ -1093,8 +1120,8 @@ try {
   await page.getByTestId('bench-run').click();
   await page.getByTestId('bench-copy').waitFor({ timeout: 120000 }).catch(() => {});
   const bench = await page.getByTestId('bench-result').innerText().catch(() => '');
-  ok(['Раздача вчетвером', '«Беру» с 12 картами', '36 карт в полёте', '«Опытный» думает'].every(t => bench.includes(t)) && /решение: 1 поз\./.test(bench),
-    '«Замер»: четыре сцены и время решения «Опытного»', bench);
+  ok(['Раздача вчетвером', '«Беру» с 12 картами', '36 карт в полёте', '«Опытный» думает', '«Мастер» думает'].every(t => bench.includes(t))
+    && (bench.match(/решение: 1 поз\./g) ?? []).length === 2, '«Замер»: пять сцен и время решения «Опытного» и «Мастера»', bench);
   ok(/UI: кадров [1-9]/.test(bench) && /JS: кадров [1-9]/.test(bench), '«Замер»: кадры обоих потоков сосчитаны', bench);
   console.log(bench.split('\n').map(l => `      ${l}`).join('\n'));
   await page.screenshot({ path: `${OUT}/09-bench.png` });

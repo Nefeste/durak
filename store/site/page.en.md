@@ -31,8 +31,8 @@ shots:
     caption: Puzzle of the day
     alt: "Puzzle of the day: the opponent's cards are open; find the move after which you go out whatever they do"
   - file: screenshots/ru/10-advice.png
-    caption: The Master's hint
-    alt: "A hint line under the table: the move the Master bot would make and the chance to go out"
+    caption: The Experienced bot's hint
+    alt: "A hint line under the table: the move the Experienced bot would make and the chance to go out"
 card:
   text: Durak in its podkidnoy and perevodnoy forms for two to four players. Against bots offline; online with family at one table by link or with an opponent of your rating, no sign-up. The game is in Russian.
   points:
@@ -60,6 +60,12 @@ The bot sees only its own cards and the table — that is how the game is built,
 Online, you can check the deck. Before the deal the server shows a fingerprint of its part of the deck, and the deck
 is made of the server's part and every player's phone. After the game your phone rebuilds it and checks every card
 you saw. How it works: [durak.gornitsa.games/fair](https://durak.gornitsa.games/fair).
+
+## Bots
+
+Bots come in seven levels, from Novice to Master. The Master is a neural network trained on millions of games: it
+beats the Experienced bot in two games out of three in podkidnoy and four out of five in perevodnoy. Like every bot, it sees only its own cards and the table.
+No internet is needed to play against bots.
 
 ## With family and friends
 

@@ -73,7 +73,6 @@ function Lobby({ table, t, onExit }: { table: OnlineTable; t: TableView; onExit:
   const host = t.you === t.host;
   const [err, setErr] = useState<string | null>(null);
   const [bar, setBar] = useState(0);
-  const [locked, setLocked] = useState(false);
   const [asking, setAsking] = useState(false);
   const fail = (e: unknown) => setErr(T.online.errors[(e as { kind?: string }).kind ?? 'other'] ?? T.online.errors.other);
   const start = () => { setErr(null); net.start(t.id).catch(fail); };
@@ -106,7 +105,7 @@ function Lobby({ table, t, onExit }: { table: OnlineTable; t: TableView; onExit:
         ) : null}
         <View style={styles.panel}>
           <Text style={styles.dim}>{T.online.waiting}</Text>
-          <SeatMap places={placesOf(t)} host={Math.max(0, t.host)} onSit={move} sitLabel={T.online.moveSeat} onLevel={level} onLocked={setLocked} />
+          <SeatMap places={placesOf(t)} host={Math.max(0, t.host)} onSit={move} sitLabel={T.online.moveSeat} onLevel={level} />
         </View>
         {starts && t.bots ? <Text style={styles.dim}>{T.online.startHint}</Text> : null}
         {err && !starts ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
@@ -115,7 +114,7 @@ function Lobby({ table, t, onExit }: { table: OnlineTable; t: TableView; onExit:
       {starts ? (
         <BottomBar bottom={insets.bottom} onHeight={setBar} testID="start-bar">
           {err ? <Text style={styles.err} testID="online-error">{err}</Text> : null}
-          <Button label={T.online.start} onPress={start} disabled={locked} testID="start" />
+          <Button label={T.online.start} onPress={start} testID="start" />
         </BottomBar>
       ) : null}
       <Dialog onClose={() => setAsking(false)} spec={asking ? {

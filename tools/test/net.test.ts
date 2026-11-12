@@ -7,11 +7,13 @@ import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { apply, legalActions, newGame, observe, RULES_V1, stateFrom } from '../../src/engine';
 import type { Observation, State } from '../../src/engine';
-import { makeRng, unseen, thinkSync, chooseAction } from '../../src/bot';
+import { createHash } from 'node:crypto';
+import { makeRng, unseen, thinkSync, chooseAction, think, NET_LEVEL, THINK_MS } from '../../src/bot';
 import { layout } from '../../src/bot/legal';
-import { encode, features, FEATURES_VERSION, INPUTS, NET_PARAMS, netFromBin, netThink, pack, RAW_SIZE, valueOf } from '../../src/bot/net';
+import { Base64Reader, encode, features, FEATURES_VERSION, fromBase64, INPUTS, MASTER_WEIGHTS, masterNet, NET_PARAMS, netFromBin, netLoader, netThink, pack, RAW_SIZE, valueOf } from '../../src/bot/net';
+import { moduleOf, OUT } from '../gpu/embed';
 import { actorOf, shuffled } from '../sim/play';
-import { netSpec } from '../sim/players';
+import { netSpec, playerOf } from '../sim/players';
 
 const GPU = join(import.meta.dir, '../gpu/vectors');
 const tiny = netFromBin(new Uint8Array(readFileSync(join(GPU, 'tiny.bin'))));
@@ -102,4 +104,91 @@ test('net:<файл> — путь с двоеточием и без, раскл�
   expect(netSpec('net:tools/gpu/nets/x/best.bin:24:bout')).toEqual({ path: 'tools/gpu/nets/x/best.bin', samples: 24, horizon: 'bout' });
   expect(netSpec('net:tools/x.bin:24')).toEqual({ path: 'tools/x.bin', samples: 24 });
   expect(netSpec('net:tools/x.bin')).toEqual({ path: 'tools/x.bin' });
+});
+
+// «Мастер» в сборке (спецификация сети, §11): веса — из файла снимка генератором, без правки руками; уровень `neural`
+// приложения ходит ровно как бот `net:<тот же файл>` арены и самоигры — числа арены верны и для игры.
+describe('сеть в сборке', () => {
+  const ROOT = join(import.meta.dir, '../..');
+  const bin = new Uint8Array(readFileSync(join(ROOT, MASTER_WEIGHTS.source)));
+
+  test('вшитые веса — байт в байт файл снимка: sha256 строки и файла — как в паспорте', () => {
+    const bytes = fromBase64(MASTER_WEIGHTS.data);
+    const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
+    expect(bytes.length).toBe(MASTER_WEIGHTS.bytes);
+    expect(sha(bytes)).toBe(MASTER_WEIGHTS.sha256);
+    expect(sha(bin)).toBe(MASTER_WEIGHTS.sha256);
+    expect(MASTER_WEIGHTS.source).toBe('tools/gpu/nets/2026-11-12-main/last.bin');
+    expect(MASTER_WEIGHTS.features).toBe(FEATURES_VERSION);
+    const net = netFromBin(bytes);
+    expect(net.sizes).toEqual([...MASTER_WEIGHTS.sizes]);
+    expect(net.sizes).toEqual([INPUTS, 256, 128, 1]);
+    expect(MASTER_WEIGHTS.arena[0]).toMatchObject({ vs: 'master', games: 2000 });
+    // порог приёмки — 60 % против «Опытного» нижней границей интервала (§9)
+    expect(MASTER_WEIGHTS.arena[0].share - MASTER_WEIGHTS.arena[0].ci).toBeGreaterThan(0.6);
+  });
+
+  test('модуль весов — тот, что пишет генератор (tools/gpu/embed.ts): руками не правлен', () => {
+    expect(readFileSync(join(ROOT, OUT), 'utf8')).toBe(moduleOf(MASTER_WEIGHTS.source.replace(/\.bin$/, '')));
+  });
+
+  test('раскодировка кусками — то же, что целиком; загрузка отдаёт управление и продолжается после «хватит»', () => {
+    const data = MASTER_WEIGHTS.data;
+    const r = new Base64Reader(data);
+    let steps = 0;
+    while (!r.done) { r.step(1000 + (steps % 7) * 333); steps++; }
+    expect(Buffer.from(r.bytes()).equals(Buffer.from(bin))).toBe(true);
+    const load = netLoader(data, 50_000);
+    // первый заход: «хватит» после второго куска — сети нет, но работа не потеряна
+    const first = load();
+    first.next();
+    expect(first.next(false).done).toBe(false);
+    expect(first.next(true)).toEqual({ done: true, value: null });
+    // второй заход дочитывает: кусков меньше, чем с начала
+    const second = load();
+    let n = 0, res = second.next();
+    while (!res.done) { n++; res = second.next(false); }
+    expect(n).toBe(Math.ceil(data.length / 50_000) - 3);
+    expect(res.value!.sizes).toEqual([...MASTER_WEIGHTS.sizes]);
+    // готовая сеть — сразу, без кусков
+    expect(load().next()).toEqual({ done: true, value: res.value });
+  });
+
+  test('уровень `neural` ходит как `net:<файл снимка>` арены; бюджет — 1,5 с, как у «Опытного»', () => {
+    expect(THINK_MS[NET_LEVEL]).toBe(1500);
+    expect(THINK_MS[NET_LEVEL]).toBe(THINK_MS.master);
+    const arena = playerOf(`net:${MASTER_WEIGHTS.source}`);
+    const net = masterNet();
+    const rng = makeRng(17);
+    let checked = 0;
+    for (let g = 0; g < 6; g++) {
+      let s = newGame({ rules: RULES_V1, variant: g % 2 ? 'perevodnoy' : 'podkidnoy', seats: 2 + (g % 2), first: 0 }, shuffled(rng));
+      for (let n = 0; n < 40 && s.phase !== 'end'; n++) {
+        const seat = actorOf(s);
+        if (n % 4 === 0) {
+          const o = observe(s, seat);
+          const app = chooseAction(o, NET_LEVEL, makeRng(n + 1));
+          expect(arena(o, makeRng(n + 1))).toEqual(app);
+          expect(thinkSync(netThink(o, net, NET_PARAMS, makeRng(n + 1)))).toEqual(app);
+          checked++;
+        }
+        s = apply(s, seat, chooseAction(observe(s, seat), 'average', rng));
+      }
+    }
+    expect(checked).toBeGreaterThan(30);
+  }, 120_000);
+
+  test('размышление «Мастера» кусками: «хватит» после первого расклада — уже готовый законный ход', () => {
+    const rng = makeRng(23);
+    let s = newGame({ rules: RULES_V1, variant: 'podkidnoy', seats: 2, first: 0 }, shuffled(rng));
+    for (let n = 0; n < 6; n++) { const seat = actorOf(s); s = apply(s, seat, chooseAction(observe(s, seat), 'average', rng)); }
+    const seat = actorOf(s);
+    const t = think(observe(s, seat), NET_LEVEL, makeRng(1));
+    let r = t.next();
+    let steps = 0;
+    while (!r.done && steps < 40) { r = t.next(false); steps++; }
+    if (!r.done) r = t.next(true);
+    while (!r.done) r = t.next(true);
+    expect(legalActions(s, seat).some(x => JSON.stringify(x) === JSON.stringify(r.value))).toBe(true);
+  });
 });

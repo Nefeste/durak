@@ -1,0 +1,9 @@
+{
+  "date": "12.11.2026",
+  "note": "arena.ts --pairs 1000 --seed 7 (против master и пилота) и --seed 9 (против прежнего last), оба варианта, 24 расклада — docs/specs/2026-11-neural.md, §8в",
+  "vs": [
+    { "who": "master", "games": 2000, "share": 0.740, "ci": 0.019, "elo": 182 },
+    { "who": "net:2026-11-09-cpu-pilot/best", "games": 2000, "share": 0.645, "ci": 0.021, "elo": 104 },
+    { "who": "net:2026-11-10-main/last", "games": 2000, "share": 0.599, "ci": 0.021, "elo": 70 }
+  ]
+}

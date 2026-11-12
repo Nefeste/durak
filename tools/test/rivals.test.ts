@@ -2,7 +2,7 @@
 // стол с теми же уровнями — те же соперники (сохранённая партия, разбор, история), онлайн их считает каждый телефон из
 // того, что сервер и так шлёт, — и у всех за столом они одинаковые. Статистика остаётся по уровням.
 import { describe, expect, test } from 'bun:test';
-import { LEVELS, LOCKED_LEVEL } from '../../src/bot';
+import { LEVELS } from '../../src/bot';
 import type { Level } from '../../src/bot';
 import { ALL_RIVALS, CAST, CAST_LEVELS, rivalsAt, rivalsOf } from '../../src/game/rivals';
 import type { CastLevel } from '../../src/game/rivals';
@@ -19,8 +19,8 @@ import { PORTRAIT } from '../../src/ui/theme';
 const ids = (rs: ReturnType<typeof rivalsAt>) => rs.map(r => r?.id ?? null);
 
 describe('состав', () => {
-  test('у каждого из шести уровней и у закрытого седьмого — три персонажа своего уровня', () => {
-    expect(CAST_LEVELS).toEqual([...LEVELS, LOCKED_LEVEL]);
+  test('у каждого из семи уровней — три персонажа своего уровня', () => {
+    expect(CAST_LEVELS).toEqual(LEVELS);
     for (const l of CAST_LEVELS) {
       expect(CAST[l].length).toBe(3);
       for (const r of CAST[l]) expect(r.level).toBe(l);
@@ -115,15 +115,17 @@ describe('кто сидит за столом', () => {
         tables++;
       }
     }
-    expect(tables).toBe(6 + 36 + 216);
+    expect(tables).toBe(7 + 49 + 343);
   });
 
   test('одни и те же уровни — одни и те же соперники, сколько ни считай', () => {
     for (const levels of all(3, LEVELS)) expect(ids(rivalsOf(levels))).toEqual(ids(rivalsOf([...levels])));
   });
 
-  test('закрытый седьмой уровень: свой состав — покажется, когда уровень откроется', () => {
+  test('седьмой уровень «Мастер»: свой состав, как был готов до открытия', () => {
     expect(ids(rivalsAt([null, 'neural', 'neural', 'neural']))).toEqual([null, 'lev', 'emma', 'mark']);
+    expect(ids(rivalsOf(['neural']))).toEqual([null, 'lev']);
+    expect(ids(rivalsOf(['master', 'neural', 'neural']))).toEqual([null, 'stepan', 'lev', 'emma']);
   });
 });
 

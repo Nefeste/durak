@@ -3,7 +3,7 @@
 import { describe, expect, test } from 'bun:test';
 import { apply, dealOf, firstOf, newGame, observe, RULES_V1 } from '../../src/engine';
 import type { Action, GameRecord, State } from '../../src/engine';
-import { chooseAction, gradeOf, levelOf, LEVELS, LOCKED_LEVEL, makeRng, sameAction, thinkSync, TOP, whyOf } from '../../src/bot';
+import { chooseAction, gradeOf, levelOf, LEVELS, makeRng, NET_LEVEL, sameAction, thinkSync, TOP, whyOf } from '../../src/bot';
 import { markOf, movesOf, positionAt, reviewGame, reviewLayout } from '../../src/game/review';
 import { layoutTable } from '../../src/render/layout';
 import { restoreGame } from '../../src/state/saved';
@@ -26,14 +26,14 @@ function botGame(seed: number, a = 'amateur', b = 'average'): GameRecord {
 }
 
 describe('уровни (#15)', () => {
-  test('шесть уровней, седьмой — закрытое место «Мастер · скоро» (нейросеть), сильнейший открытый — «Опытный» (#45)', () => {
-    expect(LEVELS).toEqual(['novice', 'beginner', 'amateur', 'average', 'experienced', 'master']);
-    expect(LOCKED_LEVEL).toBe('neural');
+  test('семь уровней, седьмой — «Мастер» на нейросети (#83); подсказка и разбор — у «Опытного» (спецификация сети, §11)', () => {
+    expect(LEVELS).toEqual(['novice', 'beginner', 'amateur', 'average', 'experienced', 'master', 'neural']);
+    expect(NET_LEVEL).toBe('neural');
     expect(TOP).toBe('master');
   });
   test('старый уровень `strong` (до 0.5.0) читается как `master` («Опытный»): сохранения, история, база сервера', () => {
     expect(levelOf('strong')).toBe('master');
-    expect(levelOf('neural')).toBeNull();
+    expect(levelOf('neural')).toBe('neural');
     expect(levelOf('nobody')).toBeNull();
     const rec = botGame(3);
     const half = { ...rec, actions: rec.actions.slice(0, 6), result: null };

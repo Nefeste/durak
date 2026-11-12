@@ -5,11 +5,11 @@
 // Имена — в словаре (`T.rival`), здесь — только номера персонажей и их вид для портрета (src/game/Portrait.tsx).
 // Порядок состава уровня вечный: он решает, кого увидит игрок в сохранённой партии (tools/test/rivals.test.ts).
 // Без React — проверяется тестами.
-import { LEVELS, LOCKED_LEVEL } from '../bot';
+import { LEVELS } from '../bot';
 import type { Level } from '../bot';
 
-/** Уровень состава: шесть уровней и закрытое седьмое место (его состав покажется, когда уровень откроется). */
-export type CastLevel = Level | typeof LOCKED_LEVEL;
+/** Уровень состава — все семь уровней (до открытия «Мастера» — шесть и закрытое место с готовым составом). */
+export type CastLevel = Level;
 
 export type RivalId =
   | 'tyoma' | 'asya' | 'gosha'
@@ -88,7 +88,7 @@ export const CAST: Record<CastLevel, readonly [Rival, Rival, Rival]> = {
 };
 
 /** Все уровни состава по порядку силы. */
-export const CAST_LEVELS: CastLevel[] = [...LEVELS, LOCKED_LEVEL];
+export const CAST_LEVELS: CastLevel[] = [...LEVELS];
 /** Все персонажи по порядку: уровни по силе, в уровне — по порядку состава. */
 export const ALL_RIVALS: Rival[] = CAST_LEVELS.flatMap(l => [...CAST[l]]);
 
