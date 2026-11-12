@@ -11,7 +11,7 @@ import { afterGame, afterShown, canShowInterstitial, canTryOn, getAdCounters, lo
 import { adsSdk } from './adsSdk';
 import { billing, STORE } from './billing';
 import { isAdsOff, loadRights, onRights, ownsBack, setRights, unlockReview, withOwned } from './rights';
-import { afterTryGame, backShown, getTryOn, loadTryOn, onTryOn, setTryOn, tryOnPending, wearAt } from './tryon';
+import { afterTryGame, backShown, getTryOn, loadTryOn, onTryOn, setTryOn, suggestBack, tryOnPending, wearAt } from './tryon';
 import { getRate, loadRate, markAsked, shouldAskRating } from './review';
 import { pay, review } from './rustore';
 import { ON_SALE } from './types';
@@ -168,6 +168,11 @@ export { onTryOn } from './tryon';
 /** Можно ли сейчас предложить «Примерить на одну партию» (правило — `canTryOn`; реклама должна быть загружена). */
 export function tryOnOffered(now = Date.now()): boolean {
   return !adsBroken && adsSdk.rewardedReady() && canTryOn(getAdCounters(), now, tryOnPending(getTryOn()));
+}
+
+/** Рубашка для строки примерки на итоге партии (#79): примерку сейчас можно взять — некупленная платная по кругу. */
+export function tryOnLineBack(now = Date.now()): PaidBackId | null {
+  return tryOnOffered(now) ? suggestBack(ownsBack, getAdCounters().games) : null;
 }
 
 /** Реклама за вознаграждение: досмотрена — рубашка `back` надета на следующую партию (одну). */

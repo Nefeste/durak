@@ -327,6 +327,30 @@ try {
     await ctx.close();
   }
 
+  console.log('Примерка рубашки на итоге партии (#79)');
+  {
+    // свой браузер: свежие счётчики рекламы, примерка ещё не взята
+    const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } });
+    const pt = await ctx.newPage();
+    pt.on('pageerror', e => errors.push(String(e)));
+    await pt.goto(`${web.url}?seed=21&fast=1`);
+    await pt.getByTestId('menu').waitFor({ timeout: 20000 });
+    await pt.getByTestId('play').click();
+    await pt.getByTestId('game').waitFor({ timeout: 10000 });
+    const over = await playOut(pt, 'примерка');
+    ok(over.ended, 'партия для примерки дошла до итога');
+    for (let i = 0; i < 40 && !(await visible(pt, 'result-try-on')); i++) await pt.waitForTimeout(100);
+    const line = await pt.getByTestId('result-try-on').innerText().catch(() => '');
+    ok(/^Следующую партию — в рубашке «[^»]+»: примерить за рекламу$/.test(line), `на итоге — строка примерки: «${line}»`, line);
+    ok(!(await visible(pt, 'result-no-ads')), 'на итоге одна денежная строка: примерка без «Без рекламы»');
+    await pt.screenshot({ path: `${OUT}/03-result-try-on.png` });
+    await pt.getByTestId('result-try-on').click();
+    await pt.getByTestId('result-tried').waitFor({ timeout: 5000 }).catch(() => {});
+    const done = await pt.getByTestId('result-tried').innerText().catch(() => '');
+    ok(/^Готово: «[^»]+» — на следующую партию$/.test(done) && !(await visible(pt, 'result-try-on')), `после рекламы: «${done}», строки примерки больше нет`, done);
+    await ctx.close();
+  }
+
   console.log('Подсказка после смены позиции (игра владельца 10.11.2026)');
   {
     // «Подсказка» считает, а позиция уже другая (подкинули, отбились, сходили сами) — счёт снят; раньше кнопка после

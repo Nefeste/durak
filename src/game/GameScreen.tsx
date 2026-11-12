@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { useInsets } from '../ui/insets';
-import { useFont } from '@shopify/react-native-skia';
+import { Canvas, Picture, useFont } from '@shopify/react-native-skia';
 import { Onest_700Bold } from '@expo-google-fonts/onest/700Bold';
 import * as Crypto from 'expo-crypto';
 import { apply, dealOf, deckFrom, firstOf, legalActions, lostBy, newGame, nextFirst, observe, reasonOf, replay, rulesWith, throwerOf } from '../engine';
@@ -17,7 +17,9 @@ import type { Advice, Level, Review } from '../bot';
 import { thinkSliced } from './think';
 import type { ThinkJob } from './think';
 import { T } from '../i18n';
-import { gameEnded, gameStarted, leavingEnd, noAdsLineFor, useBack, wearBack } from '../money';
+import { gameEnded, gameStarted, leavingEnd, noAdsLineFor, prepareRewarded, tryOnLineBack, useBack, watchToTryOn, wearBack } from '../money';
+import { makeBack } from '../render/backArt';
+import type { PaidBackId } from '../render/backs';
 import { Button } from '../ui/Button';
 import { C, RADIUS, SPACE, TOP_BAR, TYPE } from '../ui/theme';
 import { TableCanvas } from '../render/TableCanvas';
@@ -143,6 +145,11 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   // разбор (docs/10-bot.md, «Разбор»): считается кусками после партии, пока виден итог; главная ошибка — на итоге
   const hinted = useRef(false);
   const [review, setReview] = useState<Review | null>(null);
+  // примерка рубашки со строки итога (#79): какая взята на следующую партию; реклама грузится, когда партия кончилась
+  const [tried, setTried] = useState<PaidBackId | null>(null);
+  const [, setAdReady] = useState(false);
+  const ended = state.phase === 'end';
+  useEffect(() => { if (ended) prepareRewarded(() => setAdReady(true)); }, [ended]);
   const [showReview, setShowReview] = useState(false);
   const reviewJob = useRef<ThinkJob<Review> | null>(null);
   useEffect(() => () => reviewJob.current?.cancel(), []);
@@ -298,6 +305,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     leaveEnd();
     setPicked(null);
     setNote(null);
+    setTried(null);
     const rec = newRecord(variant, seats, history.current, deal + 1);
     setRecord(rec);
     setState(stateOf(rec));
@@ -422,26 +430,50 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         {holding ? <View pointerEvents="none" style={styles.held} testID="held" accessible accessibilityLabel={tableLabel(hold.shown!.table)} /> : null}
         {showSeen ? <SeenCards grid={seenGrid(view)} onClose={() => setShowSeen(false)} fourColor={settings.fourColor} /> : null}
       </View>
-      {state.phase === 'end' && state.result && !holding ? (
+      {state.phase === 'end' && state.result && !holding ? (() => {
+        const endAt = record.actions[0]?.at ?? 0;
+        const noAds = noAdsLineFor(endAt);
+        // одна денежная строка на итоге: «Без рекламы» или примерка рубашки (#79), не обе
+        const tryBack = noAds || tried ? null : tryOnLineBack();
+        return (
         <ResultSheet bottom={insets.bottom} title={resultText(state.result)} places={resultPlaces(state.result, seat => (seat === YOU ? { name: T.result.you } : { name: botName(seat), sub: name(seat), rival: rivals[seat] }), YOU)}
           lines={<>
             <Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>
             {/* после показанной межпартийной рекламы, раз за запуск — одна спокойная строка (#59, вариант 1) */}
-            {noAdsLineFor(record.actions[0]?.at ?? 0) ? (
+            {noAds ? (
               <Text style={[sheetText.line, sheetText.link]} accessibilityRole="link" onPress={() => { leaveEnd(); onStore(); }} testID="result-no-ads">{T.result.noAds}</Text>
             ) : null}
+            {tryBack ? <TryOnLine back={tryBack} onTry={() => { void watchToTryOn(tryBack).then(ok => { if (ok) setTried(tryBack); }); }} /> : null}
+            {tried ? <Text style={sheetText.line} testID="result-tried">{T.backs.tried(T.backs.names[tried])}</Text> : null}
           </>}
           main={<Button label={T.result.again} onPress={again} testID="again" />}
           rest={[
             <Button key="review" label={T.result.review} kind="ghost" onPress={() => setShowReview(true)} testID="result-review" />,
             <Button key="menu" label={T.game.menu} kind="ghost" onPress={() => { leaveEnd(); onExit(); }} testID="result-menu" />,
           ]} />
-      ) : null}
+        );
+      })() : null}
     </View>
   );
 }
 
+/** Строка примерки на итоге (#79): маленькая рубашка и ссылка — по желанию, не кнопка и не окно. */
+function TryOnLine({ back, onTry }: { back: PaidBackId; onTry: () => void }) {
+  const pic = useMemo(() => makeBack(TRY_W, TRY_H, back), [back]);
+  return (
+    <View style={styles.tryRow}>
+      <Canvas style={{ width: TRY_W, height: TRY_H }}><Picture picture={pic} /></Canvas>
+      <Text style={[sheetText.line, sheetText.link, styles.tryText]} accessibilityRole="link" onPress={onTry} testID="result-try-on">
+        {T.backs.resultTry(T.backs.names[back])}
+      </Text>
+    </View>
+  );
+}
+const TRY_W = 16, TRY_H = 22;
+
 const styles = StyleSheet.create({
+  tryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.s },
+  tryText: { flexShrink: 1 },
   root: { flex: 1, paddingHorizontal: SPACE.s, gap: SPACE.xs },
   // верхняя полоса постоянной высоты: что бы ни появлялось на экране, стол не меняет размер
   top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: SPACE.s },
