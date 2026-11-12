@@ -64,7 +64,7 @@ you saw. How it works: [durak.gornitsa.games/fair](https://durak.gornitsa.games/
 ## Bots
 
 Bots come in seven levels, from Novice to Master. The Master is a neural network trained on millions of games: it
-beats the Experienced bot in about three games out of four. Like every bot, it sees only its own cards and the table.
+beats the Experienced bot in two games out of three in podkidnoy and four out of five in perevodnoy. Like every bot, it sees only its own cards and the table.
 No internet is needed to play against bots.
 
 ## With family and friends
