@@ -236,14 +236,20 @@ def main():
             a = r[k]
             parts.append(f'против {name_of(k)} {a["share"]:.3f} ± {a["ci"]:.3f} (Эло {a["elo"]:+.0f}, {a["elo_lo"]:+.0f}…{a["elo_hi"]:+.0f})')
         log('== арена: ' + '; '.join(parts) + f'; {time.time() - t:.0f} с')
-        key = 'master' if 'master' in r else args.arena_vs.split(',')[0]
+        # лучший снимок — по средней доле против всех соперников арены, а не против одного «Опытного»: на 400 партиях
+        # доля против одного шумит на ±0,04 и рост не видит (прогон 10–12.11.2026: «лучшим» остался первый час TD,
+        # хотя поиск поднял долю против пилота с 0,54 до 0,63). `best_mean` — новый ключ: у старых прогонов `best`
+        # был долей против «Опытного», с ним не сравнить
+        keys = args.arena_vs.split(',')
+        mean = sum(r[k]['share'] for k in keys) / len(keys)
         export_bin(model, os.path.join(args.out, 'snapshots', f'h{state["seconds"] / 3600:06.2f}'), passport())
-        if r[key]['share'] > state['best']:
-            state['best'] = r[key]['share']
+        if mean > state.get('best_mean', -1.0):
+            state['best_mean'] = mean
+            state['best'] = r['master']['share'] if 'master' in r else mean
             export_bin(model, os.path.join(args.out, 'best'), passport())
             if os.path.exists(last):
                 shutil.copyfile(last, os.path.join(args.out, 'best.pt'))
-            log(f'   лучший снимок обновлён: {r[key]["share"]:.3f} против {name_of(key)}')
+            log(f'   лучший снимок обновлён: в среднем {mean:.3f} против {", ".join(name_of(k) for k in keys)}')
         with open(os.path.join(args.out, 'progress.jsonl'), 'a', encoding='utf8') as f:
             f.write(json.dumps(r, ensure_ascii=False) + '\n')
 
