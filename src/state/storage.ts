@@ -50,4 +50,6 @@ export const KEYS = {
   games: 'durak.games',
   /** задачи дня: попытки и итог по дням (`PuzzleLog`, src/state/puzzles.ts) */
   puzzles: 'durak.puzzles',
+  /** «Путь к Мастеру»: прогресс по вариантам и счёт с соперниками (`PathLog`, src/game/path.ts) */
+  path: 'durak.path',
 } as const;

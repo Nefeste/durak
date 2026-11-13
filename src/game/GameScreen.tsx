@@ -39,6 +39,10 @@ import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { ResultSheet, sheetText } from './ResultSheet';
 import { resultPlaces } from './outcome';
 import { rivalsOf } from './rivals';
+import type { RivalId } from './rivals';
+import { outcomeOf, rivalById, winsFor, withRival } from './path';
+import type { Scored } from './path';
+import { recordPathGame } from '../state/path';
 import { ReviewScreen } from './ReviewScreen';
 import { actionText, worstText } from './words';
 import { addFinished, setReview as storeReview } from '../state/history';
@@ -86,9 +90,12 @@ const adviceText = (a: Action, s: State): string => actionText(a, s.table.every(
 
 const stateOf = (r: GameRecord): State => newGame({ rules: r.rules, variant: r.variant, seats: r.seats, first: r.first }, r.deck);
 
-export function GameScreen({ variant, bots, levels, restored, onExit, onStore }: {
+export function GameScreen({ variant, bots, levels, restored, path, onExit, onStore }: {
   /** Уровни ботов по местам 1 … bots: у каждого бота свой (docs/09-game-design.md, «Боты за столом»). */
-  variant: Variant; bots: number; levels: Level[]; restored?: SavedGame | null; onExit: () => void; onStore: () => void;
+  variant: Variant; bots: number; levels: Level[]; restored?: SavedGame | null;
+  /** Матч «Пути к Мастеру» с этим соперником (docs/specs/2026-11-path.md): один бот его уровня. */
+  path?: RivalId | null;
+  onExit: () => void; onStore: () => void;
 }) {
   const insets = useInsets();
   const settings = useSettings();
@@ -114,11 +121,15 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const holding = hold.shown !== null;
   const font = useFont(Onest_700Bold, 15);
   // уровни стола — на всю партию и «Ещё партию»: тот же массив, а не новый с каждой отрисовкой меню (иначе бот думал бы заново)
-  const [lvls] = useState(() => restored?.levels ?? levels);
+  // матч пути: соперник садится на место 1 сам; после выигранного матча «Дальше» меняет соперника и уровень стола
+  const [pathRival, setPathRival] = useState<RivalId | null>(() => restored?.path ?? path ?? null);
+  const [lvls, setLvls] = useState(() => restored?.levels ?? levels);
+  /** Что стало с матчем после партии (строка и кнопки итога); `null` — партия не матча или ещё не записана. */
+  const [match, setMatch] = useState<Scored | null>(null);
   /** Уровень бота на месте `seat` (места ботов — 1 … bots). */
   const lvlAt = (seat: number): Level => levelAt(lvls, seat);
   // кто сидит на местах ботов — из уровней стола: та же партия после перезапуска — те же имена (src/game/rivals.ts)
-  const rivals = useMemo(() => rivalsOf(lvls), [lvls]);
+  const rivals = useMemo(() => withRival(rivalsOf(lvls), pathRival), [lvls, pathRival]);
   const botName = (seat: number) => { const r = rivals[seat]; return r ? T.rival[r.id] : ''; };
   // первая партия (docs/09-game-design.md, «Первая партия»): окно о переводе перед первым переводным столом и
   // «Правила» поверх стола; пока они открыты, боты ждут
@@ -156,7 +167,8 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
   const gameAt = (r: GameRecord) => r.actions[0]?.at ?? startedAt.current;
   const finished = (rec: GameRecord) => {
     const at = gameAt(rec);
-    void addFinished({ record: rec, levels: lvls, at, end: Date.now(), hinted: hinted.current, review: null });
+    void addFinished({ record: rec, levels: lvls, at, end: Date.now(), hinted: hinted.current, review: null, ...(pathRival ? { rival: pathRival } : {}) });
+    if (pathRival && rec.result) void recordPathGame(variant, pathRival, outcomeOf(rec.result, YOU)).then(setMatch);
     reviewJob.current?.cancel();
     const job = thinkSliced(reviewGame(rec, YOU), 1e9);
     reviewJob.current = job;
@@ -185,7 +197,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
       dropGame();
       finished(rec);
     } else {
-      saveGame({ record: rec, levels: lvls, history: history.current });
+      saveGame({ record: rec, levels: lvls, history: history.current, ...(pathRival ? { path: pathRival } : {}) });
     }
   };
 
@@ -296,16 +308,20 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
     setRecord(rec);
     setState(replay(rec));
     setPicked(null);
-    saveGame({ record: rec, levels: lvls, history: history.current });
+    saveGame({ record: rec, levels: lvls, history: history.current, ...(pathRival ? { path: pathRival } : {}) });
   };
   /** Уход с экрана итога: оценка RuStore или реклама между партиями, если пора (src/money). */
   const leaveEnd = () => { leavingEnd({ wonVsBot: !!state.result && !state.result.draw && !lostBy(state.result, YOU) }); };
 
-  const again = () => {
+  /** Следующая партия; `next` — после выигранного матча пути: новый соперник, его уровень и первый ход заново. */
+  const again = (next?: RivalId) => {
     leaveEnd();
     setPicked(null);
     setNote(null);
     setTried(null);
+    setMatch(null);
+    const nr = next ? rivalById(next) : null;
+    if (nr) { setPathRival(nr.id); setLvls([nr.level]); history.current = []; }
     const rec = newRecord(variant, seats, history.current, deal + 1);
     setRecord(rec);
     setState(stateOf(rec));
@@ -341,7 +357,7 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
 
   if (rulesOpen) return <RulesScreen section="transfer" onBack={() => setRulesOpen(false)} />;
   if (showReview) {
-    return <ReviewScreen review={review} record={record} levels={lvls} counting at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
+    return <ReviewScreen review={review} record={record} levels={lvls} rival={pathRival ?? undefined} counting at={record.actions[0]?.at ?? 0} lastToday onBack={() => setShowReview(false)} onStore={onStore} />;
   }
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.s, paddingBottom: insets.bottom + SPACE.s }]} testID="game">
@@ -435,9 +451,23 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
         const noAds = noAdsLineFor(endAt);
         // одна денежная строка на итоге: «Без рекламы» или примерка рубашки (#79), не обе
         const tryBack = noAds || tried ? null : tryOnLineBack();
+        // матч пути (docs/specs/2026-11-path.md, §2): строка счёта над главной ошибкой и кнопки по исходу матча
+        const m = pathRival ? match : null;
+        const mr = m?.rival;
+        const matchLine = !pathRival ? null : !m || !mr ? T.result.counting
+          : m.event === 'matchWon' ? T.path.won(T.rival[mr.id])
+          : m.event === 'matchLost' ? T.path.lost(m.you, m.them)
+          : m.event === 'pathDone' ? T.path.pathDone(T.rival[mr.id])
+          : T.path.line(m.you, m.them, T.rival[mr.id], winsFor(mr.level));
+        const main = !pathRival ? <Button label={T.result.again} onPress={() => again()} testID="again" />
+          : m?.event === 'pathDone' || (m && !m.next) ? <Button label={T.path.toPath} onPress={() => { leaveEnd(); onExit(); }} testID="path-to" />
+          : m?.event === 'matchWon' && m.next ? <Button label={T.path.nextRival(T.rival[m.next.id])} onPress={() => again(m.next!.id)} testID="path-next" />
+          : m?.next && m.next.id !== pathRival ? <Button label={T.path.nextRival(T.rival[m.next.id])} onPress={() => again(m.next!.id)} testID="path-next" />
+          : <Button label={m?.event === 'matchLost' ? T.path.again : T.path.nextGame} disabled={!m} onPress={() => again()} testID="again" />;
         return (
         <ResultSheet bottom={insets.bottom} title={resultText(state.result)} places={resultPlaces(state.result, seat => (seat === YOU ? { name: T.result.you } : { name: botName(seat), sub: name(seat), rival: rivals[seat] }), YOU)}
           lines={<>
+            {matchLine ? <Text style={[sheetText.line, m && m.event !== 'continue' && styles.matchDone]} testID="result-match">{matchLine}</Text> : null}
             <Text style={sheetText.line} testID="result-worst">{!review ? T.result.counting : review.worst ? worstText(review.worst) : T.result.clean}</Text>
             {/* после показанной межпартийной рекламы, раз за запуск — одна спокойная строка (#59, вариант 1) */}
             {noAds ? (
@@ -446,10 +476,10 @@ export function GameScreen({ variant, bots, levels, restored, onExit, onStore }:
             {tryBack ? <TryOnLine back={tryBack} onTry={() => { void watchToTryOn(tryBack).then(ok => { if (ok) setTried(tryBack); }); }} /> : null}
             {tried ? <Text style={sheetText.line} testID="result-tried">{T.backs.tried(T.backs.names[tried])}</Text> : null}
           </>}
-          main={<Button label={T.result.again} onPress={again} testID="again" />}
+          main={main}
           rest={[
             <Button key="review" label={T.result.review} kind="ghost" onPress={() => setShowReview(true)} testID="result-review" />,
-            <Button key="menu" label={T.game.menu} kind="ghost" onPress={() => { leaveEnd(); onExit(); }} testID="result-menu" />,
+            <Button key="menu" label={pathRival ? T.path.toPath : T.game.menu} kind="ghost" onPress={() => { leaveEnd(); onExit(); }} testID="result-menu" />,
           ]} />
         );
       })() : null}
@@ -474,6 +504,7 @@ const TRY_W = 16, TRY_H = 22;
 const styles = StyleSheet.create({
   tryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACE.s },
   tryText: { flexShrink: 1 },
+  matchDone: { color: C.accent, fontWeight: '700' },
   root: { flex: 1, paddingHorizontal: SPACE.s, gap: SPACE.xs },
   // верхняя полоса постоянной высоты: что бы ни появлялось на экране, стол не меняет размер
   top: { height: TOP_BAR, flexDirection: 'row', alignItems: 'center', gap: SPACE.s },

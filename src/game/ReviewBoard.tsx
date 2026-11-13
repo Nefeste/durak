@@ -20,6 +20,8 @@ import { C, RADIUS, SPACE, TYPE } from '../ui/theme';
 import { plateLines, roleOf, SeatPlate } from './SeatPlate';
 import { reviewLayout } from './review';
 import { rivalsOf } from './rivals';
+import type { RivalId } from './rivals';
+import { withRival } from './path';
 import type { MarkKind, ReviewMarks } from './review';
 
 /** Рамка метки снаружи карты: «Лучше» — ближе, «Сыграно» — дальше, чтобы у карты с обеими метками были видны обе. */
@@ -41,11 +43,12 @@ function Frame({ s, l, kind }: { s: Sprite; l: Layout; kind: MarkKind }) {
 }
 
 /** `levels` — уровни ботов партии по местам: по ним на плашках те же имена и портреты, что были за столом. */
-export function ReviewBoard({ o, marks, levels }: { o: Observation; marks: ReviewMarks; levels: readonly Level[] }) {
+export function ReviewBoard({ o, marks, levels, rival }: { o: Observation; marks: ReviewMarks; levels: readonly Level[]; rival?: RivalId }) {
   const settings = useSettings();
   const back = useBack();
   const { fontScale } = useWindowDimensions();
-  const rivals = useMemo(() => rivalsOf(levels), [levels]);
+  // партия матча «Пути к Мастеру» — соперник на месте 1 тот, с кем матч (src/game/path.ts)
+  const rivals = useMemo(() => withRival(rivalsOf(levels), rival), [levels, rival]);
   // подпись «Сыграно» / «Лучше» растёт с шрифтом телефона до ×1,3 (13-art.md, §3): ряд подписей — по её высоте
   const labelH = Math.ceil(LABEL_H * Math.min(PLATE.maxScale, Math.max(1, fontScale)));
   const font = useFont(Onest_700Bold, 15);

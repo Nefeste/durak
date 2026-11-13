@@ -12,6 +12,11 @@ import { BacksScreen } from './src/screens/BacksScreen';
 import { ReportScreen } from './src/screens/ReportScreen';
 import { BenchScreen } from './src/screens/BenchScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
+import { PathScreen } from './src/screens/PathScreen';
+import { loadPath, getPath } from './src/state/path';
+import { currentRival } from './src/game/path';
+import type { RivalId } from './src/game/rivals';
+import type { Variant } from './src/engine';
 import { DeckSheet, deckSheetWanted } from './src/render/DeckSheet';
 import { IconSheet, iconSheetWanted } from './src/render/IconSheet';
 import { CastSheet, castSheetWanted } from './src/game/CastSheet';
@@ -38,7 +43,7 @@ installCrashHandlers();
 /** Быстрый «Замер» для сценария в браузере: `?bench=quick`. */
 const quickBench = typeof globalThis.location !== 'undefined' && /[?&]bench=quick/.test(globalThis.location.search);
 
-type Route = 'menu' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'bench' | 'rules' | 'backs';
+type Route = 'menu' | 'path' | 'game' | 'settings' | 'report' | 'friends' | 'quick' | 'online' | 'store' | 'puzzle' | 'stats' | 'bench' | 'rules' | 'backs';
 
 export default function App() {
   const [route, setRoute] = useState<Route>('menu');
@@ -53,11 +58,15 @@ export default function App() {
   const [game, setGame] = useState(0);
   const [invite, setInvite] = useState<string | null>(null);
   const [online, setOnline] = useState<OnlineTable | null>(null);
+  // «Путь к Мастеру» (docs/specs/2026-11-path.md): вариант пути на экране и соперник матча, который сейчас за столом
+  const [pathVariant, setPathVariant] = useState<Variant>(choice.variant);
+  const [pathRival, setPathRival] = useState<RivalId | null>(null);
+  useEffect(() => { void loadPath(); }, []);
   // деньги — после настроек: SDK рекламы стартует с выбором «Персональная реклама»
   useEffect(() => { void loadSettings().then(() => startMoney()); }, []);
   // сохранённая партия — при каждом возврате в меню: «Продолжить партию»
   useEffect(() => {
-    if (route !== 'menu') return;
+    if (route !== 'menu' && route !== 'path') return;
     let live = true;
     loadGame().then(g => { if (live) setSaved(g?.saved ?? null); });
     return () => { live = false; };
@@ -89,12 +98,22 @@ export default function App() {
     });
     return () => sub.remove();
   }, [route, backsFrom]);
-  const play = (from: SavedGame | null) => {
+  const play = (from: SavedGame | null, rival: RivalId | null = from?.path ?? null) => {
     setResume(from);
+    setPathRival(rival);
+    if (from?.path) setPathVariant(from.record.variant);
     setGame(n => n + 1);
     setRoute('game');
   };
   const r = resume?.record;
+  // матч пути: сохранённая партия матча этого варианта с текущим соперником — «Продолжить матч»
+  const pathNow = currentRival(getPath().runs[pathVariant]);
+  const pathSaved = saved?.path && saved.record.variant === pathVariant && saved.path === pathNow?.id ? saved : null;
+  const playPath = () => {
+    if (pathSaved) { play(pathSaved); return; }
+    if (pathNow) play(null, pathNow.id);
+  };
+  const gameVariant: Variant = r?.variant ?? (pathRival ? pathVariant : choice.variant);
   if (iconSheetWanted()) return <IconSheet />;
   if (deckSheetWanted()) return <DeckSheet />;
   if (castSheetWanted()) return <CastSheet />;
@@ -107,11 +126,15 @@ export default function App() {
           <MenuScreen choice={choice} onChange={setChoice} onPlay={() => play(null)}
             onResume={saved ? () => play(saved) : null} onSettings={() => setRoute('settings')}
             onFriends={() => setRoute('friends')} onQuick={() => setRoute('quick')} onStore={() => setRoute('store')}
+            onPath={() => { setPathVariant(choice.variant); setRoute('path'); }} pathVariant={choice.variant}
             onPuzzle={() => setRoute('puzzle')} onStats={() => setRoute('stats')} onRules={() => setRoute('rules')} />
         ) : route === 'friends' || route === 'quick' ? (
           <OnlineScreen mode={route === 'quick' ? 'quick' : 'friends'} invite={invite} onBack={() => setRoute('menu')} onTable={seat} />
         ) : route === 'online' && online ? (
           <OnlineGameScreen table={online} onExit={() => { setOnline(null); setRoute('menu'); }} />
+        ) : route === 'path' ? (
+          <PathScreen variant={pathVariant} onVariant={setPathVariant} onPlay={playPath} resumable={!!pathSaved}
+            onBack={() => setRoute('menu')} onStore={() => setRoute('store')} />
         ) : route === 'puzzle' ? (
           <PuzzleScreen onBack={() => setRoute('menu')} />
         ) : route === 'rules' ? (
@@ -129,8 +152,9 @@ export default function App() {
         ) : route === 'report' ? (
           <ReportScreen onBack={() => setRoute('settings')} />
         ) : (
-          <GameScreen key={game} variant={r?.variant ?? choice.variant} bots={(r?.seats ?? choice.bots + 1) - 1}
-            levels={resume?.levels ?? botLevels(choice)} restored={resume} onExit={() => setRoute('menu')} onStore={() => setRoute('store')} />
+          <GameScreen key={game} variant={gameVariant} bots={(r?.seats ?? (pathRival ? 2 : choice.bots + 1)) - 1}
+            levels={resume?.levels ?? (pathRival && pathNow ? [pathNow.level] : botLevels(choice))} restored={resume} path={pathRival}
+            onExit={() => setRoute(pathRival ? 'path' : 'menu')} onStore={() => setRoute('store')} />
         )}
       </View>
     </SafeAreaProvider>

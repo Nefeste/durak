@@ -6,6 +6,9 @@ import type { GameRecord } from '../engine';
 import { levelOf, levelsOf } from '../bot';
 import type { Level, Review } from '../bot';
 import { KEYS, loadJson, saveJson } from './storage';
+import { isRivalId } from '../game/path';
+import { rivalsOf } from '../game/rivals';
+import type { RivalId } from '../game/rivals';
 
 export const KEEP_GAMES = 200;
 
@@ -21,6 +24,8 @@ export interface FinishedGame {
   /** Брали подсказку — партия не идёт в рейтинг тренировок (docs/09-game-design.md). */
   hinted: boolean;
   review: Review | null;
+  /** Соперник матча «Пути к Мастеру» на месте 1, если это партия матча (не «лицо уровня» — его не вывести из уровней). */
+  rival?: RivalId;
 }
 
 /** Разобрать сохранённый список; битые записи пропускаются, а не роняют игру. */
@@ -35,7 +40,8 @@ export function normalizeHistory(raw: unknown): FinishedGame[] {
     const one = levelOf(g.level);
     const levels = levelsOf(g.levels, bots) ?? (one && bots >= 1 ? Array.from({ length: bots }, () => one) : null);
     if (!levels) continue;
-    out.push({ record: g.record, levels, at: g.at, end: g.end, hinted: g.hinted === true, review: g.review ?? null });
+    const rival = isRivalId(g.rival) && g.record.seats === 2 ? g.rival : undefined;
+    out.push({ record: g.record, levels, at: g.at, end: g.end, hinted: g.hinted === true, review: g.review ?? null, ...(rival ? { rival } : {}) });
   }
   return out.slice(-KEEP_GAMES);
 }
@@ -65,4 +71,10 @@ export function lastToday(list: FinishedGame[], now: number): number | null {
   const day = (t: number) => new Date(t).toDateString();
   const today = list.filter(g => day(g.end) === day(now));
   return today.length ? today[today.length - 1].at : null;
+}
+
+/** Кто сидел за столом партии: соперник матча пути или персонажи по уровням (src/game/rivals.ts). */
+export function rivalsIn(g: FinishedGame): RivalId[] {
+  if (g.rival) return [g.rival];
+  return rivalsOf(g.levels).flatMap(r => (r ? [r.id] : []));
 }
