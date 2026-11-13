@@ -203,6 +203,28 @@ try {
   // 7. настройки
   await p.getByTestId('settings-open').click();
   await shot(p, '07-settings');
+  await p.getByTestId('settings-back').click();
+  await p.getByTestId('menu').waitFor({ timeout: 5000 });
+
+  // 11–12. «Путь к Мастеру» (docs/specs/2026-11-path.md): выиграть матч с Асей, затем путь и коллекция
+  await p.getByTestId('path-open').click();
+  await p.getByTestId('path').waitFor({ timeout: 5000 });
+  await p.getByTestId('path-variant-podkidnoy').click();
+  await p.getByTestId('path-play').click();
+  await p.getByTestId('game').waitFor({ timeout: 10000 });
+  for (let g = 0; g < 5; g++) {
+    await until(p, async () => visible(p, 'result'));
+    await p.getByTestId('result-match').filter({ hasNotText: T.result.counting }).waitFor({ timeout: 10000 }).catch(() => {});
+    if (await visible(p, 'path-next')) break;
+    if (!(await visible(p, 'again'))) break;
+    await p.getByTestId('again').click();
+    await p.waitForTimeout(400);
+  }
+  await p.getByTestId('result-menu').click();
+  await p.getByTestId('path').waitFor({ timeout: 5000 });
+  await shot(p, '11-path');
+  await p.getByTestId('path-tab-collection').click();
+  await shot(p, '12-collection');
 } finally {
   await browser.close();
   web.stop();
