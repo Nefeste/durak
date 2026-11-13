@@ -2,6 +2,7 @@
 // (`ReviewBoard`: что игрок видел, метки «Сыграно» и «Лучше»), под ним — оценка, лучший ход и одна строка «почему»,
 // внизу — переход между решениями. Что открыто — решает `reviewAccess` (src/money): бесплатно — главная ошибка каждой
 // партии и полный разбор последней партии дня; любой — «Про» или один просмотр рекламы. Онлайн разбора нет (ADR 0006).
+import type { RivalId } from './rivals';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useInsets } from '../ui/insets';
@@ -47,9 +48,9 @@ function Panel({ d, i, n, main, done }: { d: Decision; i: number; n: number; mai
 
 /** `at` — начало партии (им разбор открывается рекламой); `lastToday` — это последняя партия дня; `counting` — разбор
  *  ещё считает экран партии (тогда здесь его не считать второй раз). Запись нужна для стола. */
-export function ReviewScreen({ review: given, record, levels, at, lastToday, counting, onBack, onStore }: {
+export function ReviewScreen({ review: given, record, levels, rival, at, lastToday, counting, onBack, onStore }: {
   /** `levels` — уровни ботов партии по местам: имена и портреты на плашках стола разбора. */
-  review: Review | null; record?: GameRecord; levels?: readonly Level[]; at: number; lastToday: boolean; counting?: boolean; onBack: () => void; onStore: () => void;
+  review: Review | null; record?: GameRecord; levels?: readonly Level[]; rival?: RivalId; at: number; lastToday: boolean; counting?: boolean; onBack: () => void; onStore: () => void;
 }) {
   const insets = useInsets();
   const { height } = useWindowDimensions();
@@ -95,7 +96,7 @@ export function ReviewScreen({ review: given, record, levels, at, lastToday, cou
       <Header title={T.review.title} back={T.review.back} onBack={onBack} backTestID="review-back" />
       {!review ? <Text style={styles.text}>{T.result.counting}</Text> : (
         <>
-          {o && marks ? <View style={{ height: boardH }}><ReviewBoard o={o} marks={marks} levels={levels ?? NO_LEVELS} /></View> : null}
+          {o && marks ? <View style={{ height: boardH }}><ReviewBoard o={o} marks={marks} levels={levels ?? NO_LEVELS} rival={rival} /></View> : null}
           <ScrollView style={styles.scroll} contentContainerStyle={styles.list}>
             {!review.worst || !d ? <Text style={styles.head} testID="review-worst">{review.worst ? worstText(review.worst) : T.result.clean}</Text> : null}
             {d ? <Panel d={d} i={idx + 1} n={shown.length} main={d.at === review.worst?.at}

@@ -6,6 +6,8 @@ import { replay, knownRules } from '../engine';
 import type { Action, GameRecord, Result, State } from '../engine';
 import { levelsOf } from '../bot';
 import type { Level } from '../bot';
+import { isRivalId } from '../game/path';
+import type { RivalId } from '../game/rivals';
 
 export interface SavedGame {
   record: GameRecord;
@@ -13,6 +15,8 @@ export interface SavedGame {
   levels: Level[];
   /** Итоги прошлых партий за этим столом — кто ходит первым в следующей (п. 3.3). */
   history: (Result | null)[];
+  /** Партия матча «Пути к Мастеру» (docs/specs/2026-11-path.md): с кем матч. Нет поля — обычная партия. */
+  path?: RivalId;
 }
 
 const isAction = (a: unknown): a is Action => {
@@ -33,7 +37,9 @@ export function restoreGame(raw: unknown): { saved: SavedGame; state: State } | 
     if (!Array.isArray(s.record.actions) || !s.record.actions.every(x => x && Number.isInteger(x.seat) && isAction(x.action))) return null;
     const state = replay(s.record);
     if (state.phase === 'end') return null;
-    return { saved: { record: s.record, levels, history: Array.isArray(s.history) ? s.history : [] }, state };
+    // матч пути — один соперник того уровня, что на месте 1; иначе запись чужая — обычная партия
+    const path = isRivalId(s.path) && s.record.seats === 2 ? s.path : undefined;
+    return { saved: { record: s.record, levels, history: Array.isArray(s.history) ? s.history : [], ...(path ? { path } : {}) }, state };
   } catch {
     return null;
   }

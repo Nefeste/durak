@@ -4,7 +4,7 @@
 // «Разные уровни»: у каждого соперника своя строка «‹ Любитель ›» (docs/09-game-design.md, «Боты за столом»). «Играть» — закреплённой полосой внизу
 // над кнопками телефона, меню прокручивается над ней (аудит 09.11.2026, находка 7; решение владельца 09.11.2026).
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useInsets } from '../ui/insets';
 import type { Variant } from '../engine';
 import { LEVELS } from '../bot';
@@ -24,6 +24,8 @@ import { C, SPACE, TYPE } from '../ui/theme';
 import { Emblem } from '../render/Emblem';
 import { Glass } from '../ui/Glass';
 import { Ornament } from '../ui/Ornament';
+import { currentRival, PATH_LEN } from '../game/path';
+import { usePath } from '../state/path';
 
 export type { Choice } from '../state/settings';
 
@@ -40,7 +42,29 @@ function RivalRow({ rival, n }: { rival: Rival; n: number }) {
   );
 }
 
-export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore, onPuzzle, onStats, onRules }: {
+/** Плашка «Путь к Мастеру» (docs/specs/2026-11-path.md, §2): первой под шапкой — портрет соперника, пройдено N из 21. */
+function PathCard({ variant, onPress }: { variant: Variant; onPress: () => void }) {
+  const run = usePath().runs[variant];
+  const now = currentRival(run);
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]} testID="path-open">
+      <Glass style={styles.pathCard}>
+        <View style={styles.rival}>
+          {now ? <Face rival={now} size={FACE.tile} testID="path-open-face" /> : null}
+          <View style={styles.rivalText}>
+            <Text style={styles.pathTitle}>{T.path.menu}</Text>
+            <Text style={styles.note} testID="path-open-progress">{now ? T.path.progress(run.at, PATH_LEN) : T.path.done}</Text>
+            {now ? <Text style={styles.note}>{T.path.rival(T.rival[now.id], T.level[now.level])}</Text> : null}
+          </View>
+        </View>
+        <Text style={styles.note}>{T.path.tagline}</Text>
+      </Glass>
+    </Pressable>
+  );
+}
+
+export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onFriends, onQuick, onStore, onPuzzle, onStats, onRules, onPath, pathVariant }: {
+  onPath: () => void; pathVariant: Variant;
   choice: Choice; onChange: (c: Choice) => void; onPlay: () => void; onResume: (() => void) | null; onSettings: () => void;
   onFriends: () => void; onQuick: () => void; onStore: () => void; onPuzzle: () => void; onStats: () => void; onRules: () => void;
 }) {
@@ -72,6 +96,7 @@ export function MenuScreen({ choice, onChange, onPlay, onResume, onSettings, onF
           <Ornament />
           <Text style={styles.tagline} maxFontSizeMultiplier={1.3}>{T.app.tagline}</Text>
         </View>
+        <PathCard variant={pathVariant} onPress={onPath} />
         <Glass style={styles.panel}>
           <Text style={styles.label}>{T.menu.variant}</Text>
           <Chips id="variant" items={['podkidnoy', 'perevodnoy'] as Variant[]} value={choice.variant} label={v => T.variant[v]} onChange={variant => onChange({ ...choice, variant })} />
@@ -135,6 +160,9 @@ const styles = StyleSheet.create({
   rivalText: { flex: 1, gap: SPACE.xs / 2 },
   rivalName: { color: C.text, fontSize: TYPE.body, fontWeight: '700' },
   actions: { gap: SPACE.m },
+  pathCard: { gap: SPACE.s, padding: SPACE.l, borderColor: C.accent, borderWidth: 1 },
+  pathTitle: { color: C.accent, fontSize: TYPE.section, fontWeight: '700' },
+  pressed: { opacity: 0.8 },
   row: { flexDirection: 'row', gap: SPACE.m },
   cell: { flex: 1 },
 });

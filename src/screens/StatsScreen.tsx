@@ -60,7 +60,7 @@ export function StatsScreen({ onBack, onStore }: { onBack: () => void; onStore: 
   const [now] = useState(() => Date.now());
   const st = useMemo(() => computeStats(games, now), [games, now]);
   const last = lastToday(games, now);
-  if (open) return <ReviewScreen review={open.review} record={open.record} levels={open.levels} at={open.at} lastToday={open.at === last} onBack={() => setOpen(null)} onStore={onStore} />;
+  if (open) return <ReviewScreen review={open.review} record={open.record} levels={open.levels} rival={open.rival} at={open.at} lastToday={open.at === last} onBack={() => setOpen(null)} onStore={onStore} />;
   const pro = isPro();
   return (
     <View style={[styles.root, { paddingTop: insets.top + SPACE.m, paddingBottom: insets.bottom + SPACE.m }]} testID="stats">

@@ -1103,6 +1103,83 @@ try {
   ok(await visible(page, 'store'), '«Рубашки» открываются и из магазина, «Назад» возвращает в магазин');
   await page.getByTestId('store-back').click();
 
+  console.log('«Путь к Мастеру» (docs/specs/2026-11-path.md)');
+  await page.goto(`${web.url}?fast=1`);
+  await page.getByTestId('menu').waitFor({ timeout: 20000 });
+  ok(/Пройдено 0 из 21/.test(await page.getByTestId('path-open-progress').innerText().catch(() => '')), 'меню: плашка «Путь к Мастеру» — пройдено 0 из 21');
+  await page.getByTestId('path-open').click();
+  await page.getByTestId('path').waitFor({ timeout: 5000 });
+  await page.getByTestId('path-variant-podkidnoy').click();
+  ok(await page.getByTestId('path-now-name').innerText() === 'Ася', 'путь начинается с Аси (Новичок), лицо уровня — третьим в ступени');
+  ok(/до одной победы/.test(await page.getByTestId('path-need').innerText()), 'первая ступень — матч до одной победы');
+  ok(await page.getByTestId('path-row-lev-state').innerText() === 'впереди' && await page.getByTestId('path-row-asya-state').innerText() === 'сейчас',
+    'лестница: состояние словом — «сейчас», «впереди»');
+  await page.screenshot({ path: `${OUT}/10-path.png` });
+  await page.getByTestId('path-play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  ok(await page.getByTestId('opp-1-name').innerText() === 'Ася', 'за столом матча — Ася, а не лицо уровня');
+  // сохранение матча: выйти посреди партии — «Продолжить матч» на экране пути, за столом та же Ася
+  // партия сохраняется с первым действием: в свой ход — положить карту, иначе дождаться хода Аси
+  await page.waitForTimeout(800);
+  if (/Ваш ход/.test(await page.getByTestId('hint').innerText().catch(() => ''))) await page.locator('[data-testid^="hand-"]').first().click({ force: true });
+  await page.waitForTimeout(600);
+  await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click();
+  await page.getByTestId('path').waitFor({ timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="path-play"]')?.textContent === 'Продолжить матч', null, { timeout: 3000 }).catch(() => {});
+  ok(await page.getByTestId('path-play').innerText() === 'Продолжить матч', 'вышли из партии матча — «Продолжить матч»');
+  await page.getByTestId('path-play').click();
+  await page.getByTestId('game').waitFor({ timeout: 10000 });
+  ok(await page.getByTestId('opp-1-name').innerText() === 'Ася', 'продолженная партия матча — снова с Асей');
+  let pathWon = false;
+  for (let g = 0; g < 4 && !pathWon; g++) {
+    const res = await playOut(page, `матч с Асей, партия ${g + 1}`);
+    ok(res.ended, `партия матча ${g + 1} доиграна`);
+    if (!res.ended) break;
+    await page.getByTestId('result-match').waitFor({ timeout: 5000 });
+    const line = await page.getByTestId('result-match').innerText();
+    await page.waitForFunction(() => !/Считаем/.test(document.querySelector('[data-testid="result-match"]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    const done = await page.getByTestId('result-match').innerText();
+    ok(/Матч/.test(done), 'на итоге — строка матча', `${line} / ${done}`);
+    if (await visible(page, 'path-next')) {
+      ok(/Ася — в вашей коллекции/.test(done), 'матч выигран: Ася — в коллекции', done);
+      ok(await page.getByTestId('path-next').innerText() === 'Дальше: Гоша', 'кнопка «Дальше: Гоша»');
+      await page.screenshot({ path: `${OUT}/11-path-won.png` });
+      await page.getByTestId('path-next').click();
+      await page.getByTestId('result').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+      ok(await page.getByTestId('opp-1-name').innerText() === 'Гоша', 'следующий матч — с Гошей');
+      pathWon = true;
+    } else {
+      ok(await visible(page, 'again'), 'матч проигран или ничья — «Ещё матч» / «Следующая партия»');
+      await page.getByTestId('again').click();
+      await page.getByTestId('result').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+    }
+  }
+  await page.getByTestId('game-menu').click();
+  await page.getByTestId('game-exit').click().catch(() => {});
+  await page.getByTestId('path').waitFor({ timeout: 5000 });
+  if (pathWon) {
+    ok(/Пройдено 1 из 21/.test(await page.getByTestId('path-progress').innerText()), 'путь: пройдено 1 из 21');
+    ok(await page.getByTestId('path-row-asya-state').innerText() === 'победа', 'Ася на лестнице — «победа»');
+  }
+  await page.getByTestId('path-tab-collection').click();
+  ok(/Собрано \d+ из 21/.test(await page.getByTestId('collection-progress').innerText()), 'коллекция: собрано N из 21');
+  await page.screenshot({ path: `${OUT}/12-collection.png` });
+  await page.getByTestId('collect-asya').click();
+  await page.getByTestId('rival-card').waitFor({ timeout: 5000 });
+  ok(/В пути: \d/.test(await page.getByTestId('rival-card-score').innerText()), 'карточка соперника: счёт в пути');
+  const rg = page.locator('[data-testid^="rival-game-"]');
+  ok(await rg.count() > 0, 'карточка соперника: ваши партии с ним');
+  if (await rg.count()) {
+    await rg.first().click();
+    await page.getByTestId('review').waitFor({ timeout: 10000 }).catch(() => {});
+    ok(await visible(page, 'review'), 'партия с соперником открывает разбор');
+    await page.getByTestId('review-back').click().catch(() => {});
+  }
+  await page.getByTestId('rival-card-close').click();
+  await page.getByTestId('path-back').click();
+  await page.getByTestId('menu').waitFor({ timeout: 5000 });
+
   console.log('«Замер» (быстрый)');
   await page.goto(`${web.url}?fast=1&bench=quick`);
   await page.getByTestId('menu').waitFor({ timeout: 20000 });
