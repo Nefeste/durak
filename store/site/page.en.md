@@ -27,18 +27,12 @@ shots:
   - file: screenshots/ru/04-perevodnoy.png
     caption: Perevodnoy for three
     alt: "Perevodnoy with two bots and the four-colour deck: each bot is labelled «bot» with its card count"
-  - file: screenshots/ru/06-menu.png
-    caption: Main screen
-    alt: "Main screen: podkidnoy or perevodnoy, number of opponents, bot level, friends and quick match"
   - file: screenshots/ru/08-review.png
     caption: Review on the table
     alt: "Game review: the table before your decision, «Played» and «Better» marks, below — why it is better and the chance to go out"
   - file: screenshots/ru/09-puzzle.png
     caption: Puzzle of the day
     alt: "Puzzle of the day: the opponent's cards are open; find the move after which you go out whatever they do"
-  - file: screenshots/ru/10-advice.png
-    caption: The Experienced bot's hint
-    alt: "A hint line under the table: the move the Experienced bot would make and the chance to go out"
 card:
   text: Durak in its podkidnoy and perevodnoy forms for two to four players. Against bots offline; online with family at one table by link or with an opponent of your rating, no sign-up. The game is in Russian.
   points:
